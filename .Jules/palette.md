@@ -1,0 +1,3 @@
+## 2024-05-11 - Add Accessibility to Custom Core Button
+**Learning:** React Native's `TouchableOpacity` doesn't automatically inherit proper screen reader roles or announce loading/disabled states properly. Creating a central `Button` component is great, but missing a11y properties there means the *entire app* suffers from bad screen reader navigation.
+**Action:** Always include `accessibilityRole="button"`, `accessibilityState={{ disabled, busy }}`, and `accessibilityLabel` on custom interactive components that act as primary controls. This single change propagates accessible buttons throughout the entire application.
