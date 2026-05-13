@@ -13,7 +13,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const users = [
   { email: 'admin1@example.com', password: 'password123', name: 'Super Admin', role: 'admin' },
-  { email: 'mecanico1@example.com', password: 'password123', name: 'João Mecânico', role: 'mechanic', specialty: 'Motor' },
+  { email: 'mecanico1@example.com', password: 'password123', name: 'João Mecânico', role: 'mechanic', specialty: 'Motor', phone: '51999990001' },
+  { email: 'mecanico2@example.com', password: 'password123', name: 'Pedro Suspensão', role: 'mechanic', specialty: 'Suspensão', phone: '51999990002' },
+  { email: 'mecanico3@example.com', password: 'password123', name: 'Carlos Elétrica', role: 'mechanic', specialty: 'Elétrica', phone: '51999990003' },
   { email: 'cliente1@example.com', password: 'password123', name: 'Maria Cliente', role: 'client' },
 ];
 
@@ -42,7 +44,8 @@ async function seed() {
       id: userId,
       name: u.name,
       email: u.email,
-      role: u.role
+      role: u.role,
+      phone: u.phone ?? null
     });
 
     if (profileError) {
