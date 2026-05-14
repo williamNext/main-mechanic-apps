@@ -1,52 +1,230 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AppointmentCard } from '@/components/AppointmentCard';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { parseISO } from 'date-fns';
+import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppointmentCard } from '@/components/ui/AppointmentCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { TopAppBar } from '@/components/ui/TopAppBar';
+import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useAppointmentStore } from '@/stores/appointment-store';
-import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
 
 export default function ClientBookingsScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const { appointments, isLoading, fetchByClient } = useAppointmentStore();
+  const insets = useSafeAreaInsets();
+  const [mode, setMode] = useState<'upcoming' | 'past'>('upcoming');
 
   useEffect(() => {
-    if (user?.id) fetchByClient(user.id);
-  }, [user?.id]);
+    if (user?.id) {
+      fetchByClient(user.id);
+    }
+  }, [user?.id, fetchByClient]);
+
+  const filteredAppointments = useMemo(() => {
+    const now = new Date();
+
+    return appointments.filter((appointment) => {
+      const [hours = '00', minutes = '00', seconds = '00'] = appointment.startTime.split(':');
+      const normalizedTime = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
+      let appointmentDate = parseISO(`${appointment.date}T${normalizedTime}`);
+      if (Number.isNaN(appointmentDate.getTime())) {
+        appointmentDate = parseISO(`${appointment.date}T00:00:00`);
+      }
+      if (Number.isNaN(appointmentDate.getTime())) {
+        return mode === 'upcoming';
+      }
+
+      if (mode === 'upcoming') {
+        return appointmentDate >= now;
+      }
+      return appointmentDate < now;
+    });
+  }, [appointments, mode]);
+
+  const fabBottom = Math.max(insets.bottom + 90, 90);
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={appointments}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        refreshing={isLoading}
-        onRefresh={() => user?.id && fetchByClient(user.id)}
-        renderItem={({ item }) => (
-          <AppointmentCard appointment={item} showMechanic />
-        )}
-        ListEmptyComponent={
-          <EmptyState
-            icon="calendar-outline"
-            title="Nenhum agendamento"
-            message="Busque um mecânico e faça sua reserva"
-          />
-        }
-      />
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <TopAppBar showBackButton={false} onProfilePress={() => router.push('/(client)/profile')} />
+
+      <View style={styles.pageTitleRow}>
+        <Text style={styles.pageTitle}>Agendamentos</Text>
+        <View style={styles.segmentWrap}>
+          <SegmentButton label="Próximos" active={mode === 'upcoming'} onPress={() => setMode('upcoming')} />
+          <SegmentButton label="Anteriores" active={mode === 'past'} onPress={() => setMode('past')} />
+        </View>
+      </View>
+
+      {isLoading && appointments.length === 0 ? (
+        <SkeletonList />
+      ) : (
+        <FlatList
+          data={filteredAppointments}
+          keyExtractor={(item) => item.id}
+          refreshing={isLoading}
+          onRefresh={() => user?.id && fetchByClient(user.id)}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <AppointmentCard
+              appointment={item}
+              onPress={() => router.push(`/(client)/appointment/${item.id}`)}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <MaterialIcons name="calendar-month" size={48} color={colors.outline} />
+              <Text style={styles.emptyTitle}>Nenhum agendamento encontrado</Text>
+              <Text style={styles.emptySubtitle}>Agende um serviço para começar</Text>
+              <View style={styles.emptyCtaWrap}>
+                <PrimaryButton
+                  title="Novo Agendamento"
+                  onPress={() => router.push('/(client)/browse')}
+                  variant="secondary"
+                />
+              </View>
+            </View>
+          }
+        />
+      )}
+
+      <Pressable
+        onPress={() => router.push('/(client)/browse')}
+        android_ripple={{ color: colors.surfaceContainerHigh }}
+        style={({ pressed }) => [styles.fab, { bottom: fabBottom }, pressed && styles.pressed]}
+      >
+        <MaterialIcons name="add" size={26} color={colors.onPrimary} />
+      </Pressable>
+    </SafeAreaView>
+  );
+}
+
+function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      android_ripple={{ color: colors.surfaceContainerHigh }}
+      style={({ pressed }) => [styles.segmentButton, active && styles.segmentButtonActive, pressed && styles.pressed]}
+    >
+      <Text style={[styles.segmentLabel, active ? styles.segmentLabelActive : styles.segmentLabelInactive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function SkeletonList() {
+  const opacity = useRef(new Animated.Value(0.45)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.85, duration: 650, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.45, duration: 650, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return (
+    <View style={styles.skeletonList}>
+      {[1, 2, 3].map((item) => (
+        <Animated.View key={item} style={[styles.skeletonCard, { opacity }]} />
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
-  list: {
-    paddingHorizontal: Spacing.xxl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xxxl,
+  pageTitleRow: {
+    paddingHorizontal: spacing.gutterMobile,
+    paddingTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  pageTitle: {
+    ...typography.headlineLgMobile,
+    color: colors.onSurface,
+  },
+  segmentWrap: {
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: radius.md,
+    padding: spacing.xs,
+    flexDirection: 'row',
+  },
+  segmentButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+  },
+  segmentButtonActive: {
+    backgroundColor: colors.primary,
+    ...shadow.light,
+  },
+  segmentLabel: {
+    ...typography.labelSm,
+  },
+  segmentLabelActive: {
+    color: colors.onPrimary,
+  },
+  segmentLabelInactive: {
+    color: colors.onSurfaceVariant,
+  },
+  listContent: {
+    paddingHorizontal: spacing.gutterMobile,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xl,
+    gap: spacing.base,
+  },
+  emptyTitle: {
+    ...typography.headlineMd,
+    color: colors.onSurface,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    ...typography.bodyMd,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  emptyCtaWrap: {
+    width: '100%',
+    marginTop: spacing.sm,
+  },
+  fab: {
+    position: 'absolute',
+    right: spacing.marginMobile,
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    backgroundColor: colors.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.coral,
+  },
+  pressed: {
+    opacity: 0.88,
+  },
+  skeletonList: {
+    paddingHorizontal: spacing.gutterMobile,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
+  },
+  skeletonCard: {
+    height: 220,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceContainer,
   },
 });

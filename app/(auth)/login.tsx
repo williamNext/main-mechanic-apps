@@ -1,142 +1,231 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { InputField } from '@/components/ui/InputField';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
-import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
+import { formatPhone, toPseudoEmail } from '@/utils/format';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { loginByEmail, isLoading } = useAuthStore();
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function handleLogin() {
     setErrorMsg(null);
-    if (!email || !password) {
-      setErrorMsg('Preencha email e senha');
+    if (!phone || !password) {
+      setErrorMsg('Preencha telefone e senha.');
       return;
     }
 
+    const email = toPseudoEmail(phone);
     const success = await loginByEmail(email, password);
     if (success) {
       router.replace('/(client)/browse');
-    } else {
-      setErrorMsg('Credenciais inválidas ou erro de conexão.');
+      return;
     }
+
+    setErrorMsg('Credenciais inválidas ou erro de conexão.');
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="car-sport" size={48} color={Colors.accent} />
-          </View>
-          <Text style={styles.title}>Oficina</Text>
-          <Text style={styles.subtitle}>Para Clientes</Text>
-        </View>
-
-        <View style={styles.form}>
-          {errorMsg ? (
-            <View style={styles.errorContainer}>
-              <Ionicons name="warning" size={16} color={Colors.error} />
-              <Text style={styles.errorText}>{errorMsg}</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
+        >
+          <View style={styles.card}>
+            <View style={styles.headerBlock}>
+              <View style={styles.logoContainer}>
+                <MaterialIcons name="build" size={32} color={colors.onPrimary} />
+              </View>
+              <Text style={styles.title}>Mechanic Pro</Text>
+              <Text style={styles.subtitle}>Gestão profissional de serviços automotivos.</Text>
             </View>
-          ) : null}
 
-          <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="seu@email.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            icon={<Ionicons name="mail-outline" size={18} color={Colors.gray400} />}
-          />
+            <View style={styles.tabsRow}>
+              <View style={styles.tabActive}>
+                <Text style={styles.tabActiveText}>Entrar</Text>
+              </View>
+              <Pressable
+                onPress={() => router.push('/(auth)/register')}
+                android_ripple={{ color: colors.surfaceContainerHigh }}
+                style={({ pressed }) => [styles.tabInactive, pressed && styles.pressed]}
+              >
+                <Text style={styles.tabInactiveText}>Cadastrar</Text>
+              </Pressable>
+            </View>
 
-          <Input
-            label="Senha"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Sua senha"
-            secureTextEntry
-            icon={<Ionicons name="lock-closed-outline" size={18} color={Colors.gray400} />}
-          />
+            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
-          <Button
-            title="Entrar"
-            onPress={handleLogin}
-            loading={isLoading}
-            size="lg"
-            style={styles.submitBtn}
-          />
+            <View style={styles.form}>
+              <InputField
+                label="Telefone"
+                value={phone}
+                onChangeText={(text) => setPhone(formatPhone(text))}
+                placeholder="(51) 99999-9999"
+                keyboardType="phone-pad"
+                leftIcon={<MaterialIcons name="call" size={18} color={colors.outline} />}
+              />
 
-          <Button
-            title="Não tem conta? Cadastre-se"
-            onPress={() => router.push('/(auth)/register')}
-            variant="ghost"
-          />
-        </View>
-      </ScrollView>
+              <InputField
+                label="Senha"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Digite sua senha"
+                secureTextEntry
+                leftIcon={<MaterialIcons name="lock" size={18} color={colors.outline} />}
+              />
+
+              <Pressable
+                style={({ pressed }) => [styles.forgotWrap, pressed && styles.pressed]}
+                onPress={() => setErrorMsg('Procure o suporte para redefinir sua senha.')} 
+                android_ripple={{ color: colors.surfaceContainerHigh }}
+              >
+                <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+              </Pressable>
+
+              <PrimaryButton title="Entrar" onPress={handleLogin} loading={isLoading} variant="filled" />
+            </View>
+
+            <View style={styles.bottomLinkRow}>
+              <Text style={styles.bottomText}>Não tem uma conta?</Text>
+              <Pressable onPress={() => router.push('/(auth)/register')} style={({ pressed }) => pressed && styles.pressed}>
+                <Text style={styles.bottomActionText}>Cadastrar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.background,
+  },
+  keyboard: {
+    flex: 1,
   },
   scrollContent: {
-    paddingBottom: Spacing.xxxl,
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.marginMobile,
+    paddingVertical: spacing.md,
   },
-  header: {
+  card: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+    ...shadow.medium,
+  },
+  headerBlock: {
     alignItems: 'center',
-    paddingTop: Spacing.xxxl * 2,
-    paddingBottom: Spacing.xxxl,
+    gap: spacing.base,
+    marginBottom: spacing.base,
   },
   logoContainer: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.primaryLight,
+    width: 64,
+    height: 64,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.lg,
   },
   title: {
-    fontSize: FontSize.hero,
-    fontWeight: FontWeight.bold,
-    color: Colors.white,
+    ...typography.headlineLgMobile,
+    color: colors.primary,
   },
   subtitle: {
-    fontSize: FontSize.md,
-    color: Colors.gray400,
-    marginTop: Spacing.xs,
+    ...typography.bodyMd,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.outlineVariant,
+  },
+  tabActive: {
+    flex: 1,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.safetyOrange,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  tabActiveText: {
+    ...typography.bodyMd,
+    color: colors.onSurface,
+  },
+  tabInactive: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  tabInactiveText: {
+    ...typography.bodyMd,
+    color: colors.outline,
   },
   form: {
-    paddingHorizontal: Spacing.xxl,
-    gap: Spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.base,
   },
-  errorContainer: {
+  forgotWrap: {
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
+  },
+  forgotText: {
+    ...typography.labelSm,
+    color: colors.safetyOrange,
+    textDecorationLine: 'underline',
+  },
+  bottomLinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.error + '20',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    gap: Spacing.sm,
+    justifyContent: 'center',
+    gap: spacing.base,
+    marginTop: spacing.base,
+  },
+  bottomText: {
+    ...typography.bodyMd,
+    color: colors.onSurfaceVariant,
+  },
+  bottomActionText: {
+    ...typography.labelMd,
+    color: colors.safetyOrange,
   },
   errorText: {
-    color: Colors.error,
-    fontSize: FontSize.sm,
-    flex: 1,
+    ...typography.labelSm,
+    color: colors.error,
+    marginTop: spacing.xs,
   },
-  submitBtn: {
-    marginTop: Spacing.lg,
+  pressed: {
+    opacity: 0.8,
   },
 });
