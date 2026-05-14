@@ -1,21 +1,9 @@
 import { supabase } from './api';
 import { User, Mechanic, Role } from '@/types/models';
 
-export async function login(email: string, password?: string): Promise<User | Mechanic | null> {
-  if (!password) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*, mechanics(*)')
-      .eq('email', email)
-      .single();
-
-    if (error || !data) return null;
-    
-    if (data.role === 'mechanic' && data.mechanics) {
-      const mechData = Array.isArray(data.mechanics) ? data.mechanics[0] : data.mechanics;
-      return { ...data, ...mechData } as Mechanic;
-    }
-    return data as User;
+export async function login(email: string, password: string): Promise<User | Mechanic | null> {
+  if (!email || !password) {
+    throw new Error('Email and password are required');
   }
 
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -30,23 +18,6 @@ export async function login(email: string, password?: string): Promise<User | Me
 
 export async function logout() {
   await supabase.auth.signOut();
-}
-
-export async function loginByRole(role: Role): Promise<User | Mechanic> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*, mechanics(*)')
-    .eq('role', role)
-    .limit(1)
-    .single();
-
-  if (error || !data) throw new Error(`No user found with role ${role}`);
-
-  if (data.role === 'mechanic' && data.mechanics) {
-    const mechData = Array.isArray(data.mechanics) ? data.mechanics[0] : data.mechanics;
-    return { ...data, ...mechData } as Mechanic;
-  }
-  return data as User;
 }
 
 export async function getUserById(id: string): Promise<User | Mechanic | null> {

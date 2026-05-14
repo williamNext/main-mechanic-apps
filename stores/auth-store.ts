@@ -9,8 +9,7 @@ interface AuthState {
   isAuthenticated: boolean;
   role: Role | null;
 
-  loginByRole: (role: Role) => Promise<void>;
-  loginByEmail: (email: string, password?: string) => Promise<boolean>;
+  loginByEmail: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<Mechanic>) => Promise<void>;
   setUser: (user: User | Mechanic | null) => void;
@@ -21,17 +20,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   isAuthenticated: false,
   role: null,
-
-  loginByRole: async (role) => {
-    set({ isLoading: true });
-    try {
-      const user = await authService.loginByRole(role);
-      set({ user, isAuthenticated: true, role: user.role, isLoading: false });
-    } catch (e) {
-      set({ isLoading: false });
-      throw e;
-    }
-  },
 
   loginByEmail: async (email, password) => {
     set({ isLoading: true });
