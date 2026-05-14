@@ -5,7 +5,7 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Missing Supabase credentials in .env");
+  console.error('Missing Supabase env vars. Run with Doppler: doppler run -- node scripts/seed.js');
   process.exit(1);
 }
 

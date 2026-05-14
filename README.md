@@ -1,50 +1,53 @@
-# Welcome to your Expo app 👋
+# Oficina Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Secret model
+- `public-build-vars`: safe in client bundle.
+  - `EXPO_PUBLIC_SUPABASE_URL`
+  - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `private-server-secrets`: never ship to mobile app.
+  - service-role keys
+  - admin tokens
 
-## Get started
+## Doppler setup
+1. Create Doppler project `oficina`.
+2. Create configs: `dev`, `staging`, `prod`.
+3. Add secrets per config.
+4. Use service tokens in CI:
+   - `DOPPLER_TOKEN_DEV`
+   - `DOPPLER_TOKEN_STAGING`
+   - `DOPPLER_TOKEN_PROD`
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+## Local development
 ```bash
-npm run reset-project
+npm install
+npm run hooks:setup
+npm run start:doppler
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Validation and seed
+```bash
+npm run env:check
+npm run seed:doppler
+```
 
-## Learn more
+## EAS/CI mapping
+- `development` profile -> Doppler `dev`
+- `staging` profile -> Doppler `staging`
+- `production` profile -> Doppler `prod`
 
-To learn more about developing your project with Expo, look at the following resources:
+Workflow file runs:
+- gitleaks on PR/push
+- Doppler env validation on push to `master`
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## History cleanup for leaked `.env`
+Run once on maintainer machine, then force push:
+```bash
+git filter-branch --force --index-filter "git rm --cached --ignore-unmatch .env" --prune-empty --tag-name-filter cat -- --all
+git for-each-ref --format="%(refname)" refs/original/ | xargs -n 1 git update-ref -d
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+git push origin --force --all
+git push origin --force --tags
+```
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+After force-push, collaborators must hard reset or re-clone.
