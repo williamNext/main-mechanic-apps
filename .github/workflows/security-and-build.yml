@@ -27,12 +27,10 @@ jobs:
         with:
           node-version: 20
       - name: Install Doppler CLI
-        run: |
-          curl -Ls https://cli.doppler.com/install.sh | sh
+        uses: dopplerhq/cli-action@v3
       - name: Install deps
         run: npm ci
       - name: Validate Expo env with Doppler (dev)
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_DEV }}
         run: doppler run -- npm run env:check
-
