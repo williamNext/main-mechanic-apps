@@ -2,7 +2,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Role } from '@/types/models';
 
 export function useAuth() {
-  const { user, isAuthenticated, isLoading, loginByRole, loginByEmail, logout, updateProfile } =
+  const { user, isAuthenticated, isLoading, loginByEmail, logout, updateProfile } =
     useAuthStore();
 
   const role: Role | null = user?.role ?? null;
@@ -18,7 +18,6 @@ export function useAuth() {
     isAdmin,
     isMechanic,
     isClient,
-    loginByRole,
     loginByEmail,
     logout,
     updateProfile,
