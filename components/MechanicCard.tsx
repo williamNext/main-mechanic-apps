@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronRight, Clock3, Star } from 'lucide-react-native';
 import { Mechanic } from '@/types/models';
-import { Card } from '@/components/ui/Card';
-import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
-import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { AppCard } from '@/components/app/AppCard';
+import { Avatar } from '@/components/app/Avatar';
+import { Badge } from '@/components/app/Badge';
+import { FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-theme';
 
 interface MechanicCardProps {
   mechanic: Mechanic;
@@ -13,27 +14,29 @@ interface MechanicCardProps {
   showRating?: boolean;
 }
 
-export function MechanicCard({ mechanic, onPress, showRating = true }: MechanicCardProps) {
+export function MechanicCard({ mechanic, onPress }: MechanicCardProps) {
+  const { colors } = useAppTheme();
+
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
-      <Card style={styles.card}>
+      <AppCard style={styles.card}>
         <View style={styles.row}>
-          <Avatar name={mechanic.name} imageUrl={mechanic.avatarUrl} size="lg" />
+          <Avatar name={mechanic.name} size={52} />
           <View style={styles.info}>
-            <Text style={styles.name}>{mechanic.name}</Text>
+            <Text style={[styles.name, { color: colors.gray900 }]}>{mechanic.name}</Text>
             <Badge label={mechanic.specialty} />
-            {showRating && mechanic.rating != null && (
-              <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color={Colors.warning} />
-                <Text style={styles.rating}>{mechanic.rating.toFixed(1)}</Text>
-              </View>
-            )}
+            <View style={styles.metaRow}>
+              <Star size={14} color={colors.accent} />
+              <Text style={[styles.metaText, { color: colors.gray600 }]}>{mechanic.rating?.toFixed(1) ?? '4.8'} avaliação</Text>
+              <Clock3 size={14} color={colors.success} />
+              <Text style={[styles.metaText, { color: colors.success }]}>Disponível</Text>
+            </View>
           </View>
           {onPress && (
-            <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
+            <ChevronRight size={20} color={colors.gray400} />
           )}
         </View>
-      </Card>
+      </AppCard>
     </TouchableOpacity>
   );
 }
@@ -54,16 +57,14 @@ const styles = StyleSheet.create({
   name: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.semibold,
-    color: Colors.gray900,
   },
-  ratingRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
   },
-  rating: {
+  metaText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
-    color: Colors.gray600,
   },
 });

@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { Colors, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { BorderRadius, FontSize, FontWeight } from '@/constants/theme';
 import { getInitials } from '@/utils/format';
+import { useAppTheme } from '@/hooks/use-theme';
 
 type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -29,6 +30,7 @@ const fontSizeMap: Record<AvatarSize, number> = {
 
 export function Avatar({ name, imageUrl, size = 'md', style }: AvatarProps) {
   const dimension = sizeMap[size];
+  const { colors } = useAppTheme();
 
   if (imageUrl) {
     return (
@@ -55,11 +57,12 @@ export function Avatar({ name, imageUrl, size = 'md', style }: AvatarProps) {
           width: dimension,
           height: dimension,
           borderRadius: dimension / 2,
+          backgroundColor: colors.primaryLight,
         },
         style,
       ]}
     >
-      <Text style={[styles.initials, { fontSize: fontSizeMap[size] }]}>
+      <Text style={[styles.initials, { fontSize: fontSizeMap[size], color: colors.white }]}>
         {getInitials(name)}
       </Text>
     </View>
@@ -68,12 +71,10 @@ export function Avatar({ name, imageUrl, size = 'md', style }: AvatarProps) {
 
 const styles = StyleSheet.create({
   fallback: {
-    backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   initials: {
-    color: Colors.white,
     fontWeight: FontWeight.bold,
   },
 });

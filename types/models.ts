@@ -36,6 +36,7 @@ export interface Appointment {
   clientName?: string;
   mechanicId: string;
   mechanicName?: string;
+  mechanicPhone?: string;
   timeSlotId: string;
   date: string;
   startTime: string;

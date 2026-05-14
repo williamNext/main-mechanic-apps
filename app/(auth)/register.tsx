@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Role } from '@/types/models';
+import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as authService from '@/services/auth-service';
-import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
+import { InputField } from '@/components/ui/InputField';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { formatPhone, toPseudoEmail } from '@/utils/format';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -21,171 +30,200 @@ export default function RegisterScreen() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!name || !email || !password) {
-      setErrorMsg('Preencha todos os campos');
+    if (!name || !phone || !password) {
+      setErrorMsg('Preencha todos os campos.');
       return;
     }
 
     setLoading(true);
     try {
-      await authService.signUp(email, password, name, 'client');
-      setSuccessMsg('Conta criada! Faça login para continuar.');
-      // Optional: auto-redirect after a delay, but letting them read it is good.
+      await authService.signUp(toPseudoEmail(phone), password, name, 'client', phone);
+      setSuccessMsg('Conta criada. Faça login para continuar.');
     } catch (error: any) {
-      setErrorMsg(error.message || 'Falha ao criar conta');
+      setErrorMsg(error.message || 'Falha ao criar conta.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Criar Conta</Text>
-          <Text style={styles.subtitle}>Junte-se à nossa plataforma</Text>
-        </View>
-
-        <View style={styles.form}>
-          {errorMsg ? (
-            <View style={styles.errorContainer}>
-              <Ionicons name="warning" size={16} color={Colors.error} />
-              <Text style={styles.errorText}>{errorMsg}</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.card}>
+            <View style={styles.headerBlock}>
+              <View style={styles.logoContainer}>
+                <MaterialIcons name="build" size={32} color={colors.onPrimary} />
+              </View>
+              <Text style={styles.title}>Mechanic Pro</Text>
+              <Text style={styles.subtitle}>Gestão profissional de serviços automotivos.</Text>
             </View>
-          ) : null}
 
-          {successMsg ? (
-            <View style={[styles.errorContainer, { backgroundColor: Colors.accent + '20' }]}>
-              <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
-              <Text style={[styles.errorText, { color: Colors.accent }]}>{successMsg}</Text>
+            <View style={styles.tabsRow}>
+              <Pressable
+                onPress={() => router.push('/(auth)/login')}
+                android_ripple={{ color: colors.surfaceContainerHigh }}
+                style={({ pressed }) => [styles.tabInactive, pressed && styles.pressed]}
+              >
+                <Text style={styles.tabInactiveText}>Entrar</Text>
+              </Pressable>
+              <View style={styles.tabActive}>
+                <Text style={styles.tabActiveText}>Cadastrar</Text>
+              </View>
             </View>
-          ) : null}
 
-          <Input
-            label="Nome Completo"
-            value={name}
-            onChangeText={setName}
-            placeholder="Seu nome"
-            icon={<Ionicons name="person-outline" size={18} color={Colors.gray400} />}
-          />
+            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+            {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
 
-          <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="seu@email.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            icon={<Ionicons name="mail-outline" size={18} color={Colors.gray400} />}
-          />
+            <View style={styles.form}>
+              <InputField
+                label="Nome completo"
+                value={name}
+                onChangeText={setName}
+                placeholder="Seu nome"
+                leftIcon={<MaterialIcons name="person" size={18} color={colors.outline} />}
+              />
 
-          <Input
-            label="Senha"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Mínimo 6 caracteres"
-            secureTextEntry
-            icon={<Ionicons name="lock-closed-outline" size={18} color={Colors.gray400} />}
-          />
+              <InputField
+                label="Telefone"
+                value={phone}
+                onChangeText={(text) => setPhone(formatPhone(text))}
+                placeholder="(51) 99999-9999"
+                keyboardType="phone-pad"
+                leftIcon={<MaterialIcons name="call" size={18} color={colors.outline} />}
+              />
 
-          <Button
-            title="Registrar"
-            onPress={handleRegister}
-            loading={loading}
-            size="lg"
-            style={styles.submitBtn}
-          />
+              <InputField
+                label="Senha"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Crie sua senha"
+                secureTextEntry
+                leftIcon={<MaterialIcons name="lock" size={18} color={colors.outline} />}
+              />
 
-          <Button
-            title="Já tenho conta? Login"
-            onPress={() => router.back()}
-            variant="ghost"
-          />
-        </View>
-      </ScrollView>
+              <PrimaryButton title="Cadastrar" onPress={handleRegister} loading={loading} variant="filled" />
+            </View>
+
+            <View style={styles.bottomLinkRow}>
+              <Text style={styles.bottomText}>Já tem uma conta?</Text>
+              <Pressable onPress={() => router.push('/(auth)/login')} style={({ pressed }) => pressed && styles.pressed}>
+                <Text style={styles.bottomActionText}>Entrar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-// Re-using styles from Login where possible
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.background,
+  },
+  keyboard: {
+    flex: 1,
   },
   scrollContent: {
-    paddingBottom: Spacing.xxxl,
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.marginMobile,
+    paddingVertical: spacing.md,
   },
-  header: {
-    padding: Spacing.xxxl,
-    paddingTop: Spacing.xxxl * 2,
+  card: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+    ...shadow.medium,
+  },
+  headerBlock: {
+    alignItems: 'center',
+    gap: spacing.base,
+    marginBottom: spacing.base,
+  },
+  logoContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: FontSize.hero,
-    fontWeight: FontWeight.bold,
-    color: Colors.white,
+    ...typography.headlineLgMobile,
+    color: colors.primary,
   },
   subtitle: {
-    fontSize: FontSize.md,
-    color: Colors.gray400,
-    marginTop: Spacing.xs,
+    ...typography.bodyMd,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.outlineVariant,
+  },
+  tabActive: {
+    flex: 1,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.safetyOrange,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  tabActiveText: {
+    ...typography.bodyMd,
+    color: colors.onSurface,
+  },
+  tabInactive: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  tabInactiveText: {
+    ...typography.bodyMd,
+    color: colors.outline,
   },
   form: {
-    paddingHorizontal: Spacing.xxl,
-    gap: Spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.base,
   },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.error + '20',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    gap: Spacing.sm,
-  },
-  errorText: {
-    color: Colors.error,
-    fontSize: FontSize.sm,
-    flex: 1,
-  },
-  roleTitle: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
-    color: Colors.gray400,
-    textTransform: 'uppercase',
-    marginTop: Spacing.sm,
-  },
-  roleGrid: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  roleOption: {
-    flex: 1,
+  bottomLinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    gap: spacing.base,
+    marginTop: spacing.base,
   },
-  roleOptionActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+  bottomText: {
+    ...typography.bodyMd,
+    color: colors.onSurfaceVariant,
   },
-  roleText: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-    color: Colors.gray400,
+  bottomActionText: {
+    ...typography.labelMd,
+    color: colors.safetyOrange,
   },
-  roleTextActive: {
-    color: Colors.white,
+  errorText: {
+    ...typography.labelSm,
+    color: colors.error,
+    marginTop: spacing.xs,
   },
-  submitBtn: {
-    marginTop: Spacing.lg,
+  successText: {
+    ...typography.labelSm,
+    color: colors.secondary,
+    marginTop: spacing.xs,
+  },
+  pressed: {
+    opacity: 0.8,
   },
 });
-
-import { TouchableOpacity } from 'react-native'; // Fix for missing import

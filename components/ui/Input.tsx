@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, ViewStyle, TextInputProps } from 'react-native';
-import { Colors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-theme';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -11,27 +12,29 @@ interface InputProps extends TextInputProps {
 
 export function Input({ label, error, containerStyle, icon, style, ...rest }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const { colors } = useAppTheme();
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <Text style={[styles.label, { color: colors.gray700 }]}>{label}</Text>}
       <View
         style={[
           styles.inputWrapper,
-          isFocused && styles.inputFocused,
-          error ? styles.inputError : undefined,
+          { borderColor: colors.gray200, backgroundColor: colors.white },
+          isFocused && { borderColor: colors.primary },
+          error ? { borderColor: colors.error } : undefined,
         ]}
       >
         {icon && <View style={styles.iconWrapper}>{icon}</View>}
         <TextInput
-          style={[styles.input, icon ? styles.inputWithIcon : undefined, style]}
-          placeholderTextColor={Colors.gray400}
+          style={[styles.input, { color: colors.gray900 }, icon ? styles.inputWithIcon : undefined, style]}
+          placeholderTextColor={colors.gray400}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           {...rest}
         />
       </View>
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && <Text style={[styles.error, { color: colors.error }]}>{error}</Text>}
     </View>
   );
 }
@@ -43,22 +46,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
-    color: Colors.gray700,
     marginBottom: Spacing.xs,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: Colors.gray200,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.white,
-  },
-  inputFocused: {
-    borderColor: Colors.accent,
-  },
-  inputError: {
-    borderColor: Colors.error,
   },
   iconWrapper: {
     paddingLeft: Spacing.md,
@@ -68,14 +62,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
     fontSize: FontSize.md,
-    color: Colors.gray900,
+    minHeight: 48,
   },
   inputWithIcon: {
     paddingLeft: Spacing.sm,
   },
   error: {
     fontSize: FontSize.xs,
-    color: Colors.error,
     marginTop: Spacing.xs,
   },
 });

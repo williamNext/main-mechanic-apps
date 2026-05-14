@@ -65,12 +65,12 @@ export async function getUserById(id: string): Promise<User | Mechanic | null> {
   return data as User;
 }
 
-export async function signUp(email: string, password: string, name: string, role: Role): Promise<void> {
+export async function signUp(email: string, password: string, name: string, role: Role, phone?: string): Promise<void> {
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { name, role }
+      data: { name, role, phone }
     }
   });
 
@@ -81,6 +81,7 @@ export async function signUp(email: string, password: string, name: string, role
     name,
     email,
     role,
+    phone,
   });
 
   if (profileError) throw profileError;

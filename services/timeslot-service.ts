@@ -1,6 +1,17 @@
 import { supabase } from './api';
 import { TimeSlot } from '@/types/models';
 
+function mapSlot(s: any): TimeSlot {
+  return {
+    id: s.id,
+    mechanicId: s.mechanic_id,
+    date: s.date,
+    startTime: s.start_time,
+    endTime: s.end_time,
+    isAvailable: s.is_available,
+  };
+}
+
 export async function getSlotsByMechanic(mechanicId: string, date?: string): Promise<TimeSlot[]> {
   let query = supabase
     .from('timeslots')
@@ -14,7 +25,7 @@ export async function getSlotsByMechanic(mechanicId: string, date?: string): Pro
   const { data, error } = await query.order('start_time', { ascending: true });
 
   if (error) throw error;
-  return data as TimeSlot[];
+  return data.map(mapSlot);
 }
 
 export async function createSlot(slot: Omit<TimeSlot, 'id'>): Promise<TimeSlot> {
@@ -31,7 +42,7 @@ export async function createSlot(slot: Omit<TimeSlot, 'id'>): Promise<TimeSlot> 
     .single();
 
   if (error) throw error;
-  return data as TimeSlot;
+  return mapSlot(data);
 }
 
 export async function updateSlotAvailability(id: string, isAvailable: boolean): Promise<void> {

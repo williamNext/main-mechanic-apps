@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TimeSlot } from '@/types/models';
-import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from '@/constants/theme';
+import { BorderRadius, FontSize, FontWeight, Spacing, Shadow } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-theme';
 
 interface TimeSlotPickerProps {
   slots: TimeSlot[];
@@ -11,13 +12,14 @@ interface TimeSlotPickerProps {
 }
 
 export function TimeSlotPicker({ slots, selectedSlotId, onSelect }: TimeSlotPickerProps) {
+  const { colors, theme } = useAppTheme();
   const availableSlots = slots.filter((s) => s.isAvailable);
 
   if (availableSlots.length === 0) {
     return (
       <View style={styles.empty}>
-        <Ionicons name="time-outline" size={32} color={Colors.gray300} />
-        <Text style={styles.emptyText}>Nenhum horário disponível</Text>
+        <Ionicons name="time-outline" size={32} color={colors.gray300} />
+        <Text style={[styles.emptyText, { color: colors.gray400 }]}>Nenhum horário disponível</Text>
       </View>
     );
   }
@@ -27,6 +29,8 @@ export function TimeSlotPicker({ slots, selectedSlotId, onSelect }: TimeSlotPick
   for (let i = 0; i < availableSlots.length; i += 3) {
     rows.push(availableSlots.slice(i, i + 3));
   }
+
+  const isDark = theme === 'dark';
 
   return (
     <View>
@@ -39,10 +43,21 @@ export function TimeSlotPicker({ slots, selectedSlotId, onSelect }: TimeSlotPick
                 key={item.id}
                 onPress={() => onSelect(item)}
                 activeOpacity={0.7}
-                style={[styles.slot, isSelected && styles.slotSelected]}
+                style={[
+                  styles.slot,
+                  { backgroundColor: colors.surface, borderColor: colors.gray200 },
+                  isDark ? { borderWidth: 1 } : Shadow.sm,
+                  isSelected && { borderColor: colors.primary, backgroundColor: colors.primary + '12' },
+                ]}
               >
-                <Text style={[styles.slotText, isSelected && styles.slotTextSelected]}>
-                  {item.startTime}
+                <Text
+                  style={[
+                    styles.slotText,
+                    { color: colors.gray700 },
+                    isSelected && { color: colors.primary, fontWeight: FontWeight.bold },
+                  ]}
+                >
+                  {item.startTime.substring(0, 5)} {/* Display only HH:mm */}
                 </Text>
               </TouchableOpacity>
             );
@@ -69,23 +84,13 @@ const styles = StyleSheet.create({
     marginRight: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderWidth: 1.5,
-    borderColor: Colors.gray200,
     alignItems: 'center',
-    backgroundColor: Colors.white,
-    ...Shadow.sm,
-  },
-  slotSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + '12',
+    minHeight: 48,
+    justifyContent: 'center',
   },
   slotText: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.medium,
-    color: Colors.gray700,
-  },
-  slotTextSelected: {
-    color: Colors.accent,
-    fontWeight: FontWeight.bold,
   },
   slotPlaceholder: {
     flex: 1,
@@ -97,7 +102,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: FontSize.sm,
-    color: Colors.gray400,
     marginTop: Spacing.sm,
   },
 });

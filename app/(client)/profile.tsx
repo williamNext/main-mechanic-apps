@@ -1,120 +1,161 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Avatar } from '@/components/ui/Avatar';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { TopAppBar } from '@/components/ui/TopAppBar';
+import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
-import { formatPhone } from '@/utils/format';
+import { formatPhone, getInitials } from '@/utils/format';
 
 export default function ClientProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  function handleLogout() {
-    logout();
-    router.replace('/(auth)/login');
+  if (!user) {
+    return null;
   }
 
-  if (!user) return null;
+  const handleLogout = () => {
+    Alert.alert('Encerrar sessão', 'Deseja sair da sua conta agora?', [
+      { text: 'Continuar logado', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: () => {
+          logout();
+          router.replace('/(auth)/login');
+        },
+      },
+    ]);
+  };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.avatarSection}>
-        <Avatar name={user.name} size="xl" />
-        <Text style={styles.name}>{user.name}</Text>
-        <Text style={styles.email}>{user.email}</Text>
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <TopAppBar showBackButton={false} onProfilePress={() => undefined} />
 
       <View style={styles.content}>
-        <Card>
-          <InfoRow icon="mail-outline" label="Email" value={user.email} />
-          <InfoRow icon="call-outline" label="Telefone" value={formatPhone(user.phone ?? '')} />
-        </Card>
+        <View style={styles.profileHeader}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{getInitials(user.name)}</Text>
+          </View>
+          <Text style={styles.userName}>{user.name}</Text>
+          <Text style={styles.userPhone}>{formatPhone(user.phone || '')}</Text>
+        </View>
 
-        <Button
-          title="Sair da Conta"
+        <View style={styles.settingsList}>
+          <SettingsRow icon="person" label="Meus Dados" />
+          <SettingsRow icon="notifications" label="Notificações" />
+          <SettingsRow icon="help" label="Ajuda" />
+        </View>
+
+        <Pressable
           onPress={handleLogout}
-          variant="outline"
-          size="lg"
-          style={styles.logoutBtn}
-          icon={<Ionicons name="log-out-outline" size={18} color={Colors.accent} />}
-        />
+          android_ripple={{ color: colors.surfaceContainerHigh }}
+          style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
+        >
+          <MaterialIcons name="logout" size={20} color={colors.error} />
+          <Text style={styles.logoutText}>Encerrar sessão</Text>
+        </Pressable>
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 }
 
-function InfoRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: string;
-}) {
+function SettingsRow({ icon, label }: { icon: keyof typeof MaterialIcons.glyphMap; label: string }) {
   return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color={Colors.gray400} />
-      <View style={styles.infoContent}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value || '—'}</Text>
+    <Pressable android_ripple={{ color: colors.surfaceContainerHigh }} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
+      <View style={styles.settingsLeft}>
+        <MaterialIcons name={icon} size={18} color={colors.secondary} />
+        <Text style={styles.settingsLabel}>{label}</Text>
       </View>
-    </View>
+      <MaterialIcons name="chevron-right" size={20} color={colors.outlineVariant} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xxxl,
-    backgroundColor: Colors.white,
-    gap: Spacing.xs,
-  },
-  name: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.bold,
-    color: Colors.gray900,
-    marginTop: Spacing.sm,
-  },
-  email: {
-    fontSize: FontSize.sm,
-    color: Colors.gray500,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: Spacing.xxl,
+    flex: 1,
+    paddingHorizontal: spacing.gutterMobile,
+    paddingTop: spacing.md,
+    gap: spacing.md,
   },
-  infoRow: {
+  profileHeader: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    ...shadow.medium,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    ...typography.headlineMd,
+    color: colors.primary,
+  },
+  userName: {
+    ...typography.headlineMd,
+    color: colors.onPrimary,
+    marginTop: spacing.sm,
+  },
+  userPhone: {
+    ...typography.labelMd,
+    color: colors.primaryFixed,
+    opacity: 0.8,
+    marginTop: spacing.xs,
+  },
+  settingsList: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    overflow: 'hidden',
+  },
+  settingsRow: {
+    minHeight: 58,
+    paddingHorizontal: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.md,
+    justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray100,
-    gap: Spacing.md,
+    borderBottomColor: colors.outlineVariant,
   },
-  infoContent: {
-    flex: 1,
+  settingsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  infoLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.gray400,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  settingsLabel: {
+    ...typography.bodyMd,
+    color: colors.onSurface,
   },
-  infoValue: {
-    fontSize: FontSize.md,
-    color: Colors.gray900,
-    fontWeight: FontWeight.medium,
-    marginTop: 2,
+  logoutButton: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.errorContainer,
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.base,
   },
-  logoutBtn: {
-    marginTop: Spacing.xxl,
+  logoutText: {
+    ...typography.labelMd,
+    color: colors.error,
+  },
+  pressed: {
+    opacity: 0.85,
   },
 });

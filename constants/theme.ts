@@ -1,76 +1,257 @@
-// Design system tokens — oficina workshop aesthetic
+export const colors = {
+  primary: '#181f21',
+  onPrimary: '#ffffff',
+  primaryContainer: '#2d3436',
+  primaryFixed: '#dde4e6',
+  secondary: '#a83639',
+  onSecondary: '#ffffff',
+  secondaryContainer: '#ff7675',
+  onSecondaryContainer: '#720b16',
+  background: '#f9f9f9',
+  surface: '#f9f9f9',
+  surfaceContainer: '#eeeeee',
+  surfaceContainerLow: '#f3f3f3',
+  surfaceContainerHigh: '#e8e8e8',
+  surfaceContainerLowest: '#ffffff',
+  outline: '#747879',
+  outlineVariant: '#c3c7c8',
+  onBackground: '#1a1c1c',
+  onSurface: '#1a1c1c',
+  onSurfaceVariant: '#434749',
+  safetyOrange: '#ff6b00',
+  whatsapp: '#25d366',
+  error: '#ba1a1a',
+  errorContainer: '#ffdad6',
+  shadowBase: '#000000',
+} as const;
+
+export const spacing = {
+  xs: 4,
+  sm: 12,
+  base: 8,
+  md: 24,
+  lg: 40,
+  xl: 64,
+  gutterMobile: 16,
+  gutterDesktop: 24,
+  marginMobile: 20,
+} as const;
+
+export const radius = {
+  sm: 4,
+  md: 8,
+  lg: 12,
+  full: 9999,
+} as const;
+
+export const fontFamilies = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+  extrabold: 'Inter_800ExtraBold',
+} as const;
+
+export const typography = {
+  headlineXl: {
+    fontSize: 48,
+    lineHeight: 56,
+    letterSpacing: -0.96,
+    fontFamily: fontFamilies.extrabold,
+  },
+  headlineLg: {
+    fontSize: 32,
+    lineHeight: 40,
+    letterSpacing: -0.32,
+    fontFamily: fontFamilies.bold,
+  },
+  headlineLgMobile: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontFamily: fontFamilies.bold,
+  },
+  headlineMd: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontFamily: fontFamilies.semibold,
+  },
+  bodyLg: {
+    fontSize: 18,
+    lineHeight: 28,
+    fontFamily: fontFamilies.regular,
+  },
+  bodyMd: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontFamily: fontFamilies.regular,
+  },
+  labelMd: {
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: 0.7,
+    fontFamily: fontFamilies.semibold,
+  },
+  labelSm: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: fontFamilies.medium,
+  },
+} as const;
+
+export const shadow = {
+  light: {
+    shadowColor: colors.shadowBase,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  medium: {
+    shadowColor: colors.shadowBase,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 5,
+  },
+  coral: {
+    shadowColor: colors.secondaryContainer,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+} as const;
+
+export const StatusLabels: Record<string, string> = {
+  pending: 'Pendente',
+  confirmed: 'Confirmado',
+  in_progress: 'Em andamento',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
+};
+
+export const statusTheme = {
+  pending: {
+    background: colors.primary,
+    text: colors.onPrimary,
+    icon: 'schedule',
+  },
+  confirmed: {
+    background: colors.primary,
+    text: colors.onPrimary,
+    icon: 'schedule',
+  },
+  in_progress: {
+    background: colors.secondary,
+    text: colors.onSecondary,
+    icon: 'build-circle',
+  },
+  completed: {
+    background: colors.surfaceContainerHigh,
+    text: colors.onSurface,
+    icon: 'check-circle',
+  },
+  cancelled: {
+    background: colors.errorContainer,
+    text: colors.error,
+    icon: 'cancel',
+  },
+} as const;
 
 export const Colors = {
-  // Primary palette — dark navy + orange accent
-  primary: '#0F1A2E',
-  primaryLight: '#1A2942',
-  primaryDark: '#0A1220',
-  accent: '#F97316',
-  accentLight: '#FB923C',
-  accentDark: '#EA580C',
-
-  // Semantic
-  success: '#22C55E',
-  successLight: '#4ADE80',
-  warning: '#EAB308',
-  error: '#EF4444',
-  errorLight: '#FCA5A5',
-  info: '#3B82F6',
-
-  // Neutrals
-  white: '#FFFFFF',
-  gray50: '#F9FAFB',
-  gray100: '#F3F4F6',
-  gray200: '#E5E7EB',
-  gray300: '#D1D5DB',
-  gray400: '#9CA3AF',
-  gray500: '#6B7280',
-  gray600: '#4B5563',
-  gray700: '#374151',
-  gray800: '#1F2937',
-  gray900: '#111827',
-  black: '#000000',
-
-  // Surfaces
-  background: '#F3F4F6',
-  surface: '#FFFFFF',
-  surfaceDark: '#1A2942',
-  backgroundDark: '#0A1220',
-
-  // Status-specific
-  statusPending: '#F97316',
-  statusConfirmed: '#22C55E',
-  statusCompleted: '#3B82F6',
-  statusCancelled: '#EF4444',
+  light: {
+    ...colors,
+    primaryLight: colors.primaryContainer,
+    primaryDark: colors.primary,
+    accent: colors.safetyOrange,
+    accentLight: colors.secondaryContainer,
+    accentDark: colors.secondary,
+    success: colors.secondary,
+    warning: colors.safetyOrange,
+    info: colors.primary,
+    white: colors.surfaceContainerLowest,
+    black: colors.onSurface,
+    gray50: colors.surfaceContainerLowest,
+    gray100: colors.surfaceContainerLow,
+    gray200: colors.surfaceContainer,
+    gray300: colors.surfaceContainerHigh,
+    gray400: colors.outlineVariant,
+    gray500: colors.outline,
+    gray600: colors.onSurfaceVariant,
+    gray700: colors.onSurface,
+    gray800: colors.onBackground,
+    gray900: colors.onSurface,
+    text: colors.onSurface,
+    icon: colors.onSurfaceVariant,
+    tint: colors.primary,
+    tabIconDefault: colors.onSurfaceVariant,
+    tabIconSelected: colors.secondary,
+    statusPending: colors.primary,
+    statusConfirmed: colors.secondary,
+    statusCompleted: colors.surfaceContainerHigh,
+    statusCancelled: colors.error,
+  },
+  dark: {
+    ...colors,
+    primaryLight: colors.primaryContainer,
+    primaryDark: colors.primary,
+    accent: colors.safetyOrange,
+    accentLight: colors.secondaryContainer,
+    accentDark: colors.secondary,
+    success: colors.secondary,
+    warning: colors.safetyOrange,
+    info: colors.primary,
+    white: colors.surfaceContainerLowest,
+    black: colors.onSurface,
+    gray50: colors.surfaceContainerLowest,
+    gray100: colors.surfaceContainerLow,
+    gray200: colors.surfaceContainer,
+    gray300: colors.surfaceContainerHigh,
+    gray400: colors.outlineVariant,
+    gray500: colors.outline,
+    gray600: colors.onSurfaceVariant,
+    gray700: colors.onSurface,
+    gray800: colors.onBackground,
+    gray900: colors.onSurface,
+    text: colors.onSurface,
+    icon: colors.onSurfaceVariant,
+    tint: colors.primary,
+    tabIconDefault: colors.onSurfaceVariant,
+    tabIconSelected: colors.secondary,
+    statusPending: colors.primary,
+    statusConfirmed: colors.secondary,
+    statusCompleted: colors.surfaceContainerHigh,
+    statusCancelled: colors.error,
+  },
 } as const;
 
 export const Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
+  xs: spacing.xs,
+  sm: spacing.base,
+  md: 16,
+  lg: spacing.md,
+  xl: 32,
+  xxl: spacing.lg,
+  xxxl: spacing.xl,
 } as const;
 
 export const BorderRadius = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 20,
-  full: 9999,
+  sm: radius.sm,
+  md: radius.md,
+  lg: radius.lg,
+  xl: 16,
+  full: radius.full,
 } as const;
 
 export const FontSize = {
   xs: 11,
-  sm: 13,
-  md: 15,
-  lg: 17,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
-  hero: 40,
+  sm: typography.labelSm.fontSize,
+  md: typography.bodyMd.fontSize,
+  lg: 18,
+  xl: typography.headlineMd.fontSize,
+  xxl: typography.headlineLgMobile.fontSize,
+  xxxl: typography.headlineLg.fontSize,
+  hero: typography.headlineXl.fontSize,
 } as const;
 
 export const FontWeight = {
@@ -80,40 +261,31 @@ export const FontWeight = {
   bold: '700' as const,
 };
 
-export const Shadow = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 5,
-  },
+export const LayoutMetrics = {
+  tabBarHeight: 80,
+  tabBarBottomPadding: 0,
+  ctaHeight: 56,
+  ctaGapFromTabs: 12,
 } as const;
 
-export const StatusColors: Record<string, string> = {
-  pending: Colors.statusPending,
-  confirmed: Colors.statusConfirmed,
-  completed: Colors.statusCompleted,
-  cancelled: Colors.statusCancelled,
-};
+export const Shadow = {
+  sm: shadow.light,
+  md: shadow.medium,
+  lg: shadow.medium,
+} as const;
 
-export const StatusLabels: Record<string, string> = {
-  pending: 'Pendente',
-  confirmed: 'Confirmado',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-};
+export function getStatusColor(status: string, palette: typeof Colors.light) {
+  switch (status) {
+    case 'pending':
+    case 'confirmed':
+      return palette.statusPending;
+    case 'in_progress':
+      return palette.statusConfirmed;
+    case 'completed':
+      return palette.statusCompleted;
+    case 'cancelled':
+      return palette.statusCancelled;
+    default:
+      return palette.gray500;
+  }
+}

@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { Colors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
-import { StatusColors, StatusLabels } from '@/constants/theme';
+import { BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { getStatusColor, StatusLabels } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-theme';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
 
@@ -12,6 +13,24 @@ interface BadgeProps {
 }
 
 export function Badge({ label, variant = 'default', style }: BadgeProps) {
+  const { colors } = useAppTheme();
+
+  const variantBg: Record<BadgeVariant, ViewStyle> = {
+    default: { backgroundColor: colors.gray100 },
+    success: { backgroundColor: colors.success + '1A' },
+    warning: { backgroundColor: colors.warning + '1A' },
+    error: { backgroundColor: colors.error + '1A' },
+    info: { backgroundColor: colors.info + '1A' },
+  };
+
+  const variantText: Record<BadgeVariant, { color: string }> = {
+    default: { color: colors.gray700 },
+    success: { color: colors.success },
+    warning: { color: colors.warning },
+    error: { color: colors.error },
+    info: { color: colors.info },
+  };
+
   return (
     <View style={[styles.base, variantBg[variant], style]}>
       <Text style={[styles.text, variantText[variant]]}>{label}</Text>
@@ -25,7 +44,8 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, style }: StatusBadgeProps) {
-  const color = StatusColors[status] ?? Colors.gray500;
+  const { colors } = useAppTheme();
+  const color = getStatusColor(status, colors);
   const label = StatusLabels[status] ?? status;
 
   return (
@@ -56,19 +76,3 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
   },
 });
-
-const variantBg: Record<BadgeVariant, ViewStyle> = {
-  default: { backgroundColor: Colors.gray100 },
-  success: { backgroundColor: Colors.success + '1A' },
-  warning: { backgroundColor: Colors.warning + '1A' },
-  error: { backgroundColor: Colors.error + '1A' },
-  info: { backgroundColor: Colors.info + '1A' },
-};
-
-const variantText: Record<BadgeVariant, { color: string }> = {
-  default: { color: Colors.gray700 },
-  success: { color: Colors.success },
-  warning: { color: Colors.warning },
-  error: { color: Colors.error },
-  info: { color: Colors.info },
-};

@@ -1,19 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { TimeSlotPicker } from '@/components/TimeSlotPicker';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { DateChip } from '@/components/ui/DateChip';
+import { InputField } from '@/components/ui/InputField';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { TimeSlotButton } from '@/components/ui/TimeSlotButton';
+import { TopAppBar } from '@/components/ui/TopAppBar';
+import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useAppointmentStore } from '@/stores/appointment-store';
 import { useMechanicStore } from '@/stores/mechanic-store';
 import { useTimeSlotStore } from '@/stores/timeslot-store';
-import { useAppointmentStore } from '@/stores/appointment-store';
 import { Mechanic, TimeSlot } from '@/types/models';
-import { Colors, FontSize, FontWeight, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { getNextDays, formatDate } from '@/utils/date';
+import { getNextDays } from '@/utils/date';
+import { getInitials } from '@/utils/format';
 
 export default function BookMechanicScreen() {
   const { mechanicId } = useLocalSearchParams<{ mechanicId: string }>();
@@ -26,25 +38,30 @@ export default function BookMechanicScreen() {
   const [mechanic, setMechanic] = useState<Mechanic | null>(null);
   const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0]);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
-  const [vehicleInfo, setVehicleInfo] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [problemDescription, setProblemDescription] = useState('');
   const [booking, setBooking] = useState(false);
-  const days = getNextDays(7);
+
+  const days = useMemo(() => getNextDays(7), []);
 
   useEffect(() => {
     if (mechanicId) {
-      getById(mechanicId).then((m) => setMechanic(m));
+      getById(mechanicId).then((mechanicData) => setMechanic(mechanicData));
     }
-  }, [mechanicId]);
+  }, [mechanicId, getById]);
 
   useEffect(() => {
     if (mechanicId) {
       fetchAvailable(mechanicId, selectedDate);
       setSelectedSlot(null);
     }
-  }, [mechanicId, selectedDate]);
+  }, [mechanicId, selectedDate, fetchAvailable]);
 
   async function handleBook() {
-    if (!selectedSlot || !user || !mechanic) return;
+    if (!selectedSlot || !user || !mechanic) {
+      return;
+    }
+
     setBooking(true);
     try {
       await book({
@@ -56,11 +73,10 @@ export default function BookMechanicScreen() {
         date: selectedSlot.date,
         startTime: selectedSlot.startTime,
         endTime: selectedSlot.endTime,
-        vehicleInfo: vehicleInfo.trim() || undefined,
+        vehicleInfo: vehicleModel.trim(),
+        notes: problemDescription.trim(),
       });
-      Alert.alert('Agendado!', 'Seu agendamento foi realizado com sucesso.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      router.replace('/(client)/booking-success');
     } catch {
       Alert.alert('Erro', 'Falha ao realizar agendamento');
     } finally {
@@ -68,183 +84,215 @@ export default function BookMechanicScreen() {
     }
   }
 
-  if (!mechanic) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.loadingText}>Carregando...</Text>
-      </View>
-    );
-  }
-
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Mechanic header */}
-      <View style={styles.profileHeader}>
-        <Avatar name={mechanic.name} imageUrl={mechanic.avatarUrl} size="lg" />
-        <View style={styles.profileInfo}>
-          <Text style={styles.name}>{mechanic.name}</Text>
-          <Badge label={mechanic.specialty} />
-          {mechanic.rating != null && (
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={14} color={Colors.warning} />
-              <Text style={styles.ratingText}>{mechanic.rating.toFixed(1)}</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <TopAppBar showBackButton title="Agendar" />
+      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {!mechanic ? (
+            <View style={styles.skeletonProfile} />
+          ) : (
+            <View style={styles.profileCard}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{getInitials(mechanic.name)}</Text>
+              </View>
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileName}>{mechanic.name}</Text>
+                <Text style={styles.profileSpecialty}>{mechanic.specialty}</Text>
+                <View style={styles.ratingRow}>
+                  <MaterialIcons name="star" size={15} color={colors.secondary} />
+                  <Text style={styles.ratingText}>{mechanic.rating?.toFixed(1) || '4.8'} avaliação</Text>
+                </View>
+              </View>
             </View>
           )}
-        </View>
-      </View>
 
-      {/* Date selector — ScrollView with fixed-width chips */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Escolha o dia</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dateBar}
-        >
-          {days.map((item) => {
-            const isActive = item === selectedDate;
-            const dayNum = item.split('-')[2];
-            return (
-              <TouchableOpacity
-                key={item}
-                onPress={() => setSelectedDate(item)}
-                activeOpacity={0.7}
-                style={[styles.dateChip, isActive && styles.dateChipActive]}
-              >
-                <Text style={[styles.dateWeekday, isActive && styles.dateWeekdayActive]}>
-                  {formatDate(item)}
-                </Text>
-                <Text style={[styles.dateNum, isActive && styles.dateNumActive]}>
-                  {dayNum}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Selecione a Data</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
+              {days.map((day) => (
+                <DateChip
+                  key={day}
+                  dayLabel={format(parseISO(day), 'EEE', { locale: ptBR })}
+                  dayNumber={format(parseISO(day), 'dd')}
+                  active={selectedDate === day}
+                  onPress={() => setSelectedDate(day)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Horários Disponíveis</Text>
+            <View style={styles.slotGrid}>
+              {slots.length > 0 ? (
+                slots.map((slot) => (
+                  <View key={slot.id} style={styles.slotCell}>
+                    <TimeSlotButton
+                      label={slot.startTime.slice(0, 5)}
+                      selected={selectedSlot?.id === slot.id}
+                      onPress={() => setSelectedSlot(slot)}
+                    />
+                  </View>
+                ))
+              ) : (
+                <View style={styles.noSlots}>
+                  <MaterialIcons name="schedule" size={20} color={colors.outline} />
+                  <Text style={styles.noSlotsText}>Nenhum horário disponível para este dia.</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <InputField
+              label="Modelo do Veículo"
+              value={vehicleModel}
+              onChangeText={setVehicleModel}
+              placeholder="Ex: Toyota Corolla 2020"
+              leftIcon={<MaterialIcons name="directions-car" size={18} color={colors.outline} />}
+            />
+            <View style={styles.spacer} />
+            <InputField
+              label="Descrição do Problema"
+              value={problemDescription}
+              onChangeText={setProblemDescription}
+              placeholder="Descreva o problema"
+              multiline
+              numberOfLines={3}
+              leftIcon={<MaterialIcons name="build" size={18} color={colors.outline} />}
+            />
+          </View>
+          <View style={styles.contentBottomSpace} />
         </ScrollView>
-      </View>
 
-      {/* Time slot picker */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Horários disponíveis</Text>
-        <TimeSlotPicker
-          slots={slots}
-          selectedSlotId={selectedSlot?.id}
-          onSelect={setSelectedSlot}
-        />
-      </View>
-
-      {/* Vehicle info */}
-      <View style={styles.section}>
-        <Input
-          label="Informações do veículo (opcional)"
-          value={vehicleInfo}
-          onChangeText={setVehicleInfo}
-          placeholder="Ex: Honda Civic 2020 — Barulho no motor"
-          multiline
-          icon={<Ionicons name="car-outline" size={18} color={Colors.gray400} />}
-        />
-      </View>
-
-      {/* Book button */}
-      <View style={styles.section}>
-        <Button
-          title="Confirmar Agendamento"
-          onPress={handleBook}
-          disabled={!selectedSlot}
-          loading={booking}
-          size="lg"
-          icon={<Ionicons name="checkmark-circle" size={20} color={Colors.white} />}
-        />
-      </View>
-
-      <View style={{ height: Spacing.xxxl * 2 }} />
-    </ScrollView>
+        <SafeAreaView edges={['bottom']} style={styles.fixedCtaWrap}>
+          <PrimaryButton
+            title="Confirmar Agendamento"
+            variant="secondary"
+            leftIcon={<MaterialIcons name="event-available" size={18} color={colors.onPrimary} />}
+            onPress={handleBook}
+            loading={booking}
+            disabled={!selectedSlot || !vehicleModel.trim() || !problemDescription.trim()}
+          />
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
-  centered: {
+  keyboard: {
     flex: 1,
+  },
+  content: {
+    paddingHorizontal: spacing.gutterMobile,
+    paddingTop: spacing.sm,
+  },
+  skeletonProfile: {
+    height: 110,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceContainer,
+    marginBottom: spacing.md,
+  },
+  profileCard: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: spacing.sm,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+    ...shadow.medium,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    color: Colors.gray500,
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.xxl,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray200,
+  avatarText: {
+    ...typography.labelMd,
+    color: colors.primary,
   },
   profileInfo: {
     flex: 1,
-    marginLeft: Spacing.md,
+    gap: spacing.xs,
   },
-  name: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: Colors.gray900,
-    marginBottom: Spacing.xs,
+  profileName: {
+    ...typography.headlineMd,
+    color: colors.onSurface,
+  },
+  profileSpecialty: {
+    ...typography.labelSm,
+    color: colors.outline,
+    textTransform: 'uppercase',
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.xs,
+    gap: spacing.xs,
   },
   ratingText: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
-    color: Colors.gray600,
-    marginLeft: 4,
+    ...typography.labelSm,
+    color: colors.onSurfaceVariant,
   },
   section: {
-    paddingHorizontal: Spacing.xxl,
-    marginTop: Spacing.xxl,
+    marginTop: spacing.md,
   },
   sectionTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
-    color: Colors.gray900,
-    marginBottom: Spacing.md,
+    ...typography.headlineMd,
+    color: colors.primary,
+    marginBottom: spacing.sm,
   },
-  dateBar: {
-    paddingRight: Spacing.lg,
+  dateRow: {
+    gap: spacing.sm,
+    paddingRight: spacing.md,
   },
-  dateChip: {
+  slotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -spacing.xs,
+  },
+  slotCell: {
+    width: '33.3333%',
+    paddingHorizontal: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+  noSlots: {
+    width: '100%',
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: spacing.sm,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 56,
-    height: 72,
-    marginRight: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.white,
-    ...Shadow.sm,
+    gap: spacing.base,
   },
-  dateChipActive: {
-    backgroundColor: Colors.accent,
+  noSlotsText: {
+    ...typography.bodyMd,
+    color: colors.onSurfaceVariant,
+    flex: 1,
   },
-  dateWeekday: {
-    fontSize: FontSize.xs,
-    color: Colors.gray500,
-    fontWeight: FontWeight.medium,
-    marginBottom: 2,
+  spacer: {
+    height: spacing.sm,
   },
-  dateWeekdayActive: {
-    color: 'rgba(255,255,255,0.85)',
+  fixedCtaWrap: {
+    borderTopWidth: 1,
+    borderTopColor: colors.outlineVariant,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.gutterMobile,
+    paddingTop: spacing.sm,
   },
-  dateNum: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: Colors.gray900,
-  },
-  dateNumActive: {
-    color: Colors.white,
+  contentBottomSpace: {
+    height: spacing.xl,
   },
 });

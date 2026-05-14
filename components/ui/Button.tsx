@@ -7,7 +7,8 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { Colors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -33,7 +34,24 @@ export function Button({
   icon,
   style,
 }: ButtonProps) {
+  const { colors } = useAppTheme();
   const isDisabled = disabled || loading;
+
+  const variantStyles: Record<ButtonVariant, ViewStyle> = {
+    primary: { backgroundColor: colors.primary },
+    secondary: { backgroundColor: colors.gray200 },
+    outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
+    ghost: { backgroundColor: 'transparent' },
+    danger: { backgroundColor: colors.error },
+  };
+
+  const textVariantStyles: Record<ButtonVariant, TextStyle> = {
+    primary: { color: colors.white },
+    secondary: { color: colors.gray900 },
+    outline: { color: colors.primary },
+    ghost: { color: colors.primary },
+    danger: { color: colors.white },
+  };
 
   return (
     <TouchableOpacity
@@ -54,7 +72,7 @@ export function Button({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'outline' || variant === 'ghost' ? Colors.accent : Colors.white}
+          color={variant === 'outline' || variant === 'ghost' ? colors.accent : colors.white}
         />
       ) : (
         <>
@@ -90,26 +108,10 @@ const styles = StyleSheet.create({
   },
 });
 
-const variantStyles: Record<ButtonVariant, ViewStyle> = {
-  primary: { backgroundColor: Colors.accent },
-  secondary: { backgroundColor: Colors.primary },
-  outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: Colors.accent },
-  ghost: { backgroundColor: 'transparent' },
-  danger: { backgroundColor: Colors.error },
-};
-
-const textVariantStyles: Record<ButtonVariant, TextStyle> = {
-  primary: { color: Colors.white },
-  secondary: { color: Colors.white },
-  outline: { color: Colors.accent },
-  ghost: { color: Colors.accent },
-  danger: { color: Colors.white },
-};
-
 const sizeStyles: Record<ButtonSize, ViewStyle> = {
-  sm: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg },
-  md: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl },
-  lg: { paddingVertical: Spacing.lg, paddingHorizontal: Spacing.xxl },
+  sm: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, minHeight: 40 },
+  md: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, minHeight: 48 },
+  lg: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl, minHeight: 56 },
 };
 
 const textSizeStyles: Record<ButtonSize, TextStyle> = {

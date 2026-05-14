@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-theme';
 
 interface EmptyStateProps {
   icon?: keyof typeof Ionicons.glyphMap;
@@ -10,11 +11,13 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ icon = 'calendar-outline', title, message }: EmptyStateProps) {
+  const { colors } = useAppTheme();
+
   return (
     <View style={styles.container}>
-      <Ionicons name={icon} size={64} color={Colors.gray300} />
-      <Text style={styles.title}>{title}</Text>
-      {message && <Text style={styles.message}>{message}</Text>}
+      <Ionicons name={icon} size={64} color={colors.gray300} />
+      <Text style={[styles.title, { color: colors.gray500 }]}>{title}</Text>
+      {message && <Text style={[styles.message, { color: colors.gray400 }]}>{message}</Text>}
     </View>
   );
 }
@@ -30,13 +33,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.semibold,
-    color: Colors.gray500,
     marginTop: Spacing.lg,
     textAlign: 'center',
   },
   message: {
     fontSize: FontSize.sm,
-    color: Colors.gray400,
     marginTop: Spacing.sm,
     textAlign: 'center',
     lineHeight: 20,
