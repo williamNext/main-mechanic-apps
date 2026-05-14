@@ -1,5 +1,6 @@
 import { supabase } from './api';
 import { User, Mechanic, Role } from '@/types/models';
+import { toPseudoEmail } from '@/utils/format';
 
 export async function login(email: string, password: string): Promise<User | Mechanic | null> {
   if (!email || !password) {
@@ -14,6 +15,44 @@ export async function login(email: string, password: string): Promise<User | Mec
   if (authError || !authData.user) throw authError;
 
   return getUserById(authData.user.id);
+}
+
+function toE164BrPhone(phone: string): string | null {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10 || digits.length === 11) return `+55${digits}`;
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) return `+${digits}`;
+  return null;
+}
+
+export async function loginByPhone(phone: string, password: string): Promise<User | Mechanic | null> {
+  if (!phone || !password) {
+    throw new Error('Phone and password are required');
+  }
+
+  const normalizedPhone = toE164BrPhone(phone);
+  if (!normalizedPhone) {
+    throw new Error('Invalid phone number');
+  }
+
+  const phoneAttempt = await supabase.auth.signInWithPassword({
+    phone: normalizedPhone,
+    password,
+  });
+
+  if (!phoneAttempt.error && phoneAttempt.data.user) {
+    return getUserById(phoneAttempt.data.user.id);
+  }
+
+  const legacyEmailAttempt = await supabase.auth.signInWithPassword({
+    email: toPseudoEmail(phone),
+    password,
+  });
+
+  if (legacyEmailAttempt.error || !legacyEmailAttempt.data.user) {
+    throw legacyEmailAttempt.error ?? phoneAttempt.error ?? new Error('Invalid login credentials');
+  }
+
+  return getUserById(legacyEmailAttempt.data.user.id);
 }
 
 export async function logout() {

@@ -15,30 +15,44 @@ import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
-import { formatPhone, toPseudoEmail } from '@/utils/format';
+import { formatPhone } from '@/utils/format';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { loginByEmail, isLoading } = useAuthStore();
+  const { loginByPhone, isLoading } = useAuthStore();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function handleLogin() {
+    if (isSubmitting) return;
+
     setErrorMsg(null);
-    if (!phone || !password) {
+    const digits = phone.replace(/\D/g, '');
+
+    if (!digits || !password) {
       setErrorMsg('Preencha telefone e senha.');
       return;
     }
 
-    const email = toPseudoEmail(phone);
-    const success = await loginByEmail(email, password);
-    if (success) {
-      router.replace('/(client)/browse');
+    if (digits.length < 10 || digits.length > 13) {
+      setErrorMsg('Telefone inválido.');
       return;
     }
 
-    setErrorMsg('Credenciais inválidas ou erro de conexão.');
+    setIsSubmitting(true);
+    try {
+      const success = await loginByPhone(phone, password);
+      if (success) {
+        router.replace('/(client)/browse');
+        return;
+      }
+
+      setErrorMsg('Credenciais inválidas ou erro de conexão.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -97,18 +111,26 @@ export default function LoginScreen() {
 
               <Pressable
                 style={({ pressed }) => [styles.forgotWrap, pressed && styles.pressed]}
-                onPress={() => setErrorMsg('Procure o suporte para redefinir sua senha.')} 
+                onPress={() => setErrorMsg('Procure o suporte para redefinir sua senha.')}
                 android_ripple={{ color: colors.surfaceContainerHigh }}
               >
                 <Text style={styles.forgotText}>Esqueceu a senha?</Text>
               </Pressable>
 
-              <PrimaryButton title="Entrar" onPress={handleLogin} loading={isLoading} variant="filled" />
+              <PrimaryButton
+                title="Entrar"
+                onPress={handleLogin}
+                loading={isLoading || isSubmitting}
+                variant="filled"
+              />
             </View>
 
             <View style={styles.bottomLinkRow}>
               <Text style={styles.bottomText}>Não tem uma conta?</Text>
-              <Pressable onPress={() => router.push('/(auth)/register')} style={({ pressed }) => pressed && styles.pressed}>
+              <Pressable
+                onPress={() => router.push('/(auth)/register')}
+                style={({ pressed }) => pressed && styles.pressed}
+              >
                 <Text style={styles.bottomActionText}>Cadastrar</Text>
               </Pressable>
             </View>
