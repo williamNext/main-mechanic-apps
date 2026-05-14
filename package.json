@@ -4,14 +4,13 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "start:doppler": "doppler run -- npx expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
     "env:check": "node scripts/check-env.js",
-    "seed:doppler": "doppler run -- node scripts/seed.js",
+    "seed": "node scripts/seed.js",
     "hooks:setup": "node scripts/setup-git-hooks.js"
   },
   "dependencies": {

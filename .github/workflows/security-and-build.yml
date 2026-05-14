@@ -26,11 +26,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v3
       - name: Install deps
         run: npm ci
-      - name: Validate Expo env with Doppler (dev)
+      - name: Validate Expo env
         env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_DEV }}
-        run: doppler run -- npm run env:check
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npm run env:check

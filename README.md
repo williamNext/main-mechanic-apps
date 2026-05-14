@@ -8,36 +8,29 @@
   - service-role keys
   - admin tokens
 
-## Doppler setup
-1. Create Doppler project `oficina`.
-2. Create configs: `dev`, `staging`, `prod`.
-3. Add secrets per config.
-4. Use service tokens in CI:
-   - `DOPPLER_TOKEN_DEV`
-   - `DOPPLER_TOKEN_STAGING`
-   - `DOPPLER_TOKEN_PROD`
+## Environment setup
+1. Create `.env` from `.env.example`.
+2. Set:
+   - `EXPO_PUBLIC_SUPABASE_URL`
+   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+3. In Netlify, set same keys in Site configuration > Environment variables.
 
 ## Local development
 ```bash
 npm install
 npm run hooks:setup
-npm run start:doppler
+npm run start
 ```
 
 ## Validation and seed
 ```bash
 npm run env:check
-npm run seed:doppler
+npm run seed
 ```
-
-## EAS/CI mapping
-- `development` profile -> Doppler `dev`
-- `staging` profile -> Doppler `staging`
-- `production` profile -> Doppler `prod`
 
 Workflow file runs:
 - gitleaks on PR/push
-- Doppler env validation on push to `master`
+- env validation on push to `master`
 
 ## History cleanup for leaked `.env`
 Run once on maintainer machine, then force push:

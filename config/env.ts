@@ -19,7 +19,7 @@ function readRequiredEnv(name: keyof ClientEnv): string {
   }
 
   throw new Error(
-    `Missing required env var: ${name}. Also checked aliases: ${ENV_ALIASES[name].join(', ')}. Configure it in Netlify (Site configuration > Environment variables) or inject with Doppler (doppler run -- <command>).`
+    `Missing required env var: ${name}. Also checked aliases: ${ENV_ALIASES[name].join(', ')}. Configure it in Netlify (Site configuration > Environment variables) or local .env/.env.local.`
   );
 }
 

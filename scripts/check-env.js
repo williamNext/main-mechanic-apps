@@ -9,7 +9,7 @@ const missing = Object.entries(required)
 
 if (missing.length > 0) {
   console.error(
-    `Missing required env vars: ${missing.join(', ')}. Set them in your CI provider (for Netlify: Site configuration > Environment variables) or run with Doppler.`
+    `Missing required env vars: ${missing.join(', ')}. Set them in Netlify (Site configuration > Environment variables) and local .env/.env.local.`
   );
   process.exit(1);
 }
