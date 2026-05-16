@@ -1,12 +1,12 @@
 import { AppState, Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SecureStorage } from '@/utils/secure-storage';
 import { createClient, processLock } from '@supabase/supabase-js';
 import { env } from '@/config/env';
 
 export const supabase = createClient(env.EXPO_PUBLIC_SUPABASE_URL, env.EXPO_PUBLIC_SUPABASE_ANON_KEY, {
   auth: {
-    ...(Platform.OS !== 'web' ? { storage: AsyncStorage, lock: processLock } : {}),
+    ...(Platform.OS !== 'web' ? { storage: SecureStorage, lock: processLock } : {}),
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

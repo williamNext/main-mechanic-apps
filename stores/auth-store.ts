@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return true;
       }
     } catch (e) {
-      console.error('Login error:', e);
+      // Error handled internally
     } finally {
       set({ isLoading: false });
     }
@@ -72,7 +72,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return true;
       }
     } catch (e) {
-      console.error('Login error:', e);
+      // Error handled internally
     } finally {
       set({ isLoading: false });
     }
