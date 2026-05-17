@@ -15,7 +15,7 @@ import * as authService from '@/services/auth-service';
 import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
-import { formatPhone, toPseudoEmail } from '@/utils/format';
+import { formatPhone } from '@/utils/format';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -24,11 +24,12 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const canSubmit = !!name.trim() && !!phone.replace(/\D/g, '') && !!password;
 
   async function handleRegister() {
+    if (loading) return;
+
     setErrorMsg(null);
-    setSuccessMsg(null);
 
     if (!name || !phone || !password) {
       setErrorMsg('Preencha todos os campos.');
@@ -37,8 +38,8 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await authService.signUp(toPseudoEmail(phone), password, name, 'client', phone);
-      setSuccessMsg('Conta criada. Faça login para continuar.');
+      await authService.signUpWithPhone(phone, password, name, 'client');
+      router.replace('/(client)/browse');
     } catch (error: any) {
       setErrorMsg(error.message || 'Falha ao criar conta.');
     } finally {
@@ -76,14 +77,13 @@ export default function RegisterScreen() {
             </View>
 
             {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-            {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
-
             <View style={styles.form}>
               <InputField
                 label="Nome completo"
                 value={name}
                 onChangeText={setName}
                 placeholder="Seu nome"
+                returnKeyType="next"
                 leftIcon={<MaterialIcons name="person" size={18} color={colors.outline} />}
               />
 
@@ -93,6 +93,7 @@ export default function RegisterScreen() {
                 onChangeText={(text) => setPhone(formatPhone(text))}
                 placeholder="(51) 99999-9999"
                 keyboardType="phone-pad"
+                returnKeyType="next"
                 leftIcon={<MaterialIcons name="call" size={18} color={colors.outline} />}
               />
 
@@ -102,10 +103,16 @@ export default function RegisterScreen() {
                 onChangeText={setPassword}
                 placeholder="Crie sua senha"
                 secureTextEntry
+                returnKeyType="go"
+                onSubmitEditing={() => {
+                  if (canSubmit) {
+                    handleRegister();
+                  }
+                }}
                 leftIcon={<MaterialIcons name="lock" size={18} color={colors.outline} />}
               />
 
-              <PrimaryButton title="Cadastrar" onPress={handleRegister} loading={loading} variant="filled" />
+              <PrimaryButton title="Cadastrar" onPress={handleRegister} loading={loading} disabled={!canSubmit} variant="filled" />
             </View>
 
             <View style={styles.bottomLinkRow}>
@@ -216,11 +223,6 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.labelSm,
     color: colors.error,
-    marginTop: spacing.xs,
-  },
-  successText: {
-    ...typography.labelSm,
-    color: colors.secondary,
     marginTop: spacing.xs,
   },
   pressed: {

@@ -8,7 +8,7 @@ interface StatusBannerProps {
 }
 
 export function StatusBanner({ status }: StatusBannerProps) {
-  const safeStatus = (statusTheme as Record<string, (typeof statusTheme)[keyof typeof statusTheme]>)[status] || statusTheme.pending;
+  const safeStatus = (statusTheme as Record<string, (typeof statusTheme)[keyof typeof statusTheme]>)[status] || statusTheme.confirmado;
   const safeLabel = StatusLabels[status] || status;
 
   return (

@@ -1,8 +1,19 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { BottomNavBar } from '@/components/ui/BottomNavBar';
 import { colors } from '@/constants/theme';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function ClientLayout() {
+  const { isAuthenticated, isBootstrappingSession } = useAuth();
+
+  if (isBootstrappingSession) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs
       tabBar={(props) => <BottomNavBar {...props} />}

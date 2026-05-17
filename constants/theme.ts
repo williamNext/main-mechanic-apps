@@ -123,35 +123,23 @@ export const shadow = {
 } as const;
 
 export const StatusLabels: Record<string, string> = {
-  pending: 'Pendente',
-  confirmed: 'Confirmado',
-  in_progress: 'Em andamento',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
+  confirmado: 'Confirmado',
+  acabado: 'Acabado',
+  cancelado: 'Cancelado',
 };
 
 export const statusTheme = {
-  pending: {
+  confirmado: {
     background: colors.primary,
     text: colors.onPrimary,
     icon: 'schedule',
   },
-  confirmed: {
-    background: colors.primary,
-    text: colors.onPrimary,
-    icon: 'schedule',
-  },
-  in_progress: {
-    background: colors.secondary,
-    text: colors.onSecondary,
-    icon: 'build-circle',
-  },
-  completed: {
+  acabado: {
     background: colors.surfaceContainerHigh,
     text: colors.onSurface,
     icon: 'check-circle',
   },
-  cancelled: {
+  cancelado: {
     background: colors.errorContainer,
     text: colors.error,
     icon: 'cancel',
@@ -186,10 +174,9 @@ export const Colors = {
     tint: colors.primary,
     tabIconDefault: colors.onSurfaceVariant,
     tabIconSelected: colors.secondary,
-    statusPending: colors.primary,
-    statusConfirmed: colors.secondary,
-    statusCompleted: colors.surfaceContainerHigh,
-    statusCancelled: colors.error,
+    statusConfirmado: colors.primary,
+    statusAcabado: colors.surfaceContainerHigh,
+    statusCancelado: colors.error,
   },
   dark: {
     ...colors,
@@ -218,10 +205,9 @@ export const Colors = {
     tint: colors.primary,
     tabIconDefault: colors.onSurfaceVariant,
     tabIconSelected: colors.secondary,
-    statusPending: colors.primary,
-    statusConfirmed: colors.secondary,
-    statusCompleted: colors.surfaceContainerHigh,
-    statusCancelled: colors.error,
+    statusConfirmado: colors.primary,
+    statusAcabado: colors.surfaceContainerHigh,
+    statusCancelado: colors.error,
   },
 } as const;
 
@@ -276,15 +262,12 @@ export const Shadow = {
 
 export function getStatusColor(status: string, palette: typeof Colors.light) {
   switch (status) {
-    case 'pending':
-    case 'confirmed':
-      return palette.statusPending;
-    case 'in_progress':
-      return palette.statusConfirmed;
-    case 'completed':
-      return palette.statusCompleted;
-    case 'cancelled':
-      return palette.statusCancelled;
+    case 'confirmado':
+      return palette.statusConfirmado;
+    case 'acabado':
+      return palette.statusAcabado;
+    case 'cancelado':
+      return palette.statusCancelado;
     default:
       return palette.gray500;
   }

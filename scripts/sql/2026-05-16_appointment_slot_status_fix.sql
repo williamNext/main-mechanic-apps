@@ -1,81 +1,71 @@
--- 0. Drop existing tables if re-running
-DROP TABLE IF EXISTS appointments CASCADE;
-DROP TABLE IF EXISTS timeslots CASCADE;
-DROP TABLE IF EXISTS mechanics CASCADE;
-DROP TABLE IF EXISTS profiles CASCADE;
+-- Idempotent migration for appointment slot ownership, Portuguese statuses,
+-- secure booking/cancellation RPCs, and mechanic rating removal.
 
--- 1. Create tables
+UPDATE public.appointments
+SET status = CASE
+  WHEN status IN ('pending', 'confirmed', 'in_progress') THEN 'confirmado'
+  WHEN status = 'completed' THEN 'acabado'
+  WHEN status = 'cancelled' THEN 'cancelado'
+  ELSE status
+END
+WHERE status IN ('pending', 'confirmed', 'in_progress', 'completed', 'cancelled');
 
-CREATE TABLE profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'mechanic', 'client')),
-  phone TEXT,
-  avatar_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-);
+ALTER TABLE public.appointments
+  ALTER COLUMN status SET DEFAULT 'confirmado';
 
-CREATE TABLE mechanics (
-  id UUID REFERENCES profiles(id) ON DELETE CASCADE PRIMARY KEY,
-  specialty TEXT NOT NULL,
-  credentials TEXT NOT NULL,
-  is_active BOOLEAN DEFAULT TRUE
-);
+DO $$
+DECLARE
+  v_constraint_name TEXT;
+BEGIN
+  FOR v_constraint_name IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'public.appointments'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%status%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.appointments DROP CONSTRAINT %I', v_constraint_name);
+  END LOOP;
+END;
+$$;
 
-CREATE TABLE timeslots (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  mechanic_id UUID REFERENCES mechanics(id) ON DELETE CASCADE NOT NULL,
-  date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  is_available BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-);
+ALTER TABLE public.appointments
+  ADD CONSTRAINT appointments_status_check
+  CHECK (status IN ('confirmado', 'cancelado', 'acabado'));
 
-CREATE TABLE appointments (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  client_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  mechanic_id UUID REFERENCES mechanics(id) ON DELETE CASCADE NOT NULL,
-  timeslot_id UUID REFERENCES timeslots(id) ON DELETE SET NULL,
-  date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('confirmado', 'cancelado', 'acabado')) DEFAULT 'confirmado',
-  vehicle_info TEXT CHECK (char_length(coalesce(vehicle_info, '')) <= 120),
-  notes TEXT CHECK (char_length(coalesce(notes, '')) <= 1000),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.appointments'::regclass
+      AND conname = 'appointments_vehicle_info_length_check'
+  ) THEN
+    ALTER TABLE public.appointments
+      ADD CONSTRAINT appointments_vehicle_info_length_check
+      CHECK (char_length(coalesce(vehicle_info, '')) <= 120);
+  END IF;
 
-CREATE UNIQUE INDEX appointments_one_confirmado_per_timeslot
-  ON appointments (timeslot_id)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.appointments'::regclass
+      AND conname = 'appointments_notes_length_check'
+  ) THEN
+    ALTER TABLE public.appointments
+      ADD CONSTRAINT appointments_notes_length_check
+      CHECK (char_length(coalesce(notes, '')) <= 1000);
+  END IF;
+END;
+$$;
+
+ALTER TABLE public.mechanics
+  DROP COLUMN IF EXISTS rating;
+
+DROP POLICY IF EXISTS "Clients can book appointments" ON public.appointments;
+
+CREATE UNIQUE INDEX IF NOT EXISTS appointments_one_confirmado_per_timeslot
+  ON public.appointments (timeslot_id)
   WHERE status = 'confirmado' AND timeslot_id IS NOT NULL;
 
--- 2. Enable RLS
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE mechanics ENABLE ROW LEVEL SECURITY;
-ALTER TABLE timeslots ENABLE ROW LEVEL SECURITY;
-ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
-
--- 3. Basic RLS Policies (Simplified for MVP)
-CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
-CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "Mechanics are viewable by everyone" ON mechanics FOR SELECT USING (true);
-CREATE POLICY "Mechanics can update own details" ON mechanics FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Mechanics can insert own details" ON mechanics FOR INSERT WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "TimeSlots are viewable by everyone" ON timeslots FOR SELECT USING (true);
-CREATE POLICY "Mechanics can manage own timeslots" ON timeslots FOR ALL USING (auth.uid() = mechanic_id);
-
-CREATE POLICY "Clients can view own appointments" ON appointments FOR SELECT USING (auth.uid() = client_id);
-CREATE POLICY "Mechanics can view assigned appointments" ON appointments FOR SELECT USING (auth.uid() = mechanic_id);
-CREATE POLICY "Admins can view all" ON appointments FOR SELECT USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-);
-
--- 4. RPCs for secure booking/cancellation/status sync
 CREATE OR REPLACE FUNCTION public.book_client_appointment(
   p_timeslot_id UUID,
   p_vehicle_info TEXT DEFAULT NULL,

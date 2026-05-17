@@ -14,7 +14,11 @@ export function InputField({ label, leftIcon, style, multiline, ...props }: Inpu
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.inputWrapper, isFocused && styles.inputWrapperFocused, multiline && styles.multilineWrap]}>
-        {leftIcon ? <View style={styles.iconSlot}>{leftIcon}</View> : null}
+        {leftIcon ? (
+          <View pointerEvents="none" style={styles.iconSlot}>
+            {leftIcon}
+          </View>
+        ) : null}
         <TextInput
           {...props}
           multiline={multiline}
@@ -72,6 +76,7 @@ const styles = StyleSheet.create({
   input: {
     ...typography.bodyMd,
     color: colors.onSurface,
+    width: '100%',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
   },

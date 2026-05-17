@@ -10,6 +10,8 @@ Rules:
     Pattern: [thing] [action] [reason]. [next step].
     Not: "Sure! I'd be happy to help you with that."
     Yes: "Bug in auth middleware. Fix:"
+    For any Supabase task: mandatory read all files under `.agents/skills/supabase/` recursively and follow instructions found there.
+    For any request to alter Supabase resources: attempt execution via Supabase API first.
 
 Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
 

@@ -65,20 +65,25 @@ export default function BookMechanicScreen() {
     setBooking(true);
     try {
       await book({
-        clientId: user.id,
-        clientName: user.name,
-        mechanicId: mechanic.id,
-        mechanicName: mechanic.name,
         timeSlotId: selectedSlot.id,
-        date: selectedSlot.date,
-        startTime: selectedSlot.startTime,
-        endTime: selectedSlot.endTime,
         vehicleInfo: vehicleModel.trim(),
         notes: problemDescription.trim(),
       });
       router.replace('/(client)/booking-success');
-    } catch {
-      Alert.alert('Erro', 'Falha ao realizar agendamento');
+    } catch (error: any) {
+      const rawMessage = String(error?.message || '').toLowerCase();
+
+      if (rawMessage.includes('unavailable')) {
+        Alert.alert('Horário indisponível', 'Este horário acabou de ser reservado. Escolha outro horário.');
+      } else if (rawMessage.includes('expired')) {
+        Alert.alert('Horário expirado', 'Este horário já passou. Escolha outro horário.');
+      } else if (rawMessage.includes('too long')) {
+        Alert.alert('Erro', 'Revise os textos do veículo e da descrição.');
+      } else if (rawMessage.includes('booking rpc missing')) {
+        Alert.alert('Configuracao pendente', 'Funcao de agendamento ausente no Supabase. Aplique o SQL de correcao e tente novamente.');
+      } else {
+        Alert.alert('Erro', 'Falha ao realizar agendamento');
+      }
     } finally {
       setBooking(false);
     }
@@ -99,10 +104,6 @@ export default function BookMechanicScreen() {
               <View style={styles.profileInfo}>
                 <Text style={styles.profileName}>{mechanic.name}</Text>
                 <Text style={styles.profileSpecialty}>{mechanic.specialty}</Text>
-                <View style={styles.ratingRow}>
-                  <MaterialIcons name="star" size={15} color={colors.secondary} />
-                  <Text style={styles.ratingText}>{mechanic.rating?.toFixed(1) || '4.8'} avaliação</Text>
-                </View>
               </View>
             </View>
           )}
@@ -234,15 +235,6 @@ const styles = StyleSheet.create({
     ...typography.labelSm,
     color: colors.outline,
     textTransform: 'uppercase',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  ratingText: {
-    ...typography.labelSm,
-    color: colors.onSurfaceVariant,
   },
   section: {
     marginTop: spacing.md,

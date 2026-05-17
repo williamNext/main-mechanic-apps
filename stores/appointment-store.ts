@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { Appointment, AppointmentStatus } from '@/types/models';
+import { Appointment } from '@/types/models';
 import * as appointmentService from '@/services/appointment-service';
+import { useTimeSlotStore } from '@/stores/timeslot-store';
 
 interface AppointmentState {
   appointments: Appointment[];
@@ -10,8 +11,9 @@ interface AppointmentState {
   fetchAll: () => Promise<void>;
   fetchByMechanic: (mechanicId: string) => Promise<void>;
   fetchByClient: (clientId: string) => Promise<void>;
-  book: (data: Omit<Appointment, 'id' | 'createdAt' | 'status'>) => Promise<Appointment>;
-  updateStatus: (id: string, status: AppointmentStatus) => Promise<void>;
+  book: (data: appointmentService.BookAppointmentInput) => Promise<Appointment>;
+  cancelByClient: (id: string) => Promise<void>;
+  cancelByMechanic: (id: string) => Promise<void>;
 }
 
 export const useAppointmentStore = create<AppointmentState>((set) => ({
@@ -51,14 +53,24 @@ export const useAppointmentStore = create<AppointmentState>((set) => ({
 
   book: async (data) => {
     const appointment = await appointmentService.createAppointment(data);
+    useTimeSlotStore.getState().invalidateCache();
     set((state) => ({ appointments: [...state.appointments, appointment] }));
     return appointment;
   },
 
-  updateStatus: async (id, status) => {
-    await appointmentService.updateAppointmentStatus(id, status);
+  cancelByClient: async (id) => {
+    await appointmentService.cancelClientAppointment(id);
+    useTimeSlotStore.getState().invalidateCache();
     set((state) => ({
-      appointments: state.appointments.map((a) => (a.id === id ? { ...a, status } : a)),
+      appointments: state.appointments.map((a) => (a.id === id ? { ...a, status: 'cancelado' } : a)),
+    }));
+  },
+
+  cancelByMechanic: async (id) => {
+    await appointmentService.cancelMechanicAppointment(id);
+    useTimeSlotStore.getState().invalidateCache();
+    set((state) => ({
+      appointments: state.appointments.map((a) => (a.id === id ? { ...a, status: 'cancelado' } : a)),
     }));
   },
 }));

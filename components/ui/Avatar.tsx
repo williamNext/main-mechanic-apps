@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { FontSize, FontWeight } from '@/constants/theme';
 import { getInitials } from '@/utils/format';
 import { useAppTheme } from '@/hooks/use-theme';
 
@@ -11,7 +11,7 @@ interface AvatarProps {
   name: string;
   imageUrl?: string;
   size?: AvatarSize;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 const sizeMap: Record<AvatarSize, number> = {
@@ -34,18 +34,19 @@ export function Avatar({ name, imageUrl, size = 'md', style }: AvatarProps) {
 
   if (imageUrl) {
     return (
-      <Image
-        source={{ uri: imageUrl }}
+      <View
         style={[
           {
             width: dimension,
             height: dimension,
             borderRadius: dimension / 2,
+            overflow: 'hidden',
           },
           style,
         ]}
-        contentFit="cover"
-      />
+      >
+        <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      </View>
     );
   }
 

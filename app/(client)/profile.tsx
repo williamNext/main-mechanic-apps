@@ -1,12 +1,12 @@
-import React from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { TopAppBar } from '@/components/ui/TopAppBar';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { formatPhone, getInitials } from '@/utils/format';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ClientProfileScreen() {
   const { user, logout } = useAuth();
@@ -17,17 +17,16 @@ export default function ClientProfileScreen() {
   }
 
   const handleLogout = () => {
-    Alert.alert('Encerrar sessão', 'Deseja sair da sua conta agora?', [
-      { text: 'Continuar logado', style: 'cancel' },
-      {
-        text: 'Sair',
-        style: 'destructive',
-        onPress: () => {
-          logout();
           router.replace('/(auth)/login');
-        },
-      },
-    ]);
+          void logout(); 
+  };
+
+  const handleMyData = () => {
+    Alert.alert('Meus dados', 'Tela de edição ainda não implementada.');
+  };
+
+  const handleNotifications = () => {
+    Alert.alert('Notificações', 'Notificações ainda não implementadas.');
   };
 
   return (
@@ -44,9 +43,8 @@ export default function ClientProfileScreen() {
         </View>
 
         <View style={styles.settingsList}>
-          <SettingsRow icon="person" label="Meus Dados" />
-          <SettingsRow icon="notifications" label="Notificações" />
-          <SettingsRow icon="help" label="Ajuda" />
+          <SettingsRow icon="person" label="Meus Dados" onPress={handleMyData} />
+          <SettingsRow icon="notifications" label="Notificações" onPress={handleNotifications} />
         </View>
 
         <Pressable
@@ -62,9 +60,21 @@ export default function ClientProfileScreen() {
   );
 }
 
-function SettingsRow({ icon, label }: { icon: keyof typeof MaterialIcons.glyphMap; label: string }) {
+function SettingsRow({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
   return (
-    <Pressable android_ripple={{ color: colors.surfaceContainerHigh }} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
+    <Pressable
+      onPress={onPress}
+      android_ripple={{ color: colors.surfaceContainerHigh }}
+      style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}
+    >
       <View style={styles.settingsLeft}>
         <MaterialIcons name={icon} size={18} color={colors.secondary} />
         <Text style={styles.settingsLabel}>{label}</Text>

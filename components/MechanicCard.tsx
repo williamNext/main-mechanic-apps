@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { ChevronRight, Clock3, Star } from 'lucide-react-native';
+import { ChevronRight, Clock3 } from 'lucide-react-native';
 import { Mechanic } from '@/types/models';
 import { AppCard } from '@/components/app/AppCard';
 import { Avatar } from '@/components/app/Avatar';
@@ -11,7 +11,6 @@ import { useAppTheme } from '@/hooks/use-theme';
 interface MechanicCardProps {
   mechanic: Mechanic;
   onPress?: () => void;
-  showRating?: boolean;
 }
 
 export function MechanicCard({ mechanic, onPress }: MechanicCardProps) {
@@ -26,8 +25,6 @@ export function MechanicCard({ mechanic, onPress }: MechanicCardProps) {
             <Text style={[styles.name, { color: colors.gray900 }]}>{mechanic.name}</Text>
             <Badge label={mechanic.specialty} />
             <View style={styles.metaRow}>
-              <Star size={14} color={colors.accent} />
-              <Text style={[styles.metaText, { color: colors.gray600 }]}>{mechanic.rating?.toFixed(1) ?? '4.8'} avaliação</Text>
               <Clock3 size={14} color={colors.success} />
               <Text style={[styles.metaText, { color: colors.success }]}>Disponível</Text>
             </View>

@@ -2,28 +2,34 @@ import { create } from 'zustand';
 import { Mechanic } from '@/types/models';
 import * as mechanicService from '@/services/mechanic-service';
 
+const MECHANICS_CACHE_TTL_MS = 5 * 60 * 1000;
+
 interface MechanicState {
   mechanics: Mechanic[];
   isLoading: boolean;
   error: string | null;
+  fetchedAt: number | null;
 
-  fetchAll: () => Promise<void>;
+  fetchAll: (options?: { force?: boolean }) => Promise<void>;
   getById: (id: string) => Promise<Mechanic | null>;
-  addMechanic: (data: Omit<Mechanic, 'id' | 'createdAt' | 'role'>) => Promise<Mechanic>;
-  editMechanic: (id: string, data: Partial<Mechanic>) => Promise<void>;
-  removeMechanic: (id: string) => Promise<void>;
 }
 
 export const useMechanicStore = create<MechanicState>((set, get) => ({
   mechanics: [],
   isLoading: false,
   error: null,
+  fetchedAt: null,
 
-  fetchAll: async () => {
+  fetchAll: async (options) => {
+    const { mechanics, fetchedAt } = get();
+    const cacheFresh = fetchedAt !== null && Date.now() - fetchedAt < MECHANICS_CACHE_TTL_MS;
+
+    if (!options?.force && mechanics.length > 0 && cacheFresh) return;
+
     set({ isLoading: true, error: null });
     try {
       const mechanics = await mechanicService.getAllMechanics();
-      set({ mechanics, isLoading: false });
+      set({ mechanics, fetchedAt: Date.now(), isLoading: false });
     } catch {
       set({ error: 'Falha ao carregar mecânicos', isLoading: false });
     }
@@ -31,27 +37,5 @@ export const useMechanicStore = create<MechanicState>((set, get) => ({
 
   getById: async (id) => {
     return mechanicService.getMechanicById(id);
-  },
-
-  addMechanic: async (data) => {
-    const mechanic = await mechanicService.createMechanic(data);
-    set((state) => ({ mechanics: [...state.mechanics, mechanic] }));
-    return mechanic;
-  },
-
-  editMechanic: async (id, data) => {
-    const updated = await mechanicService.updateMechanic(id, data);
-    if (updated) {
-      set((state) => ({
-        mechanics: state.mechanics.map((m) => (m.id === id ? updated : m)),
-      }));
-    }
-  },
-
-  removeMechanic: async (id) => {
-    await mechanicService.deleteMechanic(id);
-    set((state) => ({
-      mechanics: state.mechanics.filter((m) => m.id !== id),
-    }));
   },
 }));

@@ -20,7 +20,7 @@ export function AppointmentCard({
   onActionPress,
 }: AppointmentCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
-  const theme = (statusTheme as Record<string, (typeof statusTheme)[keyof typeof statusTheme]>)[appointment.status] || statusTheme.pending;
+  const theme = (statusTheme as Record<string, (typeof statusTheme)[keyof typeof statusTheme]>)[appointment.status] || statusTheme.confirmado;
 
   const handlePressIn = () => {
     Animated.spring(scale, {
@@ -63,10 +63,6 @@ export function AppointmentCard({
 
           <View style={styles.mainInfo}>
             <Text numberOfLines={1} style={styles.name}>{appointment.mechanicName || 'Mecânico'}</Text>
-            <View style={styles.ratingRow}>
-              <MaterialIcons name="star" size={14} color={colors.secondary} />
-              <Text style={styles.ratingText}>4.8 • Oficina credenciada</Text>
-            </View>
             <Text style={styles.specialtyText}>{appointment.vehicleInfo || 'Diagnóstico e manutenção'}</Text>
           </View>
 
@@ -151,15 +147,6 @@ const styles = StyleSheet.create({
   name: {
     ...typography.headlineMd,
     color: colors.onSurface,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  ratingText: {
-    ...typography.labelSm,
-    color: colors.onSurfaceVariant,
   },
   specialtyText: {
     ...typography.labelSm,

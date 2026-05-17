@@ -55,7 +55,7 @@ export default function BrowseMechanicsScreen() {
             data={filtered}
             keyExtractor={(item) => item.id}
             refreshing={isLoading}
-            onRefresh={fetchAll}
+            onRefresh={() => fetchAll({ force: true })}
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
               <MechanicListCard
@@ -113,11 +113,6 @@ function MechanicListCard({ mechanic, onPress }: { mechanic: Mechanic; onPress: 
         <View style={styles.mechanicInfo}>
           <Text numberOfLines={1} style={styles.mechanicName}>{mechanic.name}</Text>
           <Text style={styles.specialty}>{mechanic.specialty}</Text>
-          <View style={styles.ratingRow}>
-            <MaterialIcons name="star" size={15} color={colors.secondary} />
-            <Text style={styles.ratingValue}>{mechanic.rating?.toFixed(1) || '4.8'}</Text>
-            <Text style={styles.reviewCount}>(120 avaliações)</Text>
-          </View>
         </View>
         <MaterialIcons name="chevron-right" size={22} color={colors.outlineVariant} />
       </Pressable>
@@ -204,19 +199,6 @@ const styles = StyleSheet.create({
     ...typography.labelSm,
     color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  ratingValue: {
-    ...typography.labelMd,
-    color: colors.onSurface,
-  },
-  reviewCount: {
-    ...typography.labelSm,
-    color: colors.onSurfaceVariant,
   },
   pressed: {
     opacity: 0.9,
