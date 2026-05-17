@@ -32,7 +32,16 @@ export function BottomNavBar({ state, descriptors, navigation }: BottomTabBarPro
                 canPreventDefault: true,
               });
 
-              if (!isFocused && !event.defaultPrevented) {
+              if (event.defaultPrevented) {
+                return;
+              }
+
+              if (route.name === 'browse') {
+                navigation.navigate('browse', { screen: 'index' });
+                return;
+              }
+
+              if (!isFocused) {
                 navigation.navigate(route.name, route.params);
               }
             };

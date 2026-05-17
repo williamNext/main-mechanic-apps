@@ -57,10 +57,6 @@ export default function BookingSuccessScreen() {
             </View>
             <View style={styles.summaryNameWrap}>
               <Text style={styles.mechanicName}>{latestAppointment?.mechanicName || 'Mecânico'}</Text>
-              <View style={styles.ratingRow}>
-                <MaterialIcons name="star" size={15} color={colors.secondary} />
-                <Text style={styles.ratingText}>4.8 avaliação</Text>
-              </View>
             </View>
           </View>
 
@@ -97,9 +93,9 @@ export default function BookingSuccessScreen() {
         ) : null}
 
         <PrimaryButton
-          title="Ir para Meus Agendamentos"
+          title="Voltar para Mecânicos"
           variant="secondary"
-          onPress={() => router.replace('/(client)/bookings')}
+          onPress={() => router.replace('/(client)/browse')}
         />
 
         <Text style={styles.linkText}>Precisa cancelar ou reagendar?</Text>
@@ -175,15 +171,6 @@ const styles = StyleSheet.create({
   mechanicName: {
     ...typography.headlineMd,
     color: colors.onSurface,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  ratingText: {
-    ...typography.labelSm,
-    color: colors.onSurfaceVariant,
   },
   divider: {
     height: 1,

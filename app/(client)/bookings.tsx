@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { parseISO } from 'date-fns';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppointmentCard } from '@/components/ui/AppointmentCard';
@@ -25,27 +24,16 @@ export default function ClientBookingsScreen() {
   }, [user?.id, fetchByClient]);
 
   const filteredAppointments = useMemo(() => {
-    const now = new Date();
-
     return appointments.filter((appointment) => {
-      const [hours = '00', minutes = '00', seconds = '00'] = appointment.startTime.split(':');
-      const normalizedTime = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
-      let appointmentDate = parseISO(`${appointment.date}T${normalizedTime}`);
-      if (Number.isNaN(appointmentDate.getTime())) {
-        appointmentDate = parseISO(`${appointment.date}T00:00:00`);
-      }
-      if (Number.isNaN(appointmentDate.getTime())) {
-        return mode === 'upcoming';
-      }
-
       if (mode === 'upcoming') {
-        return appointmentDate >= now;
+        return appointment.status === 'confirmado';
       }
-      return appointmentDate < now;
+      return appointment.status === 'acabado' || appointment.status === 'cancelado';
     });
   }, [appointments, mode]);
 
-  const fabBottom = Math.max(insets.bottom + 90, 90);
+  const fabBottom = insets.bottom + spacing.md;
+  const listBottomPadding = fabBottom + 56 + spacing.lg;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -55,7 +43,7 @@ export default function ClientBookingsScreen() {
         <Text style={styles.pageTitle}>Agendamentos</Text>
         <View style={styles.segmentWrap}>
           <SegmentButton label="Próximos" active={mode === 'upcoming'} onPress={() => setMode('upcoming')} />
-          <SegmentButton label="Anteriores" active={mode === 'past'} onPress={() => setMode('past')} />
+          <SegmentButton label="Histórico" active={mode === 'past'} onPress={() => setMode('past')} />
         </View>
       </View>
 
@@ -67,7 +55,7 @@ export default function ClientBookingsScreen() {
           keyExtractor={(item) => item.id}
           refreshing={isLoading}
           onRefresh={() => user?.id && fetchByClient(user.id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
           renderItem={({ item }) => (
             <AppointmentCard
               appointment={item}
@@ -181,7 +169,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: spacing.gutterMobile,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
   },
   emptyState: {
     alignItems: 'center',

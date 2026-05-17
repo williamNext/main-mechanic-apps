@@ -2,12 +2,12 @@
 
 export type Role = 'admin' | 'mechanic' | 'client';
 
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type AppointmentStatus = 'confirmado' | 'cancelado' | 'acabado';
 
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   role: Role;
   avatarUrl?: string;
   phone?: string;
@@ -18,7 +18,6 @@ export interface Mechanic extends User {
   role: 'mechanic';
   specialty: string;
   credentials: string;
-  rating?: number;
 }
 
 export interface TimeSlot {

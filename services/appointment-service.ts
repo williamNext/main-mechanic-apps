@@ -1,5 +1,21 @@
 import { supabase } from './api';
-import { Appointment, AppointmentStatus } from '@/types/models';
+import { Appointment } from '@/types/models';
+
+export interface BookAppointmentInput {
+  timeSlotId: string;
+  vehicleInfo?: string;
+  notes?: string;
+}
+
+function isMissingBookingRpcError(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string; details?: string };
+  const text = `${candidate.message ?? ''} ${candidate.details ?? ''}`.toLowerCase();
+
+  return candidate.code === 'PGRST202' || (
+    text.includes('book_client_appointment') &&
+    (text.includes('schema cache') || text.includes('could not find the function'))
+  );
+}
 
 function mapAppointmentRow(a: any): Appointment {
   return {
@@ -20,7 +36,14 @@ function mapAppointmentRow(a: any): Appointment {
   };
 }
 
+export async function syncAcabadoAppointments(): Promise<void> {
+  const { error } = await supabase.rpc('sync_acabado_appointments');
+  if (error) throw error;
+}
+
 export async function getAllAppointments(): Promise<Appointment[]> {
+  await syncAcabadoAppointments();
+
   const { data, error } = await supabase
     .from('appointments')
     .select(`
@@ -49,6 +72,8 @@ export async function getAllAppointments(): Promise<Appointment[]> {
 }
 
 export async function getAppointmentsByClient(clientId: string): Promise<Appointment[]> {
+  await syncAcabadoAppointments();
+
   const { data, error } = await supabase
     .from('appointments')
     .select(`*`)
@@ -73,6 +98,8 @@ export async function getAppointmentsByClient(clientId: string): Promise<Appoint
 }
 
 export async function getAppointmentsByMechanic(mechanicId: string): Promise<Appointment[]> {
+  await syncAcabadoAppointments();
+
   const { data, error } = await supabase
     .from('appointments')
     .select(`
@@ -91,39 +118,52 @@ export async function getAppointmentsByMechanic(mechanicId: string): Promise<App
   }));
 }
 
-export async function createAppointment(appointment: Omit<Appointment, 'id' | 'createdAt'>): Promise<Appointment> {
+export async function createAppointment(appointment: BookAppointmentInput): Promise<Appointment> {
   const { data, error } = await supabase
-    .from('appointments')
-    .insert({
-      client_id: appointment.clientId,
-      mechanic_id: appointment.mechanicId,
-      timeslot_id: appointment.timeSlotId,
-      date: appointment.date,
-      start_time: appointment.startTime,
-      end_time: appointment.endTime,
-      vehicle_info: appointment.vehicleInfo,
-      notes: appointment.notes,
-      status: 'pending',
-    })
-    .select()
+    .rpc('book_client_appointment', {
+      p_timeslot_id: appointment.timeSlotId,
+      p_vehicle_info: appointment.vehicleInfo ?? null,
+      p_notes: appointment.notes ?? null,
+    });
+
+  if (error) {
+    if (isMissingBookingRpcError(error)) {
+      throw new Error(
+        'Booking RPC missing in Supabase. Run scripts/sql/2026-05-16_fix_book_client_appointment_rpc.sql and retry.',
+      );
+    }
+
+    throw error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('appointment not created');
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, name, phone')
+    .eq('id', row.mechanic_id)
     .single();
 
-  if (error) throw error;
-
-  // Mark timeslot as unavailable
-  await supabase
-    .from('timeslots')
-    .update({ is_available: false })
-    .eq('id', appointment.timeSlotId);
-
-  return mapAppointmentRow(data);
+  return mapAppointmentRow({
+    ...row,
+    mechanicName: profile?.name ?? undefined,
+    mechanicPhone: profile?.phone ?? undefined,
+  });
 }
 
-export async function updateAppointmentStatus(id: string, status: AppointmentStatus): Promise<void> {
-  const { error } = await supabase
-    .from('appointments')
-    .update({ status })
-    .eq('id', id);
+export async function cancelClientAppointment(appointmentId: string): Promise<void> {
+  const { error } = await supabase.rpc('cancel_client_appointment', {
+    p_appointment_id: appointmentId,
+  });
+
+  if (error) throw error;
+}
+
+export async function cancelMechanicAppointment(appointmentId: string): Promise<void> {
+  const { error } = await supabase.rpc('cancel_mechanic_appointment', {
+    p_appointment_id: appointmentId,
+  });
 
   if (error) throw error;
 }

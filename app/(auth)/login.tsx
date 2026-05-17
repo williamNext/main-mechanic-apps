@@ -19,11 +19,12 @@ import { formatPhone } from '@/utils/format';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { loginByPhone, isLoading } = useAuthStore();
+  const { loginByPhone, isAuthActionLoading } = useAuthStore();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const canSubmit = !!phone.replace(/\D/g, '') && !!password;
 
   async function handleLogin() {
     if (isSubmitting) return;
@@ -45,7 +46,11 @@ export default function LoginScreen() {
     try {
       const success = await loginByPhone(phone, password);
       if (success) {
+        const routeStart = Date.now();
         router.replace('/(client)/browse');
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.log(`[auth] login route replace queued in ${Date.now() - routeStart}ms`);
+        }
         return;
       }
 
@@ -97,6 +102,7 @@ export default function LoginScreen() {
                 onChangeText={(text) => setPhone(formatPhone(text))}
                 placeholder="(51) 99999-9999"
                 keyboardType="phone-pad"
+                returnKeyType="next"
                 leftIcon={<MaterialIcons name="call" size={18} color={colors.outline} />}
               />
 
@@ -106,6 +112,12 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 placeholder="Digite sua senha"
                 secureTextEntry
+                returnKeyType="go"
+                onSubmitEditing={() => {
+                  if (canSubmit) {
+                    handleLogin();
+                  }
+                }}
                 leftIcon={<MaterialIcons name="lock" size={18} color={colors.outline} />}
               />
 
@@ -120,7 +132,8 @@ export default function LoginScreen() {
               <PrimaryButton
                 title="Entrar"
                 onPress={handleLogin}
-                loading={isLoading || isSubmitting}
+                loading={isAuthActionLoading || isSubmitting}
+                disabled={!canSubmit}
                 variant="filled"
               />
             </View>

@@ -28,6 +28,23 @@ export async function getSlotsByMechanic(mechanicId: string, date?: string): Pro
   return data.map(mapSlot);
 }
 
+export async function getAvailableSlotsByMechanic(mechanicId: string, date?: string): Promise<TimeSlot[]> {
+  let query = supabase
+    .from('timeslots')
+    .select('*')
+    .eq('mechanic_id', mechanicId)
+    .eq('is_available', true);
+
+  if (date) {
+    query = query.eq('date', date);
+  }
+
+  const { data, error } = await query.order('start_time', { ascending: true });
+
+  if (error) throw error;
+  return data.map(mapSlot);
+}
+
 export async function createSlot(slot: Omit<TimeSlot, 'id'>): Promise<TimeSlot> {
   const { data, error } = await supabase
     .from('timeslots')

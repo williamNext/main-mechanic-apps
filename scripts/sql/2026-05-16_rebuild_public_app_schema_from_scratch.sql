@@ -1,81 +1,186 @@
--- 0. Drop existing tables if re-running
-DROP TABLE IF EXISTS appointments CASCADE;
-DROP TABLE IF EXISTS timeslots CASCADE;
-DROP TABLE IF EXISTS mechanics CASCADE;
-DROP TABLE IF EXISTS profiles CASCADE;
+-- DESTRUCTIVE RESET: drops and rebuilds the app schema in public.
+-- This does NOT delete Supabase Auth users. It deletes app tables/data:
+-- profiles, mechanics, timeslots, appointments.
+--
+-- Run order in Supabase SQL Editor:
+-- 1. Run this full file.
+-- 2. Ensure Auth users exist for mechanics/clients.
+-- 3. Run scripts/sql/2026-05-16_seed_3_mechanics_timeslots.sql.
 
--- 1. Create tables
+BEGIN;
 
-CREATE TABLE profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+-- 1. Drop old public app objects.
+DROP FUNCTION IF EXISTS public.book_client_appointment(UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.cancel_client_appointment(UUID);
+DROP FUNCTION IF EXISTS public.cancel_mechanic_appointment(UUID);
+DROP FUNCTION IF EXISTS public.sync_acabado_appointments();
+
+DROP TABLE IF EXISTS public.appointments CASCADE;
+DROP TABLE IF EXISTS public.timeslots CASCADE;
+DROP TABLE IF EXISTS public.mechanics CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+-- 2. Tables.
+CREATE TABLE public.profiles (
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT,
   role TEXT NOT NULL CHECK (role IN ('admin', 'mechanic', 'client')),
   phone TEXT,
   avatar_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-CREATE TABLE mechanics (
-  id UUID REFERENCES profiles(id) ON DELETE CASCADE PRIMARY KEY,
+CREATE TABLE public.mechanics (
+  id UUID REFERENCES public.profiles(id) ON DELETE CASCADE PRIMARY KEY,
   specialty TEXT NOT NULL,
   credentials TEXT NOT NULL,
-  is_active BOOLEAN DEFAULT TRUE
+  is_active BOOLEAN DEFAULT TRUE NOT NULL
 );
 
-CREATE TABLE timeslots (
+CREATE TABLE public.timeslots (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  mechanic_id UUID REFERENCES mechanics(id) ON DELETE CASCADE NOT NULL,
+  mechanic_id UUID REFERENCES public.mechanics(id) ON DELETE CASCADE NOT NULL,
   date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
-  is_available BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  is_available BOOLEAN DEFAULT TRUE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  CONSTRAINT timeslots_time_order_check CHECK (end_time > start_time)
 );
 
-CREATE TABLE appointments (
+CREATE TABLE public.appointments (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  client_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  mechanic_id UUID REFERENCES mechanics(id) ON DELETE CASCADE NOT NULL,
-  timeslot_id UUID REFERENCES timeslots(id) ON DELETE SET NULL,
+  client_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  mechanic_id UUID REFERENCES public.mechanics(id) ON DELETE CASCADE NOT NULL,
+  timeslot_id UUID REFERENCES public.timeslots(id) ON DELETE SET NULL,
   date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('confirmado', 'cancelado', 'acabado')) DEFAULT 'confirmado',
   vehicle_info TEXT CHECK (char_length(coalesce(vehicle_info, '')) <= 120),
   notes TEXT CHECK (char_length(coalesce(notes, '')) <= 1000),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  CONSTRAINT appointments_time_order_check CHECK (end_time > start_time)
 );
 
+-- 3. Indexes.
 CREATE UNIQUE INDEX appointments_one_confirmado_per_timeslot
-  ON appointments (timeslot_id)
+  ON public.appointments (timeslot_id)
   WHERE status = 'confirmado' AND timeslot_id IS NOT NULL;
 
--- 2. Enable RLS
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE mechanics ENABLE ROW LEVEL SECURITY;
-ALTER TABLE timeslots ENABLE ROW LEVEL SECURITY;
-ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+CREATE UNIQUE INDEX timeslots_mechanic_date_time_unique_idx
+  ON public.timeslots (mechanic_id, date, start_time, end_time);
 
--- 3. Basic RLS Policies (Simplified for MVP)
-CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
-CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE INDEX profiles_role_mechanic_idx
+  ON public.profiles (role)
+  WHERE role = 'mechanic';
 
-CREATE POLICY "Mechanics are viewable by everyone" ON mechanics FOR SELECT USING (true);
-CREATE POLICY "Mechanics can update own details" ON mechanics FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Mechanics can insert own details" ON mechanics FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE INDEX timeslots_mechanic_date_available_start_idx
+  ON public.timeslots (mechanic_id, date, is_available, start_time);
 
-CREATE POLICY "TimeSlots are viewable by everyone" ON timeslots FOR SELECT USING (true);
-CREATE POLICY "Mechanics can manage own timeslots" ON timeslots FOR ALL USING (auth.uid() = mechanic_id);
+CREATE INDEX appointments_client_date_desc_idx
+  ON public.appointments (client_id, date DESC);
 
-CREATE POLICY "Clients can view own appointments" ON appointments FOR SELECT USING (auth.uid() = client_id);
-CREATE POLICY "Mechanics can view assigned appointments" ON appointments FOR SELECT USING (auth.uid() = mechanic_id);
-CREATE POLICY "Admins can view all" ON appointments FOR SELECT USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-);
+CREATE INDEX appointments_mechanic_date_desc_idx
+  ON public.appointments (mechanic_id, date DESC);
 
--- 4. RPCs for secure booking/cancellation/status sync
+-- 4. Data API privileges. RLS still controls row access.
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+
+GRANT SELECT ON public.profiles TO anon, authenticated;
+GRANT INSERT, UPDATE ON public.profiles TO authenticated;
+
+GRANT SELECT ON public.mechanics TO anon, authenticated;
+GRANT INSERT, UPDATE ON public.mechanics TO authenticated;
+
+GRANT SELECT ON public.timeslots TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.timeslots TO authenticated;
+
+GRANT SELECT ON public.appointments TO authenticated;
+
+-- 5. RLS.
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mechanics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.timeslots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public profiles are viewable by everyone"
+  ON public.profiles
+  FOR SELECT
+  USING (true);
+
+CREATE POLICY "Users can insert own profile"
+  ON public.profiles
+  FOR INSERT
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile"
+  ON public.profiles
+  FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Mechanics are viewable by everyone"
+  ON public.mechanics
+  FOR SELECT
+  USING (true);
+
+CREATE POLICY "Mechanics can insert own details"
+  ON public.mechanics
+  FOR INSERT
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Mechanics can update own details"
+  ON public.mechanics
+  FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "TimeSlots are viewable by everyone"
+  ON public.timeslots
+  FOR SELECT
+  USING (true);
+
+CREATE POLICY "Mechanics can insert own timeslots"
+  ON public.timeslots
+  FOR INSERT
+  WITH CHECK (auth.uid() = mechanic_id);
+
+CREATE POLICY "Mechanics can update own timeslots"
+  ON public.timeslots
+  FOR UPDATE
+  USING (auth.uid() = mechanic_id)
+  WITH CHECK (auth.uid() = mechanic_id);
+
+CREATE POLICY "Mechanics can delete own timeslots"
+  ON public.timeslots
+  FOR DELETE
+  USING (auth.uid() = mechanic_id);
+
+CREATE POLICY "Clients can view own appointments"
+  ON public.appointments
+  FOR SELECT
+  USING (auth.uid() = client_id);
+
+CREATE POLICY "Mechanics can view assigned appointments"
+  ON public.appointments
+  FOR SELECT
+  USING (auth.uid() = mechanic_id);
+
+CREATE POLICY "Admins can view all appointments"
+  ON public.appointments
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.profiles
+      WHERE id = auth.uid()
+        AND role = 'admin'
+    )
+  );
+
+-- 6. Secure booking/cancellation RPCs.
 CREATE OR REPLACE FUNCTION public.book_client_appointment(
   p_timeslot_id UUID,
   p_vehicle_info TEXT DEFAULT NULL,
@@ -96,8 +201,10 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = v_user_id AND role = 'client'
+    SELECT 1
+    FROM public.profiles
+    WHERE id = v_user_id
+      AND role = 'client'
   ) THEN
     RAISE EXCEPTION 'not authorized';
   END IF;
@@ -283,9 +390,35 @@ REVOKE ALL ON FUNCTION public.book_client_appointment(UUID, TEXT, TEXT) FROM PUB
 REVOKE ALL ON FUNCTION public.cancel_client_appointment(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.cancel_mechanic_appointment(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_acabado_appointments() FROM PUBLIC;
+
 GRANT EXECUTE ON FUNCTION public.book_client_appointment(UUID, TEXT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.cancel_client_appointment(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.cancel_mechanic_appointment(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.sync_acabado_appointments() TO authenticated;
 
+COMMIT;
+
+-- Force PostgREST to reload exposed tables/functions.
 NOTIFY pgrst, 'reload schema';
+
+-- Sanity checks. Expected: four tables + four functions.
+SELECT tablename
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN ('profiles', 'mechanics', 'timeslots', 'appointments')
+ORDER BY tablename;
+
+SELECT
+  n.nspname AS schema,
+  p.proname AS function_name,
+  pg_get_function_identity_arguments(p.oid) AS identity_arguments
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname IN (
+    'book_client_appointment',
+    'cancel_client_appointment',
+    'cancel_mechanic_appointment',
+    'sync_acabado_appointments'
+  )
+ORDER BY p.proname;

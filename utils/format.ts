@@ -27,11 +27,6 @@ export function toBrazilWhatsAppPhone(phone: string): string | null {
   return null;
 }
 
-export function toPseudoEmail(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  return `55${digits}@oficina.app`;
-}
-
 export function getInitials(name: string): string {
   return name
     .split(' ')
