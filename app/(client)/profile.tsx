@@ -18,7 +18,9 @@ export default function ClientProfileScreen() {
 
   const handleLogout = () => {
           router.replace('/(auth)/login');
+
           void logout();
+
   };
 
   const handleMyData = () => {
