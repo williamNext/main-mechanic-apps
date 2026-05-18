@@ -7,7 +7,7 @@ import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 
 const tabMeta: Record<string, { label: string; icon: keyof typeof MaterialIcons.glyphMap }> = {
   agenda: { label: 'Agenda', icon: 'event-note' },
-  availability: { label: 'Horários', icon: 'schedule' },
+  availability: { label: 'Horarios', icon: 'schedule' },
   profile: { label: 'Perfil', icon: 'person' },
 };
 
@@ -114,3 +114,5 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 });
+
+

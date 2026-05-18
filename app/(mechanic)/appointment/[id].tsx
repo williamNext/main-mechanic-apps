@@ -27,7 +27,7 @@ export default function MechanicAppointmentDetailScreen() {
   const handleCancel = () => {
     if (!appointment || appointment.status !== 'confirmado') return;
 
-    Alert.alert('Cancelar agendamento?', 'O horário será reaberto para clientes se o RPC do banco permitir.', [
+    Alert.alert('Cancelar agendamento?', 'O horario sera reaberto para clientes se o RPC do banco permitir.', [
       { text: 'Manter', style: 'cancel' },
       {
         text: 'Cancelar',
@@ -53,11 +53,11 @@ export default function MechanicAppointmentDetailScreen() {
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <ArrowLeft size={20} color={colors.onSurface} />
           </Pressable>
-          <Text style={styles.headerTitle}>Appointment</Text>
+          <Text style={styles.headerTitle}>Agendamento</Text>
         </View>
         <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Agendamento não carregado</Text>
-          <Text style={styles.emptyText}>Volte para a agenda e atualize os agendamentos atribuídos.</Text>
+          <Text style={styles.emptyTitle}>Agendamento nao carregado</Text>
+          <Text style={styles.emptyText}>Volte para a agenda e atualize os agendamentos atribuidos.</Text>
         </View>
       </View>
     );
@@ -71,7 +71,7 @@ export default function MechanicAppointmentDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={20} color={colors.onSurface} />
         </Pressable>
-        <Text style={styles.headerTitle}>Entrada do serviço</Text>
+        <Text style={styles.headerTitle}>Entrada do servico</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -94,27 +94,27 @@ export default function MechanicAppointmentDetailScreen() {
           <Text style={styles.sectionTitle}>Cliente</Text>
           <View style={styles.infoRow}>
             <UserRound size={18} color={colors.safetyOrange} />
-            <Text style={styles.infoText}>{appointment.clientName ?? 'Nome não informado'}</Text>
+            <Text style={styles.infoText}>{appointment.clientName ?? 'Nome nao informado'}</Text>
           </View>
           <View style={styles.infoRow}>
             <Phone size={18} color={colors.safetyOrange} />
-            <Text style={styles.infoText}>{appointment.clientPhone ?? 'Telefone oculto ou indisponível'}</Text>
+            <Text style={styles.infoText}>{appointment.clientPhone ?? 'Telefone oculto ou indisponivel'}</Text>
           </View>
         </View>
 
         <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>Veículo e queixa</Text>
+          <Text style={styles.sectionTitle}>Veiculo e queixa</Text>
           <View style={styles.infoRow}>
             <Car size={18} color={colors.safetyOrange} />
-            <Text style={styles.infoText}>{appointment.vehicleInfo || 'Veículo não informado'}</Text>
+            <Text style={styles.infoText}>{appointment.vehicleInfo || 'Veiculo nao informado'}</Text>
           </View>
-          <Text style={styles.notes}>{appointment.notes || 'Nenhuma observação informada.'}</Text>
+          <Text style={styles.notes}>{appointment.notes || 'Nenhuma observacao informada.'}</Text>
         </View>
 
         <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>Ações atuais do MVP</Text>
+          <Text style={styles.sectionTitle}>Acoes atuais do MVP</Text>
           <Text style={styles.notes}>
-            Use o contexto da agenda para preparação e entrada. Ordens de serviço, orçamentos, pagamentos e mensagens ainda não estão habilitados.
+            Use o contexto da agenda para preparacao e entrada. Ordens de servico, orcamentos, pagamentos e mensagens ainda nao estao habilitados.
           </Text>
           <PrimaryButton
             title="Cancelar agendamento"

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { Clock3, Plus, Trash2 } from 'lucide-react-native';
+import { Clock3, Lock, Plus, Trash2 } from 'lucide-react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -108,8 +108,12 @@ function SlotRow({
           trackColor={{ false: colors.surfaceContainerHigh, true: colors.secondaryContainer }}
           thumbColor={slot.isAvailable ? colors.secondary : colors.outline}
         />
-        <Pressable onPress={() => onDelete(slot)} style={styles.iconButton}>
-          <Trash2 size={18} color={colors.error} />
+        <Pressable
+          disabled={!slot.isAvailable}
+          onPress={() => onDelete(slot)}
+          style={[styles.iconButton, !slot.isAvailable ? styles.iconButtonDisabled : null]}
+        >
+          {slot.isAvailable ? <Trash2 size={18} color={colors.error} /> : <Lock size={18} color={colors.onSurfaceVariant} />}
         </Pressable>
       </View>
     </View>
@@ -119,7 +123,8 @@ function SlotRow({
 export default function AvailabilityScreen() {
   const user = useAuthStore((state) => state.user);
   const { slots, fetchByMechanic, addSlot, toggleAvailability, removeSlot, isLoading, error } = useTimeSlotStore();
-  const [date, setDate] = useState(toISODate(new Date()));
+  const today = toISODate(new Date());
+  const [date, setDate] = useState(today);
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('09:00');
   const [formError, setFormError] = useState<string | null>(null);
@@ -127,6 +132,7 @@ export default function AvailabilityScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [batchDuration, setBatchDuration] = useState<60 | 90 | 120>(60);
   const [batchCount, setBatchCount] = useState('1');
+  const [mode, setMode] = useState<'single' | 'batch'>('single');
 
   useEffect(() => {
     if (user?.role === 'mechanic') {
@@ -137,6 +143,11 @@ export default function AvailabilityScreen() {
   const orderedSlots = useMemo(
     () => [...slots].sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)),
     [slots],
+  );
+
+  const todaySlotsCount = useMemo(
+    () => orderedSlots.filter((slot) => slot.date === today).length,
+    [orderedSlots, today],
   );
 
   const refresh = () => {
@@ -175,8 +186,7 @@ export default function AvailabilityScreen() {
     }
   };
 
-  const handleQuickAdd = async (durationMinutes: number) => {
-    if (user?.role !== 'mechanic') return;
+  const handleDurationSuggestion = (durationMinutes: number) => {
     const baseStart = findLastEndTimeForDate(date.trim(), orderedSlots, maskTimeInput(endTime.trim()));
     const nextEnd = addMinutesToTime(baseStart, durationMinutes);
 
@@ -185,29 +195,9 @@ export default function AvailabilityScreen() {
       return;
     }
 
-    const validation = validateSlot(date.trim(), baseStart, nextEnd, orderedSlots);
-    if (validation) {
-      setFormError(validation);
-      return;
-    }
-
-    setSaving(true);
     setFormError(null);
-    try {
-      await addSlot({
-        mechanicId: user.id,
-        date: date.trim(),
-        startTime: baseStart,
-        endTime: nextEnd,
-        isAvailable: true,
-      });
-      setStartTime(baseStart);
-      setEndTime(nextEnd);
-    } catch (slotError: any) {
-      setFormError(slotError.message || 'Falha ao criar horario por intervalo.');
-    } finally {
-      setSaving(false);
-    }
+    setStartTime(baseStart);
+    setEndTime(nextEnd);
   };
 
   const handleBatchAdd = async () => {
@@ -274,6 +264,16 @@ export default function AvailabilityScreen() {
     setFormError(null);
   };
 
+  const handleWebDateChange = (value: string) => {
+    const nextDate = value.replace(/[^\d-]/g, '').slice(0, 10);
+    setDate(nextDate);
+    if (DATE_PATTERN.test(nextDate) && isPastDate(nextDate)) {
+      setFormError('Nao pode usar data no passado.');
+      return;
+    }
+    setFormError(null);
+  };
+
   const handleToggle = async (slot: TimeSlot) => {
     try {
       await toggleAvailability(slot.id, !slot.isAvailable);
@@ -283,7 +283,9 @@ export default function AvailabilityScreen() {
   };
 
   const handleDelete = (slot: TimeSlot) => {
-    Alert.alert('Excluir horario?', `${slot.date} ${slot.startTime}`, [
+    if (!slot.isAvailable) return;
+
+    Alert.alert('Excluir horario?', `${formatDateFull(slot.date)} - ${formatTimeRange(slot.startTime, slot.endTime)}`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Excluir',
@@ -312,75 +314,59 @@ export default function AvailabilityScreen() {
         <View style={styles.formCard}>
           <View style={styles.formTitleRow}>
             <Plus size={20} color={colors.safetyOrange} />
-            <Text style={styles.formTitle}>Novo horario</Text>
+            <Text style={styles.formTitle}>Adicionar disponibilidade</Text>
           </View>
-
-          <Pressable testID="availability-date-trigger" onPress={() => setPickerVisible((v) => !v)} style={styles.dateButton}>
-            <Text style={styles.dateButtonLabel}>Data</Text>
-            <Text style={styles.dateButtonValue}>{formatDateFull(date)}</Text>
-            <Text style={styles.dateButtonHint}>{date}</Text>
-          </Pressable>
 
           {Platform.OS === 'web' ? (
             <AppInput
-              label="Data (web)"
+              label="Data"
               testID="availability-date-input-web"
               value={date}
-              onChangeText={(value) => {
-                const nextDate = value.replace(/[^\d-]/g, '').slice(0, 10);
-                setDate(nextDate);
-                if (DATE_PATTERN.test(nextDate) && isPastDate(nextDate)) {
-                  setFormError('Nao pode usar data no passado.');
-                } else {
-                  setFormError(null);
-                }
-              }}
+              onChangeText={handleWebDateChange}
               placeholder="AAAA-MM-DD"
               autoCapitalize="none"
+              {...({ type: 'date', min: today } as any)}
             />
-          ) : null}
+          ) : (
+            <Pressable testID="availability-date-trigger" onPress={() => setPickerVisible((v) => !v)} style={styles.dateButton}>
+              <Text style={styles.dateButtonLabel}>Data</Text>
+              <Text style={styles.dateButtonValue}>{formatDateFull(date)}</Text>
+              <Text style={styles.dateButtonHint}>{date}</Text>
+            </Pressable>
+          )}
 
           {Platform.OS !== 'web' && pickerVisible ? (
             <DateTimePicker
               testID="availability-date-picker"
               mode="date"
               value={toDateAtMidnight(date)}
-              minimumDate={toDateAtMidnight(toISODate(new Date()))}
+              minimumDate={toDateAtMidnight(today)}
               onChange={handleDateChange}
             />
           ) : null}
 
-          <View style={styles.timeInputs}>
-            <AppInput
-              label="Inicio"
-              value={startTime}
-              onChangeText={(value) => setStartTime(maskTimeInput(value))}
-              placeholder="08:00"
-              autoCapitalize="none"
-              keyboardType="number-pad"
-              maxLength={5}
-              testID="availability-start-input"
-            />
-            <AppInput
-              label="Fim"
-              value={endTime}
-              onChangeText={(value) => setEndTime(maskTimeInput(value))}
-              placeholder="09:00"
-              autoCapitalize="none"
-              keyboardType="number-pad"
-              maxLength={5}
-              testID="availability-end-input"
-            />
+          <View style={styles.modeSwitcher}>
+            <Pressable
+              onPress={() => setMode('single')}
+              style={[styles.modeButton, mode === 'single' ? styles.modeButtonActive : null]}
+            >
+              <Text style={[styles.modeButtonText, mode === 'single' ? styles.modeButtonTextActive : null]}>Horario individual</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMode('batch')}
+              style={[styles.modeButton, mode === 'batch' ? styles.modeButtonActive : null]}
+            >
+              <Text style={[styles.modeButtonText, mode === 'batch' ? styles.modeButtonTextActive : null]}>Adicionar em lote</Text>
+            </Pressable>
           </View>
 
+          <Text style={styles.hintTitle}>Sugestoes de duracao</Text>
           <View style={styles.quickRow}>
             {QUICK_INTERVALS.map((interval) => (
               <Pressable
                 key={interval.label}
                 style={styles.quickChip}
-                onPress={() => {
-                  void handleQuickAdd(interval.minutes);
-                }}
+                onPress={() => handleDurationSuggestion(interval.minutes)}
                 disabled={saving}
                 testID={`availability-quick-${interval.minutes}`}
               >
@@ -389,45 +375,70 @@ export default function AvailabilityScreen() {
             ))}
           </View>
 
-          <View style={styles.batchCard}>
-            <Text style={styles.batchTitle}>Adicionar em lote</Text>
-            <View style={styles.batchDurationRow}>
-              {[60, 90, 120].map((minutes) => (
-                <Pressable
-                  key={minutes}
-                  testID={`availability-duration-${minutes}`}
-                  onPress={() => setBatchDuration(minutes as 60 | 90 | 120)}
-                  style={[styles.durationChip, batchDuration === minutes ? styles.durationChipActive : null]}
-                >
-                  <Text style={[styles.durationChipText, batchDuration === minutes ? styles.durationChipTextActive : null]}>
-                    {minutes === 90 ? '1h30' : `${minutes / 60}h`}
-                  </Text>
-                </Pressable>
-              ))}
+          {mode === 'single' ? (
+            <View style={styles.timeInputs}>
+              <AppInput
+                label="Inicio"
+                value={startTime}
+                onChangeText={(value) => setStartTime(maskTimeInput(value))}
+                placeholder="08:00"
+                autoCapitalize="none"
+                keyboardType="number-pad"
+                maxLength={5}
+                testID="availability-start-input"
+              />
+              <AppInput
+                label="Fim"
+                value={endTime}
+                onChangeText={(value) => setEndTime(maskTimeInput(value))}
+                placeholder="09:00"
+                autoCapitalize="none"
+                keyboardType="number-pad"
+                maxLength={5}
+                testID="availability-end-input"
+              />
             </View>
-            <AppInput
-              label="Quantidade"
-              value={batchCount}
-              onChangeText={(value) => setBatchCount(value.replace(/\D/g, '').slice(0, 2))}
-              placeholder="3"
-              keyboardType="number-pad"
-              autoCapitalize="none"
-              testID="availability-batch-count-input"
-            />
-            <PrimaryButton
-              title="Criar lote"
-              testID="availability-create-batch-button"
-              onPress={handleBatchAdd}
-              loading={saving}
-              disabled={saving}
-              variant="outlined"
-            />
-          </View>
+          ) : (
+            <View style={styles.batchCard}>
+              <Text style={styles.batchTitle}>Configuracao de lote</Text>
+              <View style={styles.batchDurationRow}>
+                {[60, 90, 120].map((minutes) => (
+                  <Pressable
+                    key={minutes}
+                    testID={`availability-duration-${minutes}`}
+                    onPress={() => setBatchDuration(minutes as 60 | 90 | 120)}
+                    style={[styles.durationChip, batchDuration === minutes ? styles.durationChipActive : null]}
+                  >
+                    <Text style={[styles.durationChipText, batchDuration === minutes ? styles.durationChipTextActive : null]}>
+                      {minutes === 90 ? '1h30' : `${minutes / 60}h`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <AppInput
+                label="Quantidade de slots"
+                value={batchCount}
+                onChangeText={(value) => setBatchCount(value.replace(/\D/g, '').slice(0, 2))}
+                placeholder="3"
+                keyboardType="number-pad"
+                autoCapitalize="none"
+                testID="availability-batch-count-input"
+              />
+              <PrimaryButton
+                title="Criar lote"
+                testID="availability-create-batch-button"
+                onPress={handleBatchAdd}
+                loading={saving}
+                disabled={saving}
+                variant="outlined"
+              />
+            </View>
+          )}
 
           {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
 
           <PrimaryButton
-            title="Criar horario"
+            title="Criar horarios"
             testID="availability-create-slot-button"
             onPress={handleAdd}
             loading={saving}
@@ -440,7 +451,7 @@ export default function AvailabilityScreen() {
 
         <View style={styles.listHeader}>
           <Text style={styles.sectionTitle}>Horarios atuais</Text>
-          <Text style={styles.count}>{orderedSlots.length}</Text>
+          <Text style={styles.count}>{todaySlotsCount} slots hoje</Text>
         </View>
 
         {orderedSlots.length === 0 ? (
@@ -478,6 +489,32 @@ const styles = StyleSheet.create({
   },
   formTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
   formTitle: { ...typography.headlineMd, color: colors.onSurface },
+  modeSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceContainerHigh,
+    borderRadius: radius.lg,
+    padding: spacing.xs,
+    gap: spacing.xs,
+  },
+  modeButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeButtonActive: {
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  modeButtonText: { ...typography.labelMd, color: colors.onSurfaceVariant },
+  modeButtonTextActive: { color: colors.onSurface },
+  hintTitle: {
+    ...typography.labelSm,
+    color: colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+  },
   timeInputs: { flexDirection: 'row', gap: spacing.sm },
   dateButton: {
     borderWidth: 1,
@@ -554,6 +591,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.errorContainer,
+  },
+  iconButtonDisabled: {
+    backgroundColor: colors.surfaceContainerHigh,
+    opacity: 0.7,
   },
   empty: {
     minHeight: 180,
