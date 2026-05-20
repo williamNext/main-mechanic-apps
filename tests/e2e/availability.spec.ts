@@ -12,6 +12,10 @@ function isoDateDaysFromToday(daysFromToday: number) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function slotTestId(date: string, start: string, end: string) {
+  return `availability-slot-${date}-${start.replace(':', '')}-${end.replace(':', '')}`;
+}
+
 async function tryLogin(page: import('@playwright/test').Page, phone: string, password: string) {
   await page.goto('/(auth)/login');
   await page.getByPlaceholder('(51) 99999-9999').fill(phone);
@@ -73,7 +77,11 @@ test('availability flow smoke', async ({ page }) => {
   await openAndSetDate(page, yesterday);
   await expect(page.getByText('Nao pode usar data no passado.')).toBeVisible();
 
-  const targetDate = isoDateDaysFromToday(10);
+  const smokeSeed = Date.now() % 20;
+  const targetDate = isoDateDaysFromToday(15 + smokeSeed);
+  const baseMinute = String((Date.now() % 4) * 10).padStart(2, '0');
+  const baseStart = `08:${baseMinute}`;
+  const baseEnd = `08:${String(Number(baseMinute) + 5).padStart(2, '0')}`;
   await openAndSetDate(page, targetDate);
 
   const startInput = page.getByTestId('availability-start-input');
@@ -91,20 +99,22 @@ test('availability flow smoke', async ({ page }) => {
   const rangesBeforeBase = page.getByText(/\d{2}:\d{2}(?::\d{2})? - \d{2}:\d{2}(?::\d{2})?/);
   const beforeBaseCount = await rangesBeforeBase.count();
 
-  await fillTimeFields(page, '0800', '0900');
+  await fillTimeFields(page, baseStart.replace(':', ''), baseEnd.replace(':', ''));
   await page.getByTestId('availability-create-slot-button').click();
-  await expect(page.getByText(/08:00(:00)? - 09:00(:00)?/)).toBeVisible();
+  await expect(page.getByText(new RegExp(`${baseStart}(:00)? - ${baseEnd}(:00)?`))).toBeVisible();
 
   const afterBaseCount = await page.getByText(/\d{2}:\d{2}(?::\d{2})? - \d{2}:\d{2}(?::\d{2})?/).count();
   expect(afterBaseCount).toBeGreaterThanOrEqual(beforeBaseCount + 1);
 
   const beforeQuickCount = await page.getByText(/\d{2}:\d{2}(?::\d{2})? - \d{2}:\d{2}(?::\d{2})?/).count();
   await page.getByTestId('availability-quick-60').click();
+  await page.getByTestId('availability-create-slot-button').click();
   await expect
     .poll(async () => page.getByText(/\d{2}:\d{2}(?::\d{2})? - \d{2}:\d{2}(?::\d{2})?/).count(), { timeout: 20000 })
     .toBeGreaterThanOrEqual(beforeQuickCount + 1);
 
   const beforeBatchCount = await page.getByText(/\d{2}:\d{2}(?::\d{2})? - \d{2}:\d{2}(?::\d{2})?/).count();
+  await page.getByText('Adicionar em lote').click();
   await page.getByTestId('availability-duration-90').click();
   await page.getByPlaceholder('3').fill('3');
   await page.getByTestId('availability-create-batch-button').click();
@@ -112,11 +122,47 @@ test('availability flow smoke', async ({ page }) => {
     .poll(async () => page.getByText(/\d{2}:\d{2}(?::\d{2})? - \d{2}:\d{2}(?::\d{2})?/).count(), { timeout: 30000 })
     .toBeGreaterThanOrEqual(beforeBatchCount + 3);
 
-  const overflowDate = isoDateDaysFromToday(11);
+  const overflowDate = isoDateDaysFromToday(36 + smokeSeed);
   await openAndSetDate(page, overflowDate);
+  await page.getByText('Horario individual').click();
   await fillTimeFields(page, '2200', '2330');
+  await page.getByText('Adicionar em lote').click();
   await page.getByTestId('availability-duration-90').click();
   await page.getByPlaceholder('3').fill('3');
   await page.getByTestId('availability-create-batch-button').click();
   await expect(page.getByText('Parou no item 1: intervalo passou de 23:59.')).toBeVisible();
+});
+
+test('availability deletes an available slot and keeps it deleted after refresh', async ({ page }) => {
+  await loginAsMechanic(page);
+  await page.goto('/(mechanic)/availability');
+  await expect(page.getByText('Gerenciar horarios')).toBeVisible();
+
+  const seed = Date.now() % 20;
+  const targetDate = isoDateDaysFromToday(45 + seed);
+  const minute = String((Date.now() % 4) * 10).padStart(2, '0');
+  const start = `17:${minute}`;
+  const end = `17:${String(Number(minute) + 5).padStart(2, '0')}`;
+  const createdSlot = page.getByTestId(slotTestId(targetDate, start, end));
+
+  await openAndSetDate(page, targetDate);
+  if (await createdSlot.isVisible().catch(() => false)) {
+    await createdSlot.getByTestId('availability-delete-slot-button').click();
+    await page.getByTestId('availability-delete-confirm-button').click();
+    await expect(createdSlot).toHaveCount(0, { timeout: 20000 });
+  }
+
+  await fillTimeFields(page, start.replace(':', ''), end.replace(':', ''));
+  await page.getByTestId('availability-create-slot-button').click();
+  await expect(createdSlot).toBeVisible({ timeout: 20000 });
+
+  await createdSlot.getByTestId('availability-delete-slot-button').click();
+  await expect(page.getByText('Excluir horario?')).toBeVisible();
+  await page.getByTestId('availability-delete-confirm-button').click();
+  await expect(createdSlot).toHaveCount(0, { timeout: 20000 });
+
+  await page.reload();
+  await expect(page.getByText('Gerenciar horarios')).toBeVisible();
+  await openAndSetDate(page, targetDate);
+  await expect(createdSlot).toHaveCount(0);
 });

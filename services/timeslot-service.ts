@@ -76,7 +76,20 @@ export async function updateSlotAvailability(id: string, isAvailable: boolean): 
   if (error) throw error;
 }
 
-export async function deleteSlot(id: string): Promise<void> {
-  const { error } = await supabase.from('timeslots').delete().eq('id', id);
+export async function deleteSlot(id: string, mechanicId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('timeslots')
+    .delete()
+    .eq('id', id)
+    .eq('mechanic_id', mechanicId)
+    .eq('is_available', true)
+    .select('id')
+    .maybeSingle();
+
   if (error) throw error;
+  if (!data) {
+    throw new Error('Horario nao encontrado, reservado ou sem permissao para excluir.');
+  }
+
+  return data.id;
 }

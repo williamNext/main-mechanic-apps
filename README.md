@@ -28,7 +28,21 @@ Ainda não implementado:
 2. Configure:
    - `EXPO_PUBLIC_SUPABASE_URL`
    - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-3. No Netlify, configure as mesmas chaves em Configuração do site > Variáveis de ambiente.
+3. Na Vercel, configure as mesmas chaves em Project Settings > Environment Variables para `Production` e `Preview`.
+4. Não configure `SUPABASE_SERVICE_ROLE_KEY` neste app cliente; ela é um segredo privado de servidor.
+
+## Deploy na Vercel
+Antes de publicar, valide que as variáveis públicas de build existem e que o export web conclui:
+```bash
+npm run env:check
+npm run vercel-build
+```
+
+Se o build remoto falhar com `Missing required env var`, adicione na Vercel:
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+Depois de salvar as variáveis, faça um redeploy sem cache e valide a URL publicada.
 
 ## Desenvolvimento local
 ```bash

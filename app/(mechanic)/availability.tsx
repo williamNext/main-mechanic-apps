@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Clock3, Lock, Plus, Trash2 } from 'lucide-react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { AppInput } from '@/components/app/AppInput';
@@ -80,17 +80,25 @@ function findLastEndTimeForDate(date: string, slots: TimeSlot[], fallback: strin
   return ordered[ordered.length - 1].endTime;
 }
 
+function getSlotTestId(slot: TimeSlot) {
+  return `availability-slot-${slot.date}-${slot.startTime.replace(':', '')}-${slot.endTime.replace(':', '')}`;
+}
+
 function SlotRow({
   slot,
+  isDeleting,
   onToggle,
   onDelete,
 }: {
   slot: TimeSlot;
+  isDeleting: boolean;
   onToggle: (slot: TimeSlot) => void;
   onDelete: (slot: TimeSlot) => void;
 }) {
+  const deleteDisabled = !slot.isAvailable || isDeleting;
+
   return (
-    <View style={styles.slotCard}>
+    <View style={styles.slotCard} testID={getSlotTestId(slot)}>
       <View style={styles.slotMain}>
         <Text style={styles.slotDate}>{formatDateFull(slot.date)}</Text>
         <View style={styles.slotTimeRow}>
@@ -105,15 +113,21 @@ function SlotRow({
         <Switch
           value={slot.isAvailable}
           onValueChange={() => onToggle(slot)}
+          disabled={isDeleting}
           trackColor={{ false: colors.surfaceContainerHigh, true: colors.secondaryContainer }}
           thumbColor={slot.isAvailable ? colors.secondary : colors.outline}
         />
         <Pressable
-          disabled={!slot.isAvailable}
+          disabled={deleteDisabled}
           onPress={() => onDelete(slot)}
-          style={[styles.iconButton, !slot.isAvailable ? styles.iconButtonDisabled : null]}
+          style={[styles.iconButton, deleteDisabled ? styles.iconButtonDisabled : null]}
+          testID="availability-delete-slot-button"
         >
-          {slot.isAvailable ? <Trash2 size={18} color={colors.error} /> : <Lock size={18} color={colors.onSurfaceVariant} />}
+          {slot.isAvailable ? (
+            <Trash2 size={18} color={isDeleting ? colors.onSurfaceVariant : colors.error} />
+          ) : (
+            <Lock size={18} color={colors.onSurfaceVariant} />
+          )}
         </Pressable>
       </View>
     </View>
@@ -133,6 +147,8 @@ export default function AvailabilityScreen() {
   const [batchDuration, setBatchDuration] = useState<60 | 90 | 120>(60);
   const [batchCount, setBatchCount] = useState('1');
   const [mode, setMode] = useState<'single' | 'batch'>('single');
+  const [slotPendingDelete, setSlotPendingDelete] = useState<TimeSlot | null>(null);
+  const [deletingSlotId, setDeletingSlotId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.role === 'mechanic') {
@@ -284,19 +300,26 @@ export default function AvailabilityScreen() {
 
   const handleDelete = (slot: TimeSlot) => {
     if (!slot.isAvailable) return;
+    setSlotPendingDelete(slot);
+  };
 
-    Alert.alert('Excluir horario?', `${formatDateFull(slot.date)} - ${formatTimeRange(slot.startTime, slot.endTime)}`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: () => {
-          void removeSlot(slot.id).catch((deleteError: any) => {
-            Alert.alert('Falha ao excluir', deleteError.message || 'Tente novamente.');
-          });
-        },
-      },
-    ]);
+  const closeDeleteModal = () => {
+    if (deletingSlotId) return;
+    setSlotPendingDelete(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!slotPendingDelete || user?.role !== 'mechanic') return;
+
+    setDeletingSlotId(slotPendingDelete.id);
+    try {
+      await removeSlot(slotPendingDelete.id, user.id);
+      setSlotPendingDelete(null);
+    } catch (deleteError: any) {
+      Alert.alert('Falha ao excluir', deleteError.message || 'Tente novamente.');
+    } finally {
+      setDeletingSlotId(null);
+    }
   };
 
   return (
@@ -460,9 +483,55 @@ export default function AvailabilityScreen() {
             <Text style={styles.emptyText}>Crie horarios para clientes reservarem periodos disponiveis.</Text>
           </View>
         ) : (
-          orderedSlots.map((slot) => <SlotRow key={slot.id} slot={slot} onToggle={handleToggle} onDelete={handleDelete} />)
+          orderedSlots.map((slot) => (
+            <SlotRow
+              key={slot.id}
+              slot={slot}
+              isDeleting={deletingSlotId === slot.id}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+            />
+          ))
         )}
       </ScrollView>
+
+      <Modal
+        visible={!!slotPendingDelete}
+        transparent
+        animationType="fade"
+        onRequestClose={closeDeleteModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmDialog}>
+            <Text style={styles.confirmTitle}>Excluir horario?</Text>
+            {slotPendingDelete ? (
+              <Text style={styles.confirmText}>
+                {formatDateFull(slotPendingDelete.date)} - {formatTimeRange(slotPendingDelete.startTime, slotPendingDelete.endTime)}
+              </Text>
+            ) : null}
+            <View style={styles.confirmActions}>
+              <Pressable
+                disabled={!!deletingSlotId}
+                onPress={closeDeleteModal}
+                style={[styles.confirmButton, styles.cancelButton, deletingSlotId ? styles.confirmButtonDisabled : null]}
+                testID="availability-delete-cancel-button"
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                disabled={!!deletingSlotId}
+                onPress={() => {
+                  void confirmDelete();
+                }}
+                style={[styles.confirmButton, styles.deleteButton, deletingSlotId ? styles.confirmButtonDisabled : null]}
+                testID="availability-delete-confirm-button"
+              >
+                <Text style={styles.deleteButtonText}>{deletingSlotId ? 'Excluindo...' : 'Excluir'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -608,4 +677,42 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { ...typography.headlineMd, color: colors.onSurface },
   emptyText: { ...typography.bodyMd, color: colors.onSurfaceVariant, textAlign: 'center' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.44)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  confirmDialog: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: spacing.lg,
+    gap: spacing.base,
+    ...shadow.light,
+  },
+  confirmTitle: { ...typography.headlineMd, color: colors.onSurface },
+  confirmText: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  confirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
+  confirmButton: {
+    minWidth: 108,
+    minHeight: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  confirmButtonDisabled: { opacity: 0.7 },
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surface,
+  },
+  deleteButton: { backgroundColor: colors.error },
+  cancelButtonText: { ...typography.labelMd, color: colors.onSurface },
+  deleteButtonText: { ...typography.labelMd, color: colors.onPrimary },
 });

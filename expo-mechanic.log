@@ -62,3 +62,19 @@ Web Bundled 109ms node_modules\expo-router\entry.js (1 module)
 Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
 λ Bundled 229ms node_modules\expo-router\node\render.js (1 module)
 Web Bundled 2836ms node_modules\expo-router\entry.js (1 module)
+Unable to resolve "@/stores/Agendamento-store" from "app\(mechanic)\appointment\[id].tsx"
+[0m [90m 4 |[39m [36mimport[39m { [33mArrowLeft[39m[33m,[39m [33mCalendarDays[39m[33m,[39m [33mCar[39m[33m,[39m [33mClock3[39m[33m,[39m [33mPhone[39m[33m,[39m [33mUserRound[39m } [36mfrom[39m [32m'lucide-react-native'[39m[33m;[39m
+ [90m 5 |[39m [36mimport[39m { [33mPrimaryButton[39m } [36mfrom[39m [32m'@/components/ui/PrimaryButton'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 6 |[39m [36mimport[39m { useAgendamentoStore } [36mfrom[39m [32m'@/stores/Agendamento-store'[39m[33m;[39m
+ [90m   |[39m                                      [31m[1m^[22m[39m
+ [90m 7 |[39m [36mimport[39m { colors[33m,[39m radius[33m,[39m shadow[33m,[39m spacing[33m,[39m statusTheme[33m,[39m typography } [36mfrom[39m [32m'@/constants/theme'[39m[33m;[39m
+ [90m 8 |[39m [36mimport[39m { formatDateFull[33m,[39m formatTimeRange } [36mfrom[39m [32m'@/utils/date'[39m[33m;[39m
+ [90m 9 |[39m[0m
+
+Import stack:
+
+ app\(mechanic)\appointment\[id].tsx
+ | import "@/stores/Agendamento-store"
+
+ app (require.context)
+

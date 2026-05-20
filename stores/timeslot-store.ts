@@ -15,7 +15,7 @@ interface TimeSlotState {
   fetchAvailable: (mechanicId: string, date?: string, options?: { force?: boolean }) => Promise<void>;
   addSlot: (data: Omit<TimeSlot, 'id'>) => Promise<TimeSlot>;
   toggleAvailability: (slotId: string, isAvailable: boolean) => Promise<void>;
-  removeSlot: (slotId: string) => Promise<void>;
+  removeSlot: (slotId: string, mechanicId: string) => Promise<void>;
   invalidateCache: () => void;
 }
 
@@ -73,10 +73,10 @@ export const useTimeSlotStore = create<TimeSlotState>((set, get) => ({
     }));
   },
 
-  removeSlot: async (slotId) => {
-    await timeslotService.deleteSlot(slotId);
+  removeSlot: async (slotId, mechanicId) => {
+    const deletedSlotId = await timeslotService.deleteSlot(slotId, mechanicId);
     set((state) => ({
-      slots: state.slots.filter((s) => s.id !== slotId),
+      slots: state.slots.filter((s) => s.id !== deletedSlotId),
       fetchedAt: null,
       fetchKey: null,
     }));
