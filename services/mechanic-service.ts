@@ -1,38 +1,39 @@
 import { supabase } from './api';
 import { Mechanic } from '@/types/models';
 
-function mapMechanicRow(item: any): Mechanic {
-  const mechanic = Array.isArray(item.mechanics) ? item.mechanics[0] : item.mechanics;
-
+function mapPublicMechanicRow(item: any): Mechanic {
   return {
-    ...item,
-    ...mechanic,
+    id: item.id,
+    name: item.name,
+    role: 'mechanic',
+    specialty: item.specialty,
+    credentials: '',
     avatarUrl: item.avatar_url ?? undefined,
-    isActive: mechanic?.is_active,
+    isActive: true,
   } as Mechanic;
 }
 
 export async function getAllMechanics(): Promise<Mechanic[]> {
   const { data, error } = await supabase
-    .from('profiles')
-    .select('*, mechanics!inner(*)')
-    .eq('role', 'mechanic');
+    .from('public_mechanics')
+    .select('id, name, specialty, avatar_url')
+    .order('name', { ascending: true });
 
   if (error) throw error;
 
-  return data.map(mapMechanicRow);
+  return data.map(mapPublicMechanicRow);
 }
 
 export async function getMechanicById(id: string): Promise<Mechanic | null> {
   const { data, error } = await supabase
-    .from('profiles')
-    .select('*, mechanics!inner(*)')
+    .from('public_mechanics')
+    .select('id, name, specialty, avatar_url')
     .eq('id', id)
     .single();
 
   if (error || !data) return null;
 
-  return mapMechanicRow(data);
+  return mapPublicMechanicRow(data);
 }
 
 export async function updateMechanicProfile(id: string, updates: Partial<Mechanic>): Promise<void> {
@@ -50,8 +51,6 @@ export async function updateMechanicProfile(id: string, updates: Partial<Mechani
   // Update mechanics part
   const mechanicUpdates: any = {};
   if (updates.specialty) mechanicUpdates.specialty = updates.specialty;
-  if (updates.credentials) mechanicUpdates.credentials = updates.credentials;
-  if (updates.isActive !== undefined) mechanicUpdates.is_active = updates.isActive;
 
   if (Object.keys(mechanicUpdates).length > 0) {
     const { error } = await supabase.from('mechanics').update(mechanicUpdates).eq('id', id);

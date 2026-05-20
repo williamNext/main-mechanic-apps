@@ -2,9 +2,9 @@ import { Redirect } from 'expo-router';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function Index() {
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, isApprovedMechanic } = useAuth();
 
-  if (!isAuthenticated || role !== 'mechanic') {
+  if (!isAuthenticated || !isApprovedMechanic) {
     return <Redirect href="/(auth)/login" />;
   }
 

@@ -1,6 +1,8 @@
 import { supabase } from './api';
 import { User, Mechanic, Role } from '@/types/models';
 
+type SelfServiceRole = Exclude<Role, 'admin'>;
+
 const AUTH_TIMEOUT_MS = 15000;
 const PROFILE_TIMEOUT_MS = 15000;
 const SIGNUP_TIMEOUT_MS = 20000;
@@ -124,7 +126,7 @@ export async function getUserById(id: string): Promise<User | Mechanic | null> {
   return { ...data, avatarUrl: data.avatar_url ?? undefined } as User;
 }
 
-export async function signUpWithPhone(phone: string, password: string, name: string, role: Role): Promise<void> {
+export async function signUpWithPhone(phone: string, password: string, name: string, role: SelfServiceRole): Promise<void> {
   const normalizedPhone = toE164BrPhone(phone);
   if (!normalizedPhone) {
     throw new Error('Telefone inválido');
@@ -171,6 +173,7 @@ export async function signUpWithPhone(phone: string, password: string, name: str
           id: userId,
           specialty: 'Geral',
           credentials: 'PENDENTE',
+          is_active: false,
         }),
         PROFILE_TIMEOUT_MS,
         'Tempo limite excedido ao criar perfil do mecânico',
@@ -180,7 +183,7 @@ export async function signUpWithPhone(phone: string, password: string, name: str
   }
 }
 
-export async function signUp(email: string, password: string, name: string, role: Role, phone?: string): Promise<void> {
+export async function signUp(email: string, password: string, name: string, role: SelfServiceRole, phone?: string): Promise<void> {
   const { data: authData, error: authError } = await timed('signUp email', () =>
     withTimeout(
       supabase.auth.signUp({

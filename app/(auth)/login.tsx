@@ -38,14 +38,20 @@ export default function LoginScreen() {
     try {
       const success = await loginByPhone(phone, password);
       const loggedUser = useAuthStore.getState().user;
+      const isMechanic = loggedUser?.role === 'mechanic';
+      const isApprovedMechanic = isMechanic && 'isActive' in loggedUser && loggedUser.isActive === true;
 
-      if (success && loggedUser?.role === 'mechanic') {
+      if (success && isApprovedMechanic) {
         router.replace('/(mechanic)/agenda');
         return;
       }
 
       if (success) {
         await logout();
+        if (isMechanic) {
+          setErrorMsg('Acesso pendente de aprovacao pela oficina.');
+          return;
+        }
         setErrorMsg('Acesso de mecânico obrigatório.');
         return;
       }

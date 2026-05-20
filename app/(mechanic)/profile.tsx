@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BadgeCheck, UserRound } from 'lucide-react-native';
 import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -15,23 +15,19 @@ export default function MechanicProfileScreen() {
   const mechanic = user?.role === 'mechanic' ? (user as Mechanic) : null;
   const [name, setName] = useState('');
   const [specialty, setSpecialty] = useState('');
-  const [credentials, setCredentials] = useState('');
-  const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (mechanic) {
       setName(mechanic.name ?? '');
       setSpecialty(mechanic.specialty ?? '');
-      setCredentials(mechanic.credentials ?? '');
-      setIsActive(mechanic.isActive ?? true);
     }
   }, [mechanic]);
 
   const handleSave = async () => {
     if (!mechanic) return;
     if (!name.trim() || !specialty.trim()) {
-      setError('Nome e especialidade são obrigatórios.');
+      setError('Nome e especialidade sao obrigatorios.');
       return;
     }
 
@@ -40,17 +36,15 @@ export default function MechanicProfileScreen() {
       await updateProfile({
         name: name.trim(),
         specialty: specialty.trim(),
-        credentials: credentials.trim() || 'PENDENTE',
-        isActive,
       });
-      Alert.alert('Perfil salvo', 'Perfil público do mecânico atualizado.');
+      Alert.alert('Perfil salvo', 'Perfil publico do mecanico atualizado.');
     } catch (error: any) {
       setError(error.message || 'Falha ao atualizar perfil.');
     }
   };
 
   const handleLogout = () => {
-    Alert.alert('Sair?', 'A sessão local atual será encerrada.', [
+    Alert.alert('Sair?', 'A sessao local atual sera encerrada.', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Sair', style: 'destructive', onPress: () => void logout() },
     ]);
@@ -59,7 +53,7 @@ export default function MechanicProfileScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.kicker}>Configurações</Text>
+        <Text style={styles.kicker}>Configuracoes</Text>
         <Text style={styles.title}>Perfil</Text>
       </View>
 
@@ -69,8 +63,8 @@ export default function MechanicProfileScreen() {
             <UserRound size={34} color={colors.onPrimary} />
           </View>
           <View style={styles.identityText}>
-            <Text style={styles.name}>{mechanic?.name ?? 'Mecânico'}</Text>
-            <Text style={styles.subtle}>{mechanic?.phone ?? 'Telefone não definido'}</Text>
+            <Text style={styles.name}>{mechanic?.name ?? 'Mecanico'}</Text>
+            <Text style={styles.subtle}>{mechanic?.phone ?? 'Telefone nao definido'}</Text>
           </View>
           <View style={styles.badge}>
             <BadgeCheck size={16} color={colors.secondary} />
@@ -79,27 +73,19 @@ export default function MechanicProfileScreen() {
         </View>
 
         <View style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Perfil público</Text>
+          <Text style={styles.sectionTitle}>Perfil publico</Text>
           <AppInput label="Nome" value={name} onChangeText={setName} placeholder="Nome completo" />
-          <AppInput label="Especialidade" value={specialty} onChangeText={setSpecialty} placeholder="Elétrica, freios, motor" />
-          <AppInput
-            label="Credenciais"
-            value={credentials}
-            onChangeText={setCredentials}
-            placeholder="Certificações, observações, estado de aprovação"
-            multiline
-          />
-          <View style={styles.switchRow}>
-            <View style={styles.switchTextBlock}>
-              <Text style={styles.switchTitle}>Disponibilidade pública</Text>
-              <Text style={styles.switchDescription}>Mecânicos ativos podem receber reservas.</Text>
+          <AppInput label="Especialidade" value={specialty} onChangeText={setSpecialty} placeholder="Eletrica, freios, motor" />
+          <View style={styles.approvalRow}>
+            <View style={styles.approvalTextBlock}>
+              <Text style={styles.approvalTitle}>Status de aprovacao</Text>
+              <Text style={styles.approvalDescription}>
+                {mechanic?.isActive ? 'Aprovado pela oficina.' : 'Pendente de aprovacao pela oficina.'}
+              </Text>
             </View>
-            <Switch
-              value={isActive}
-              onValueChange={setIsActive}
-              trackColor={{ false: colors.surfaceContainerHigh, true: colors.secondaryContainer }}
-              thumbColor={isActive ? colors.secondary : colors.outline}
-            />
+            <Text style={[styles.approvalBadge, mechanic?.isActive ? styles.approvalBadgeActive : styles.approvalBadgePending]}>
+              {mechanic?.isActive ? 'Ativo' : 'Pendente'}
+            </Text>
           </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <PrimaryButton title="Salvar perfil" onPress={handleSave} loading={isLoading} disabled={isLoading} variant="filled" />
@@ -163,7 +149,7 @@ const styles = StyleSheet.create({
     ...shadow.light,
   },
   sectionTitle: { ...typography.headlineMd, color: colors.onSurface },
-  switchRow: {
+  approvalRow: {
     minHeight: 64,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceContainerLow,
@@ -173,8 +159,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  switchTextBlock: { flex: 1 },
-  switchTitle: { ...typography.labelMd, color: colors.onSurface },
-  switchDescription: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  approvalTextBlock: { flex: 1 },
+  approvalTitle: { ...typography.labelMd, color: colors.onSurface },
+  approvalDescription: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  approvalBadge: {
+    ...typography.labelSm,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  approvalBadgeActive: {
+    backgroundColor: colors.secondaryContainer,
+    color: colors.secondary,
+  },
+  approvalBadgePending: {
+    backgroundColor: colors.surfaceContainerHigh,
+    color: colors.onSurfaceVariant,
+  },
   errorText: { ...typography.labelSm, color: colors.error },
 });
