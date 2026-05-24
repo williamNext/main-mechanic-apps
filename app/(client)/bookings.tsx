@@ -28,7 +28,7 @@ export default function ClientBookingsScreen() {
       if (mode === 'upcoming') {
         return appointment.status === 'confirmado';
       }
-      return appointment.status === 'acabado' || appointment.status === 'cancelado';
+      return appointment.status === 'acabado' || appointment.status === 'cancelado' || appointment.status === 'nao_finalizado';
     });
   }, [appointments, mode]);
 

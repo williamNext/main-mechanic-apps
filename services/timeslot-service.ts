@@ -12,6 +12,26 @@ function mapSlot(s: any): TimeSlot {
   };
 }
 
+function getSaoPauloDateTimeParts(): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}:${values.second}`,
+  };
+}
+
 export async function getSlotsByMechanic(mechanicId: string, date?: string): Promise<TimeSlot[]> {
   let query = supabase
     .from('timeslots')
@@ -29,6 +49,12 @@ export async function getSlotsByMechanic(mechanicId: string, date?: string): Pro
 }
 
 export async function getAvailableSlotsByMechanic(mechanicId: string, date?: string): Promise<TimeSlot[]> {
+  const now = getSaoPauloDateTimeParts();
+
+  if (date && date < now.date) {
+    return [];
+  }
+
   let query = supabase
     .from('timeslots')
     .select('*')
@@ -37,12 +63,18 @@ export async function getAvailableSlotsByMechanic(mechanicId: string, date?: str
 
   if (date) {
     query = query.eq('date', date);
+
+    if (date === now.date) {
+      query = query.gt('start_time', now.time);
+    }
+  } else {
+    query = query.gte('date', now.date);
   }
 
   const { data, error } = await query.order('start_time', { ascending: true });
 
   if (error) throw error;
-  return data.map(mapSlot);
+  return data.map(mapSlot).filter((slot) => slot.date > now.date || slot.startTime > now.time);
 }
 
 export async function createSlot(slot: Omit<TimeSlot, 'id'>): Promise<TimeSlot> {

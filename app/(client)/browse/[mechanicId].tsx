@@ -75,8 +75,12 @@ export default function BookMechanicScreen() {
 
       if (rawMessage.includes('unavailable')) {
         Alert.alert('Horário indisponível', 'Este horário acabou de ser reservado. Escolha outro horário.');
+        await fetchAvailable(mechanicId, selectedDate, { force: true });
+        setSelectedSlot(null);
       } else if (rawMessage.includes('expired')) {
         Alert.alert('Horário expirado', 'Este horário já passou. Escolha outro horário.');
+        await fetchAvailable(mechanicId, selectedDate, { force: true });
+        setSelectedSlot(null);
       } else if (rawMessage.includes('too long')) {
         Alert.alert('Erro', 'Revise os textos do veículo e da descrição.');
       } else if (rawMessage.includes('booking rpc missing')) {

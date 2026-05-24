@@ -137,6 +137,8 @@ export default function AppointmentDetailsScreen() {
             <DetailTile icon="calendar-today" title="Data e Hora" value={`${formatDate(appointment.date)} ${formatTimeRange(appointment.startTime, appointment.endTime)}`} />
             <DetailTile icon="directions-car" title="Veículo" value={appointment.vehicleInfo || 'Não informado'} />
             <DetailTile icon="build" title="Serviço" value={appointment.notes || 'Sem descrição'} />
+            <DetailTile icon="fact-check" title="Fechamento" value={appointment.serviceSummary || 'Nao finalizado'} />
+            <DetailTile icon="payments" title="Valor" value={appointment.totalAmountCents ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(appointment.totalAmountCents / 100) : 'Nao informado'} />
             <DetailTile
               icon="call"
               title="Telefone"
