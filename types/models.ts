@@ -2,7 +2,7 @@
 
 export type Role = 'admin' | 'mechanic' | 'client';
 
-export type AppointmentStatus = 'confirmado' | 'cancelado' | 'acabado';
+export type AppointmentStatus = 'confirmado' | 'nao_finalizado' | 'cancelado' | 'acabado';
 
 export interface User {
   id: string;
@@ -45,5 +45,30 @@ export interface Appointment {
   status: AppointmentStatus;
   vehicleInfo?: string;
   notes?: string;
+  serviceSummary?: string | null;
+  serviceDiagnosis?: string | null;
+  workPerformed?: string | null;
+  partsUsed?: string | null;
+  recommendations?: string | null;
+  totalAmountCents?: number | null;
+  closedAt?: string | null;
+  serviceItems?: ServiceItem[];
   createdAt: string;
+}
+
+export interface ServiceItem {
+  id?: string;
+  description: string;
+  amountCents: number;
+  sortOrder?: number;
+}
+
+export interface CompleteAppointmentInput {
+  appointmentId: string;
+  summary: string;
+  diagnosis?: string;
+  workPerformed: string;
+  partsUsed?: string;
+  recommendations?: string;
+  items: ServiceItem[];
 }

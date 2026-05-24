@@ -8,20 +8,22 @@ import { useAppointmentStore } from '@/stores/appointment-store';
 import { colors, radius, shadow, spacing, statusTheme, typography } from '@/constants/theme';
 import { formatDateFull, formatTimeRange } from '@/utils/date';
 
-type AgendaMode = 'today' | 'upcoming' | 'history';
+type AgendaMode = 'today' | 'upcoming' | 'pending' | 'history';
 
 const modeLabels: Record<AgendaMode, string> = {
   today: 'Hoje',
-  upcoming: 'Próximos',
-  history: 'Histórico',
+  upcoming: 'Proximos',
+  pending: 'Pendentes',
+  history: 'Historico',
 };
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 function isHistory(appointment: Appointment) {
-  return appointment.status !== 'confirmado' || appointment.date < todayKey();
+  return appointment.status === 'acabado' || appointment.status === 'cancelado';
 }
 
 function filterAppointments(appointments: Appointment[], mode: AgendaMode) {
@@ -31,13 +33,14 @@ function filterAppointments(appointments: Appointment[], mode: AgendaMode) {
     .filter((appointment) => {
       if (mode === 'today') return appointment.date === today && appointment.status === 'confirmado';
       if (mode === 'upcoming') return appointment.date > today && appointment.status === 'confirmado';
+      if (mode === 'pending') return appointment.status === 'nao_finalizado';
       return isHistory(appointment);
     })
     .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
 }
 
 function AppointmentRow({ appointment, onPress }: { appointment: Appointment; onPress: () => void }) {
-  const theme = statusTheme[appointment.status];
+  const theme = statusTheme[appointment.status] ?? statusTheme.confirmado;
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
@@ -55,9 +58,10 @@ function AppointmentRow({ appointment, onPress }: { appointment: Appointment; on
       </View>
       <View style={styles.metaRow}>
         <UserRound size={16} color={colors.onSurfaceVariant} />
-        <Text style={styles.metaText}>{appointment.vehicleInfo || 'Veículo não informado'}</Text>
+        <Text style={styles.metaText}>{appointment.vehicleInfo || 'Veiculo nao informado'}</Text>
       </View>
       {appointment.notes ? <Text style={styles.notes} numberOfLines={2}>{appointment.notes}</Text> : null}
+      {appointment.serviceSummary ? <Text style={styles.notes} numberOfLines={2}>{appointment.serviceSummary}</Text> : null}
     </Pressable>
   );
 }
@@ -79,6 +83,10 @@ export default function AgendaScreen() {
     () => appointments.filter((appointment) => appointment.date === todayKey() && appointment.status === 'confirmado').length,
     [appointments],
   );
+  const pendingCount = useMemo(
+    () => appointments.filter((appointment) => appointment.status === 'nao_finalizado').length,
+    [appointments],
+  );
 
   const refresh = () => {
     if (user?.role === 'mechanic') {
@@ -89,7 +97,7 @@ export default function AgendaScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.kicker}>Acesso mecânico</Text>
+        <Text style={styles.kicker}>Acesso mecanico</Text>
         <Text style={styles.title}>Agenda</Text>
         <View style={styles.summaryRow}>
           <View style={styles.summaryBox}>
@@ -99,14 +107,14 @@ export default function AgendaScreen() {
           </View>
           <View style={styles.summaryBox}>
             <CalendarDays size={18} color={colors.safetyOrange} />
-            <Text style={styles.summaryValue}>{appointments.length}</Text>
-            <Text style={styles.summaryLabel}>atribuídos</Text>
+            <Text style={styles.summaryValue}>{pendingCount}</Text>
+            <Text style={styles.summaryLabel}>pendentes</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.segmented}>
-        {(['today', 'upcoming', 'history'] as AgendaMode[]).map((item) => (
+        {(['today', 'upcoming', 'pending', 'history'] as AgendaMode[]).map((item) => (
           <Pressable
             key={item}
             onPress={() => setMode(item)}
@@ -177,7 +185,7 @@ const styles = StyleSheet.create({
   },
   segment: { flex: 1, minHeight: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   segmentActive: { backgroundColor: colors.surfaceContainerLowest, ...shadow.light },
-  segmentText: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'capitalize' },
+  segmentText: { ...typography.labelSm, color: colors.onSurfaceVariant },
   segmentTextActive: { color: colors.onSurface },
   errorText: { ...typography.labelSm, color: colors.error, marginHorizontal: spacing.marginMobile },
   list: { paddingHorizontal: spacing.marginMobile, paddingBottom: 120, gap: spacing.sm },

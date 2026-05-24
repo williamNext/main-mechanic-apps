@@ -13,7 +13,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'npx expo start --web --non-interactive --port 19006',
+    command: 'powershell -NoProfile -Command "$env:CI=1; npx expo start --web --port 19006"',
     url: 'http://127.0.0.1:19006',
     reuseExistingServer: true,
     timeout: 180000,

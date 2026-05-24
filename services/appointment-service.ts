@@ -1,5 +1,7 @@
 import { supabase } from './api';
-import { Appointment } from '@/types/models';
+import { Appointment, CompleteAppointmentInput } from '@/types/models';
+
+export type { CompleteAppointmentInput };
 
 export interface BookAppointmentInput {
   timeSlotId: string;
@@ -18,6 +20,9 @@ function isMissingBookingRpcError(error: unknown): boolean {
 }
 
 function mapAppointmentRow(a: any): Appointment {
+  const reportList = a.appointment_service_reports;
+  const report = Array.isArray(reportList) ? reportList[0] : (reportList || {});
+
   return {
     id: a.id,
     clientId: a.client_id,
@@ -29,6 +34,14 @@ function mapAppointmentRow(a: any): Appointment {
     status: a.status,
     vehicleInfo: a.vehicle_info,
     notes: a.notes,
+    serviceSummary: report.summary ?? a.service_summary ?? a.serviceSummary,
+    serviceDiagnosis: report.diagnosis ?? a.service_diagnosis ?? a.serviceDiagnosis,
+    workPerformed: report.work_performed ?? a.work_performed ?? a.workPerformed,
+    partsUsed: report.parts_used ?? a.parts_used ?? a.partsUsed,
+    recommendations: report.recommendations ?? a.recommendations,
+    totalAmountCents: report.total_amount_cents ?? a.total_amount_cents ?? a.totalAmountCents,
+    closedAt: report.closed_at ?? a.closed_at ?? a.closedAt,
+    serviceItems: a.service_items ?? a.serviceItems ?? [],
     createdAt: a.created_at,
     clientName: a.clientName,
     clientPhone: a.clientPhone,
@@ -37,19 +50,28 @@ function mapAppointmentRow(a: any): Appointment {
   };
 }
 
-export async function syncAcabadoAppointments(): Promise<void> {
-  const { error } = await supabase.rpc('sync_acabado_appointments');
+export async function syncUnfinalizedAppointments(): Promise<void> {
+  const { error } = await supabase.rpc('sync_unfinalized_appointments');
   if (error) throw error;
 }
 
 export async function getAllAppointments(): Promise<Appointment[]> {
-  await syncAcabadoAppointments();
+  await syncUnfinalizedAppointments();
 
   const { data, error } = await supabase
     .from('appointments')
     .select(`
       *,
-      client:profiles!client_id(name)
+      client:profiles!client_id(name),
+      appointment_service_reports (
+        summary,
+        diagnosis,
+        work_performed,
+        parts_used,
+        recommendations,
+        total_amount_cents,
+        closed_at
+      )
     `)
     .order('date', { ascending: false });
 
@@ -73,11 +95,22 @@ export async function getAllAppointments(): Promise<Appointment[]> {
 }
 
 export async function getAppointmentsByClient(clientId: string): Promise<Appointment[]> {
-  await syncAcabadoAppointments();
+  await syncUnfinalizedAppointments();
 
   const { data, error } = await supabase
     .from('appointments')
-    .select(`*`)
+    .select(`
+      *,
+      appointment_service_reports (
+        summary,
+        diagnosis,
+        work_performed,
+        parts_used,
+        recommendations,
+        total_amount_cents,
+        closed_at
+      )
+    `)
     .eq('client_id', clientId)
     .order('date', { ascending: false });
 
@@ -99,13 +132,22 @@ export async function getAppointmentsByClient(clientId: string): Promise<Appoint
 }
 
 export async function getAppointmentsByMechanic(mechanicId: string): Promise<Appointment[]> {
-  await syncAcabadoAppointments();
+  await syncUnfinalizedAppointments();
 
   const { data, error } = await supabase
     .from('appointments')
     .select(`
       *,
-      client:profiles!client_id(name, phone)
+      client:profiles!client_id(name, phone),
+      appointment_service_reports (
+        summary,
+        diagnosis,
+        work_performed,
+        parts_used,
+        recommendations,
+        total_amount_cents,
+        closed_at
+      )
     `)
     .eq('mechanic_id', mechanicId)
     .order('date', { ascending: false });
@@ -164,6 +206,24 @@ export async function cancelClientAppointment(appointmentId: string): Promise<vo
 export async function cancelMechanicAppointment(appointmentId: string): Promise<void> {
   const { error } = await supabase.rpc('cancel_mechanic_appointment', {
     p_appointment_id: appointmentId,
+  });
+
+  if (error) throw error;
+}
+
+export async function completeMechanicAppointment(input: CompleteAppointmentInput): Promise<void> {
+  const { error } = await supabase.rpc('complete_mechanic_appointment', {
+    p_appointment_id: input.appointmentId,
+    p_summary: input.summary,
+    p_diagnosis: input.diagnosis ?? null,
+    p_work_performed: input.workPerformed,
+    p_parts_used: input.partsUsed ?? null,
+    p_recommendations: input.recommendations ?? null,
+    p_items: input.items.map((item, index) => ({
+      description: item.description,
+      amountCents: item.amountCents,
+      sortOrder: item.sortOrder ?? index,
+    })),
   });
 
   if (error) throw error;

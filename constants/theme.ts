@@ -124,6 +124,7 @@ export const shadow = {
 
 export const StatusLabels: Record<string, string> = {
   confirmado: 'Confirmado',
+  nao_finalizado: 'Nao finalizado',
   acabado: 'Acabado',
   cancelado: 'Cancelado',
 };
@@ -133,6 +134,11 @@ export const statusTheme = {
     background: colors.primary,
     text: colors.onPrimary,
     icon: 'schedule',
+  },
+  nao_finalizado: {
+    background: '#fffaeb',
+    text: '#b54708',
+    icon: 'pending-actions',
   },
   acabado: {
     background: colors.surfaceContainerHigh,
@@ -175,6 +181,7 @@ export const Colors = {
     tabIconDefault: colors.onSurfaceVariant,
     tabIconSelected: colors.secondary,
     statusConfirmado: colors.primary,
+    statusNaoFinalizado: colors.safetyOrange,
     statusAcabado: colors.surfaceContainerHigh,
     statusCancelado: colors.error,
   },
@@ -206,6 +213,7 @@ export const Colors = {
     tabIconDefault: colors.onSurfaceVariant,
     tabIconSelected: colors.secondary,
     statusConfirmado: colors.primary,
+    statusNaoFinalizado: colors.safetyOrange,
     statusAcabado: colors.surfaceContainerHigh,
     statusCancelado: colors.error,
   },
@@ -264,6 +272,8 @@ export function getStatusColor(status: string, palette: typeof Colors.light) {
   switch (status) {
     case 'confirmado':
       return palette.statusConfirmado;
+    case 'nao_finalizado':
+      return palette.statusNaoFinalizado;
     case 'acabado':
       return palette.statusAcabado;
     case 'cancelado':

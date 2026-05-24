@@ -14,6 +14,7 @@ interface AppointmentState {
   book: (data: appointmentService.BookAppointmentInput) => Promise<Appointment>;
   cancelByClient: (id: string) => Promise<void>;
   cancelByMechanic: (id: string) => Promise<void>;
+  completeByMechanic: (data: appointmentService.CompleteAppointmentInput) => Promise<void>;
 }
 
 export const useAppointmentStore = create<AppointmentState>((set) => ({
@@ -71,6 +72,28 @@ export const useAppointmentStore = create<AppointmentState>((set) => ({
     useTimeSlotStore.getState().invalidateCache();
     set((state) => ({
       appointments: state.appointments.map((a) => (a.id === id ? { ...a, status: 'cancelado' } : a)),
+    }));
+  },
+
+  completeByMechanic: async (data) => {
+    await appointmentService.completeMechanicAppointment(data);
+    set((state) => ({
+      appointments: state.appointments.map((a) => (
+        a.id === data.appointmentId
+          ? {
+              ...a,
+              status: 'acabado',
+              serviceSummary: data.summary,
+              serviceDiagnosis: data.diagnosis,
+              workPerformed: data.workPerformed,
+              partsUsed: data.partsUsed,
+              recommendations: data.recommendations,
+              totalAmountCents: data.items.reduce((sum, item) => sum + item.amountCents, 0),
+              closedAt: new Date().toISOString(),
+              serviceItems: data.items,
+            }
+          : a
+      )),
     }));
   },
 }));

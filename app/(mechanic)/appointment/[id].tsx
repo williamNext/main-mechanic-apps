@@ -1,14 +1,35 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CalendarDays, Car, Clock3, Phone, UserRound } from 'lucide-react-native';
+import { ArrowLeft, CalendarDays, Car, Clock3, Phone, Plus, Trash2, UserRound } from 'lucide-react-native';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useAppointmentStore } from '@/stores/appointment-store';
 import { colors, radius, shadow, spacing, statusTheme, typography } from '@/constants/theme';
 import { formatDateFull, formatTimeRange } from '@/utils/date';
 
+type ServiceItemDraft = {
+  id: string;
+  description: string;
+  amount: string;
+};
+
 function safeParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function parseMoneyCents(value: string) {
+  const normalized = value.replace(/[^\d,.]/g, '').replace(',', '.');
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.round(parsed * 100);
+}
+
+function formatMoney(cents?: number | null) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((cents ?? 0) / 100);
+}
+
+function blankItem(): ServiceItemDraft {
+  return { id: `${Date.now()}-${Math.random()}`, description: '', amount: '' };
 }
 
 export default function MechanicAppointmentDetailScreen() {
@@ -17,17 +38,28 @@ export default function MechanicAppointmentDetailScreen() {
   const appointmentId = safeParam(id);
   const appointments = useAppointmentStore((state) => state.appointments);
   const cancelByMechanic = useAppointmentStore((state) => state.cancelByMechanic);
+  const completeByMechanic = useAppointmentStore((state) => state.completeByMechanic);
   const [cancelling, setCancelling] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [diagnosis, setDiagnosis] = useState('');
+  const [workPerformed, setWorkPerformed] = useState('');
+  const [partsUsed, setPartsUsed] = useState('');
+  const [recommendations, setRecommendations] = useState('');
+  const [items, setItems] = useState<ServiceItemDraft[]>([blankItem()]);
 
   const appointment = useMemo(
     () => appointments.find((item) => item.id === appointmentId),
     [appointments, appointmentId],
   );
 
-  const handleCancel = () => {
-    if (!appointment || appointment.status !== 'confirmado') return;
+  const canClose = appointment?.status === 'confirmado' || appointment?.status === 'nao_finalizado';
+  const totalCents = items.reduce((sum, item) => sum + (parseMoneyCents(item.amount) ?? 0), 0);
 
-    Alert.alert('Cancelar agendamento?', 'O horario sera reaberto para clientes se o RPC do banco permitir.', [
+  const handleCancel = () => {
+    if (!appointment || !canClose) return;
+
+    Alert.alert('Cancelar agendamento?', 'Horario sera liberado para clientes.', [
       { text: 'Manter', style: 'cancel' },
       {
         text: 'Cancelar',
@@ -36,6 +68,7 @@ export default function MechanicAppointmentDetailScreen() {
           setCancelling(true);
           try {
             await cancelByMechanic(appointment.id);
+            router.back();
           } catch (error: any) {
             Alert.alert('Falha ao cancelar', error.message || 'Tente novamente.');
           } finally {
@@ -44,6 +77,49 @@ export default function MechanicAppointmentDetailScreen() {
         },
       },
     ]);
+  };
+
+  const handleFinish = async () => {
+    if (!appointment || !canClose || finishing) return;
+
+    const preparedItems = items.map((item, index) => ({
+      description: item.description.trim(),
+      amountCents: parseMoneyCents(item.amount),
+      sortOrder: index,
+    }));
+
+    if (summary.trim().length < 3 || workPerformed.trim().length < 3) {
+      Alert.alert('Revise o fechamento', 'Resumo e servico executado sao obrigatorios.');
+      return;
+    }
+
+    if (preparedItems.length === 0 || preparedItems.some((item) => !item.description || item.amountCents === null)) {
+      Alert.alert('Revise os valores', 'Informe descricao e valor valido para cada item.');
+      return;
+    }
+
+    setFinishing(true);
+    try {
+      await completeByMechanic({
+        appointmentId: appointment.id,
+        summary: summary.trim(),
+        diagnosis: diagnosis.trim(),
+        workPerformed: workPerformed.trim(),
+        partsUsed: partsUsed.trim(),
+        recommendations: recommendations.trim(),
+        items: preparedItems.map((item) => ({
+          description: item.description,
+          amountCents: item.amountCents ?? 0,
+          sortOrder: item.sortOrder,
+        })),
+      });
+      Alert.alert('Servico finalizado', 'Fechamento salvo com sucesso.');
+      router.back();
+    } catch (error: any) {
+      Alert.alert('Falha ao finalizar', error.message || 'Tente novamente.');
+    } finally {
+      setFinishing(false);
+    }
   };
 
   if (!appointment) {
@@ -57,13 +133,13 @@ export default function MechanicAppointmentDetailScreen() {
         </View>
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>Agendamento nao carregado</Text>
-          <Text style={styles.emptyText}>Volte para a agenda e atualize os agendamentos atribuidos.</Text>
+          <Text style={styles.emptyText}>Volte para agenda e atualize agendamentos atribuidos.</Text>
         </View>
       </View>
     );
   }
 
-  const theme = statusTheme[appointment.status];
+  const theme = statusTheme[appointment.status] ?? statusTheme.confirmado;
 
   return (
     <View style={styles.screen}>
@@ -111,20 +187,110 @@ export default function MechanicAppointmentDetailScreen() {
           <Text style={styles.notes}>{appointment.notes || 'Nenhuma observacao informada.'}</Text>
         </View>
 
-        <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>Acoes atuais do MVP</Text>
-          <Text style={styles.notes}>
-            Use o contexto da agenda para preparacao e entrada. Ordens de servico, orcamentos, pagamentos e mensagens ainda nao estao habilitados.
-          </Text>
-          <PrimaryButton
-            title="Cancelar agendamento"
-            onPress={handleCancel}
-            loading={cancelling}
-            disabled={appointment.status !== 'confirmado' || cancelling}
-            variant="danger"
-          />
-        </View>
+        {appointment.status === 'acabado' ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.sectionTitle}>Servico finalizado</Text>
+            <Text style={styles.infoText}>{appointment.serviceSummary ?? 'Resumo nao informado'}</Text>
+            <Text style={styles.notes}>{appointment.workPerformed ?? 'Detalhamento nao informado'}</Text>
+            <Text style={styles.totalText}>{formatMoney(appointment.totalAmountCents)}</Text>
+          </View>
+        ) : null}
+
+        {canClose ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.sectionTitle}>Fechamento do servico</Text>
+            <Field label="Resumo" value={summary} onChangeText={setSummary} testID="service-summary-input" />
+            <Field label="Diagnostico" value={diagnosis} onChangeText={setDiagnosis} multiline testID="service-diagnosis-input" />
+            <Field label="Servico executado" value={workPerformed} onChangeText={setWorkPerformed} multiline testID="service-work-input" />
+            <Field label="Pecas usadas" value={partsUsed} onChangeText={setPartsUsed} multiline testID="service-parts-input" />
+            <Field label="Recomendacoes" value={recommendations} onChangeText={setRecommendations} multiline testID="service-recommendations-input" />
+
+            <View style={styles.itemHeader}>
+              <Text style={styles.sectionTitle}>Itens e valores</Text>
+              <Pressable onPress={() => setItems((current) => [...current, blankItem()])} style={styles.iconButton} testID="service-add-item-button">
+                <Plus size={18} color={colors.onSurface} />
+              </Pressable>
+            </View>
+
+            {items.map((item, index) => (
+              <View key={item.id} style={styles.serviceItem}>
+                <TextInput
+                  value={item.description}
+                  onChangeText={(description) => setItems((current) => current.map((next) => (next.id === item.id ? { ...next, description } : next)))}
+                  placeholder="Descricao do item"
+                  placeholderTextColor={colors.outline}
+                  style={styles.input}
+                  testID={`service-item-description-${index}`}
+                />
+                <TextInput
+                  value={item.amount}
+                  onChangeText={(amount) => setItems((current) => current.map((next) => (next.id === item.id ? { ...next, amount } : next)))}
+                  placeholder="0,00"
+                  placeholderTextColor={colors.outline}
+                  keyboardType="decimal-pad"
+                  style={[styles.input, styles.amountInput]}
+                  testID={`service-item-amount-${index}`}
+                />
+                <Pressable
+                  onPress={() => setItems((current) => (current.length === 1 ? current : current.filter((next) => next.id !== item.id)))}
+                  style={styles.iconButton}
+                  testID={`service-remove-item-${index}`}
+                >
+                  <Trash2 size={18} color={colors.error} />
+                </Pressable>
+              </View>
+            ))}
+
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalText}>{formatMoney(totalCents)}</Text>
+            </View>
+
+            <PrimaryButton
+              title="Finalizar servico"
+              onPress={handleFinish}
+              loading={finishing}
+              disabled={finishing || cancelling}
+            />
+            <PrimaryButton
+              title="Cancelar agendamento"
+              onPress={handleCancel}
+              loading={cancelling}
+              disabled={finishing || cancelling}
+              variant="danger"
+            />
+          </View>
+        ) : null}
       </ScrollView>
+    </View>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChangeText,
+  multiline,
+  testID,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  multiline?: boolean;
+  testID: string;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        multiline={multiline}
+        placeholder={label}
+        placeholderTextColor={colors.outline}
+        style={[styles.input, multiline && styles.textarea]}
+        testID={testID}
+      />
     </View>
   );
 }
@@ -177,6 +343,39 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
   infoText: { ...typography.bodyMd, color: colors.onSurface, flex: 1 },
   notes: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  field: { gap: 5 },
+  fieldLabel: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'uppercase' },
+  input: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.base,
+    color: colors.onSurface,
+    backgroundColor: colors.surfaceContainerLowest,
+    ...typography.bodyMd,
+  },
+  textarea: {
+    minHeight: 94,
+    textAlignVertical: 'top',
+  },
+  itemHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.base },
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  serviceItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
+  amountInput: { width: 110 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalLabel: { ...typography.labelMd, color: colors.onSurfaceVariant },
+  totalText: { ...typography.headlineMd, color: colors.onSurface },
   empty: {
     margin: spacing.marginMobile,
     minHeight: 180,
