@@ -76,17 +76,6 @@ export default function MechanicProfileScreen() {
           <Text style={styles.sectionTitle}>Perfil publico</Text>
           <AppInput label="Nome" value={name} onChangeText={setName} placeholder="Nome completo" />
           <AppInput label="Especialidade" value={specialty} onChangeText={setSpecialty} placeholder="Eletrica, freios, motor" />
-          <View style={styles.approvalRow}>
-            <View style={styles.approvalTextBlock}>
-              <Text style={styles.approvalTitle}>Status de aprovacao</Text>
-              <Text style={styles.approvalDescription}>
-                {mechanic?.isActive ? 'Aprovado pela oficina.' : 'Pendente de aprovacao pela oficina.'}
-              </Text>
-            </View>
-            <Text style={[styles.approvalBadge, mechanic?.isActive ? styles.approvalBadgeActive : styles.approvalBadgePending]}>
-              {mechanic?.isActive ? 'Ativo' : 'Pendente'}
-            </Text>
-          </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <PrimaryButton title="Salvar perfil" onPress={handleSave} loading={isLoading} disabled={isLoading} variant="filled" />
         </View>
@@ -149,33 +138,5 @@ const styles = StyleSheet.create({
     ...shadow.light,
   },
   sectionTitle: { ...typography.headlineMd, color: colors.onSurface },
-  approvalRow: {
-    minHeight: 64,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceContainerLow,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.base,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  approvalTextBlock: { flex: 1 },
-  approvalTitle: { ...typography.labelMd, color: colors.onSurface },
-  approvalDescription: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  approvalBadge: {
-    ...typography.labelSm,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    overflow: 'hidden',
-  },
-  approvalBadgeActive: {
-    backgroundColor: colors.secondaryContainer,
-    color: colors.secondary,
-  },
-  approvalBadgePending: {
-    backgroundColor: colors.surfaceContainerHigh,
-    color: colors.onSurfaceVariant,
-  },
   errorText: { ...typography.labelSm, color: colors.error },
 });

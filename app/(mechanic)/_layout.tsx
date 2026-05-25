@@ -4,13 +4,13 @@ import { colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function MechanicLayout() {
-  const { isAuthenticated, isBootstrappingSession, isApprovedMechanic } = useAuth();
+  const { isAuthenticated, isBootstrappingSession, isMechanic } = useAuth();
 
   if (isBootstrappingSession) {
     return null;
   }
 
-  if (!isAuthenticated || !isApprovedMechanic) {
+  if (!isAuthenticated || !isMechanic) {
     return <Redirect href="/(auth)/login" />;
   }
 

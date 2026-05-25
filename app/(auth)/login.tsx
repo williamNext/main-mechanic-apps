@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,12 +25,12 @@ export default function LoginScreen() {
     const digits = phone.replace(/\D/g, '');
 
     if (!digits || !password) {
-      setErrorMsg('Telefone e senha obrigatórios.');
+      setErrorMsg('Telefone e senha obrigatorios.');
       return;
     }
 
     if (digits.length < 10 || digits.length > 13) {
-      setErrorMsg('Telefone inválido.');
+      setErrorMsg('Telefone invalido.');
       return;
     }
 
@@ -39,24 +39,19 @@ export default function LoginScreen() {
       const success = await loginByPhone(phone, password);
       const loggedUser = useAuthStore.getState().user;
       const isMechanic = loggedUser?.role === 'mechanic';
-      const isApprovedMechanic = isMechanic && 'isActive' in loggedUser && loggedUser.isActive === true;
 
-      if (success && isApprovedMechanic) {
+      if (success && isMechanic) {
         router.replace('/(mechanic)/agenda');
         return;
       }
 
       if (success) {
         await logout();
-        if (isMechanic) {
-          setErrorMsg('Acesso pendente de aprovacao pela oficina.');
-          return;
-        }
-        setErrorMsg('Acesso de mecânico obrigatório.');
+        setErrorMsg('Acesso de mecanico obrigatorio.');
         return;
       }
 
-      setErrorMsg('Credenciais inválidas ou erro de conexão.');
+      setErrorMsg('Credenciais invalidas ou erro de conexao.');
     } finally {
       setIsSubmitting(false);
     }
@@ -71,21 +66,8 @@ export default function LoginScreen() {
               <View style={styles.logoContainer}>
                 <MaterialIcons name="build" size={32} color={colors.onPrimary} />
               </View>
-              <Text style={styles.title}>Acesso Mecânico</Text>
-              <Text style={styles.subtitle}>Agenda e disponibilidade para mecânicos aprovados.</Text>
-            </View>
-
-            <View style={styles.tabsRow}>
-              <View style={styles.tabActive}>
-                <Text style={styles.tabActiveText}>Entrar</Text>
-              </View>
-              <Pressable
-                onPress={() => router.push('/(auth)/register')}
-                android_ripple={{ color: colors.surfaceContainerHigh }}
-                style={({ pressed }) => [styles.tabInactive, pressed && styles.pressed]}
-              >
-                <Text style={styles.tabInactiveText}>Solicitar acesso</Text>
-              </Pressable>
+              <Text style={styles.title}>Acesso Mecanico</Text>
+              <Text style={styles.subtitle}>Agenda e disponibilidade para mecanicos.</Text>
             </View>
 
             {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
@@ -162,18 +144,7 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.headlineLgMobile, color: colors.primary },
   subtitle: { ...typography.bodyMd, color: colors.onSurfaceVariant, textAlign: 'center' },
-  tabsRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.outlineVariant },
-  tabActive: {
-    flex: 1,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.safetyOrange,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  tabActiveText: { ...typography.bodyMd, color: colors.onSurface },
-  tabInactive: { flex: 1, paddingVertical: spacing.sm, alignItems: 'center' },
-  tabInactiveText: { ...typography.bodyMd, color: colors.outline },
+
   form: { gap: spacing.sm, marginTop: spacing.base },
   errorText: { ...typography.labelSm, color: colors.error, marginTop: spacing.xs },
-  pressed: { opacity: 0.8 },
 });

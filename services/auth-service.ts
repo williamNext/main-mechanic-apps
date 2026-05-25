@@ -1,11 +1,8 @@
 import { supabase } from './api';
-import { User, Mechanic, Role } from '@/types/models';
-
-type SelfServiceRole = Exclude<Role, 'admin'>;
+import { User, Mechanic } from '@/types/models';
 
 const AUTH_TIMEOUT_MS = 15000;
 const PROFILE_TIMEOUT_MS = 15000;
-const SIGNUP_TIMEOUT_MS = 20000;
 
 const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
 
@@ -37,7 +34,7 @@ async function timed<T>(label: string, task: () => Promise<T>): Promise<T> {
 
 export async function login(email: string, password: string): Promise<User | Mechanic | null> {
   if (!email || !password) {
-    throw new Error('E-mail e senha são obrigatórios');
+    throw new Error('E-mail e senha sao obrigatorios');
   }
 
   const { data: authData, error: authError } = await timed('email signInWithPassword', () =>
@@ -65,12 +62,12 @@ export function toE164BrPhone(phone: string): string | null {
 
 export async function loginByPhone(phone: string, password: string): Promise<User | Mechanic | null> {
   if (!phone || !password) {
-    throw new Error('Telefone e senha são obrigatórios');
+    throw new Error('Telefone e senha sao obrigatorios');
   }
 
   const normalizedPhone = toE164BrPhone(phone);
   if (!normalizedPhone) {
-    throw new Error('Telefone inválido');
+    throw new Error('Telefone invalido');
   }
 
   const { data: authData, error: authError } = await timed('phone signInWithPassword', () =>
@@ -126,101 +123,9 @@ export async function getUserById(id: string): Promise<User | Mechanic | null> {
   return { ...data, avatarUrl: data.avatar_url ?? undefined } as User;
 }
 
-export async function signUpWithPhone(phone: string, password: string, name: string, role: SelfServiceRole): Promise<void> {
-  const normalizedPhone = toE164BrPhone(phone);
-  if (!normalizedPhone) {
-    throw new Error('Telefone inválido');
-  }
-
-  const { data: authData, error: authError } = await timed('signUp', () =>
-    withTimeout(
-      supabase.auth.signUp({
-        phone: normalizedPhone,
-        password,
-        options: {
-          data: { name, role, phone: normalizedPhone },
-          channel: 'sms',
-        }
-      }),
-      SIGNUP_TIMEOUT_MS,
-      'Tempo limite excedido ao criar cadastro',
-    ),
-  );
-
-  if (authError || !authData.user) throw authError;
-  const userId = authData.user.id;
-
-  const { error: profileError } = await timed('profile insert', () =>
-    withTimeout(
-      supabase.from('profiles').insert({
-        id: userId,
-        name,
-        email: null,
-        role,
-        phone: normalizedPhone,
-      }),
-      PROFILE_TIMEOUT_MS,
-      'Tempo limite excedido ao criar perfil',
-    ),
-  );
-
-  if (profileError) throw profileError;
-
-  if (role === 'mechanic') {
-    const { error: mechanicError } = await timed('mechanic insert', () =>
-      withTimeout(
-        supabase.from('mechanics').insert({
-          id: userId,
-          specialty: 'Geral',
-          credentials: 'PENDENTE',
-          is_active: false,
-        }),
-        PROFILE_TIMEOUT_MS,
-        'Tempo limite excedido ao criar perfil do mecânico',
-      ),
-    );
-    if (mechanicError) throw mechanicError;
-  }
-}
-
-export async function signUp(email: string, password: string, name: string, role: SelfServiceRole, phone?: string): Promise<void> {
-  const { data: authData, error: authError } = await timed('signUp email', () =>
-    withTimeout(
-      supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name, role, phone }
-        }
-      }),
-      SIGNUP_TIMEOUT_MS,
-      'Tempo limite excedido ao criar cadastro',
-    ),
-  );
-
-  if (authError || !authData.user) throw authError;
-  const userId = authData.user.id;
-
-  const { error: profileError } = await timed('profile insert', () =>
-    withTimeout(
-      supabase.from('profiles').insert({
-        id: userId,
-        name,
-        email,
-        role,
-        phone,
-      }),
-      PROFILE_TIMEOUT_MS,
-      'Tempo limite excedido ao criar perfil',
-    ),
-  );
-
-  if (profileError) throw profileError;
-}
-
 export async function getCurrentSessionUser(): Promise<User | Mechanic | null> {
   const { data: { session } } = await timed('getSession', () =>
-    withTimeout(supabase.auth.getSession(), AUTH_TIMEOUT_MS, 'Tempo limite excedido ao carregar sessão'),
+    withTimeout(supabase.auth.getSession(), AUTH_TIMEOUT_MS, 'Tempo limite excedido ao carregar sessao'),
   );
   if (!session?.user) return null;
   return getUserById(session.user.id);

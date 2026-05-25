@@ -54,8 +54,8 @@ async function seed() {
       const { error: mechError } = await supabase.from('mechanics').insert({
         id: userId,
         specialty: u.specialty,
-        credentials: 'PENDENTE',
-        is_active: false,
+        credentials: 'CREA-123456',
+        is_active: true,
       });
       if (mechError) console.error('Error creating mechanic profile:', mechError.message);
     }
@@ -64,7 +64,7 @@ async function seed() {
   }
 
   console.log('\nSeed complete!');
-  console.log('Mechanic accounts are pending. Approve them with an admin/service-role workflow before login.');
+  console.log('Mechanic accounts are active.');
 }
 
 seed();
