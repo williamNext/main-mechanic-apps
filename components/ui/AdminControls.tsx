@@ -1,7 +1,10 @@
-import { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
+import { ReactNode, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
-import { Search } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ChevronRight, Search } from 'lucide-react-native';
+import { addDays, addMonths, format, isSameDay, isSameMonth, startOfMonth, startOfWeek, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { formatDateDisplay, parseISODateSafe, toISODate } from '@/utils/date';
 
 export function Panel({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   return <View style={[styles.panel, style]}>{children}</View>;
@@ -52,7 +55,17 @@ export function ActionButton({
   );
 }
 
-export function SearchField({ value, onChangeText, placeholder = 'Buscar' }: { value: string; onChangeText: (value: string) => void; placeholder?: string }) {
+export function SearchField({
+  value,
+  onChangeText,
+  placeholder = 'Buscar',
+  onSubmitEditing,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder?: string;
+  onSubmitEditing?: () => void;
+}) {
   return (
     <View style={styles.searchBox}>
       <Search size={16} color="#667085" />
@@ -62,22 +75,75 @@ export function SearchField({ value, onChangeText, placeholder = 'Buscar' }: { v
         placeholder={placeholder}
         placeholderTextColor="#98a2b3"
         style={styles.searchInput}
+        onSubmitEditing={onSubmitEditing}
       />
     </View>
   );
 }
 
-export function DateInput({ label, value, onChangeText }: { label: string; value: string; onChangeText: (value: string) => void }) {
+export function CalendarDateInput({ label, value, onChangeDate }: { label: string; value: string; onChangeDate: (value: string) => void }) {
+  const selectedDate = parseISODateSafe(value);
+  const [open, setOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => selectedDate ?? new Date());
+  const calendarDays = useMemo(() => {
+    const start = startOfWeek(startOfMonth(visibleMonth));
+    return Array.from({ length: 42 }, (_, index) => addDays(start, index));
+  }, [visibleMonth]);
+  const monthLabel = format(visibleMonth, 'MMMM yyyy', { locale: ptBR });
+
+  const openCalendar = () => {
+    setVisibleMonth(selectedDate ?? new Date());
+    setOpen(true);
+  };
+
   return (
     <View style={styles.fieldBlock}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={(text) => onChangeText(text.slice(0, 10))}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor="#98a2b3"
-        style={styles.fieldInput}
-      />
+      <Pressable accessibilityRole="button" onPress={openCalendar} style={styles.fieldButton}>
+        <CalendarDays size={15} color="#667085" />
+        <Text style={[styles.fieldButtonText, !selectedDate && styles.fieldPlaceholder]}>{formatDateDisplay(value) || 'dd/mm/aaaa'}</Text>
+      </Pressable>
+      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.calendarBackdrop} onPress={() => setOpen(false)}>
+          <Pressable style={styles.calendarCard}>
+            <View style={styles.calendarHeader}>
+              <Pressable accessibilityRole="button" onPress={() => setVisibleMonth((current) => subMonths(current, 1))} style={styles.calendarNavButton}>
+                <ChevronLeft size={18} color="#344054" />
+              </Pressable>
+              <Text style={styles.calendarTitle}>{monthLabel}</Text>
+              <Pressable accessibilityRole="button" onPress={() => setVisibleMonth((current) => addMonths(current, 1))} style={styles.calendarNavButton}>
+                <ChevronRight size={18} color="#344054" />
+              </Pressable>
+            </View>
+            <View style={styles.calendarWeekRow}>
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map((day) => (
+                <Text key={day} style={styles.calendarWeekText}>
+                  {day}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.calendarGrid}>
+              {calendarDays.map((day) => {
+                const inMonth = isSameMonth(day, visibleMonth);
+                const selected = selectedDate ? isSameDay(day, selectedDate) : false;
+                return (
+                  <Pressable
+                    key={day.toISOString()}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      onChangeDate(toISODate(day));
+                      setOpen(false);
+                    }}
+                    style={[styles.calendarDay, selected && styles.calendarDaySelected]}
+                  >
+                    <Text style={[styles.calendarDayText, !inMonth && styles.calendarDayMuted, selected && styles.calendarDayTextSelected]}>{format(day, 'd')}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -126,7 +192,7 @@ export function DataTable({
   rows,
   keyExtractor,
 }: {
-  columns: { key: string; label: string; width?: number; flex?: number }[];
+  columns: { key: string; label: ReactNode; width?: number; flex?: number }[];
   rows: Record<string, ReactNode>[];
   keyExtractor: (row: Record<string, ReactNode>, index: number) => string;
 }) {
@@ -134,9 +200,9 @@ export function DataTable({
     <View style={styles.table}>
       <View style={styles.tableHeader}>
         {columns.map((column) => (
-          <Text key={column.key} style={[styles.th, { width: column.width, flex: column.flex }]}>
-            {column.label}
-          </Text>
+          <View key={column.key} style={[styles.th, { width: column.width, flex: column.flex }]}>
+            {typeof column.label === 'string' || typeof column.label === 'number' ? <Text style={styles.thText}>{column.label}</Text> : column.label}
+          </View>
         ))}
       </View>
       {rows.map((row, index) => (
@@ -221,8 +287,69 @@ export function MiniBarChart({ values }: { values: { label: string; value: numbe
       <View style={styles.chartLabels}>
         {values.slice(0, 8).map((item) => (
           <Text key={item.label} style={styles.chartLabel}>
-            {item.label.slice(5)}
+            {item.label}
           </Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+export function FinanceBarChart({
+  values,
+  valueFormatter = (value: number) => String(value),
+  color = '#067647',
+  emptyLabel = 'Sem dados no periodo.',
+}: {
+  values: { label: string; value: number; meta?: string | number }[];
+  valueFormatter?: (value: number) => string;
+  color?: string;
+  emptyLabel?: string;
+}) {
+  const width = 640;
+  const height = 168;
+  const displayValues = values.slice(0, 36);
+  const hasData = displayValues.some((item) => item.value > 0);
+  const max = Math.max(1, ...displayValues.map((item) => item.value));
+  const barWidth = Math.max(7, (width - 36) / Math.max(displayValues.length, 1) - 5);
+  const labelStep = Math.max(1, Math.ceil(displayValues.length / 8));
+
+  if (!hasData) {
+    return (
+      <View style={styles.financeChartEmpty}>
+        <Text style={styles.financeChartEmptyText}>{emptyLabel}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.financeChartWrap}>
+      <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
+        {displayValues.map((item, index) => {
+          const barHeight = Math.max(3, (item.value / max) * 118);
+          const x = 18 + index * (barWidth + 5);
+          const y = 132 - barHeight;
+          return <Rect key={`${item.label}-${index}`} x={x} y={y} width={barWidth} height={barHeight} rx={3} fill={color} />;
+        })}
+      </Svg>
+      <View style={styles.financeChartLabels}>
+        {displayValues.map((item, index) => {
+          if (index !== 0 && index !== displayValues.length - 1 && index % labelStep !== 0) return null;
+          return (
+            <Text key={`${item.label}-${index}`} style={styles.financeChartLabel}>
+              {item.label}
+            </Text>
+          );
+        })}
+      </View>
+      <View style={styles.financeChartLegend}>
+        {values.slice(0, 6).map((item, index) => (
+          <View key={`${item.label}-${index}`} style={styles.financeChartLegendRow}>
+            <Text style={styles.financeChartLegendLabel} numberOfLines={1}>
+              {item.label}
+            </Text>
+            <Text style={styles.financeChartLegendValue}>{valueFormatter(item.value)}</Text>
+          </View>
         ))}
       </View>
     </View>
@@ -342,6 +469,106 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     outlineStyle: 'none' as never,
   },
+  fieldButton: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: '#d0d5dd',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#ffffff',
+  },
+  fieldButtonText: {
+    color: '#101828',
+    fontSize: 13,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  fieldPlaceholder: {
+    color: '#98a2b3',
+  },
+  calendarBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(16, 24, 40, 0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  calendarCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderWidth: 1,
+    borderColor: '#eaecf0',
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    padding: 14,
+    gap: 12,
+    boxShadow: '0 12px 28px rgba(16, 24, 40, 0.18)',
+  },
+  calendarHeader: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  calendarTitle: {
+    flex: 1,
+    color: '#101828',
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+    textTransform: 'capitalize',
+  },
+  calendarNavButton: {
+    width: 34,
+    height: 34,
+    borderWidth: 1,
+    borderColor: '#d0d5dd',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  calendarWeekRow: {
+    flexDirection: 'row',
+  },
+  calendarWeekText: {
+    flex: 1,
+    color: '#667085',
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  calendarDay: {
+    width: '13.25%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDaySelected: {
+    backgroundColor: '#101828',
+  },
+  calendarDayText: {
+    color: '#344054',
+    fontSize: 13,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  calendarDayMuted: {
+    color: '#98a2b3',
+  },
+  calendarDayTextSelected: {
+    color: '#ffffff',
+  },
   segmentRoot: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -392,12 +619,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eaecf0',
   },
   th: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  thText: {
     color: '#667085',
     fontSize: 11,
     fontWeight: '800',
     textTransform: 'uppercase',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
   tableRow: {
     minHeight: 54,
@@ -472,6 +702,57 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#667085',
     fontSize: 10,
+    fontWeight: '700',
+  },
+  financeChartWrap: {
+    gap: 10,
+  },
+  financeChartLabels: {
+    minHeight: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  financeChartLabel: {
+    color: '#667085',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  financeChartLegend: {
+    gap: 6,
+  },
+  financeChartLegendRow: {
+    minHeight: 26,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f2f4f7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  financeChartLegendLabel: {
+    flex: 1,
+    color: '#344054',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  financeChartLegendValue: {
+    color: '#101828',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  financeChartEmpty: {
+    minHeight: 120,
+    borderWidth: 1,
+    borderColor: '#eaecf0',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f9fafb',
+  },
+  financeChartEmptyText: {
+    color: '#667085',
+    fontSize: 13,
     fontWeight: '700',
   },
 });

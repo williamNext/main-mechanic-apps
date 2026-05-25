@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { AdminAppointmentRow, AdminFinancialReport, AdminMechanicRow } from '@/types/models';
+import { formatDateDisplay } from '@/utils/date';
 
 function cell(value: unknown): string {
   const text = value === null || value === undefined ? '' : String(value);
@@ -33,7 +34,7 @@ export function mechanicsToCsv(rows: AdminMechanicRow[]): string {
       row.credentials,
       row.isActive ? 'sim' : 'nao',
       row.appointmentsTotal,
-      row.lastAppointmentDate,
+      formatDateDisplay(row.lastAppointmentDate),
     ]),
   );
 }
@@ -43,7 +44,7 @@ export function appointmentsToCsv(rows: AdminAppointmentRow[]): string {
     ['ID', 'Data', 'Inicio', 'Fim', 'Status', 'Cliente', 'Telefone do cliente', 'Mecanico', 'Telefone do mecanico', 'Veiculo', 'Observacoes', 'Resumo do servico', 'Detalhamento', 'Valor total'],
     rows.map((row) => [
       row.id,
-      row.date,
+      formatDateDisplay(row.date),
       row.startTime,
       row.endTime,
       appointmentStatusLabel(row.status),
@@ -65,13 +66,13 @@ export function financeToCsv(report: AdminFinancialReport): string {
     ['ID', 'Data', 'Cliente', 'Mecanico', 'Veiculo', 'Servico', 'Valor total', 'Fechado em'],
     report.appointments.map((row) => [
       row.id,
-      row.date,
+      formatDateDisplay(row.date),
       row.clientName,
       row.mechanicName,
       row.vehicleInfo,
       row.serviceSummary,
       money(row.totalAmountCents),
-      row.closedAt,
+      formatDateDisplay(row.closedAt),
     ]),
   );
 }

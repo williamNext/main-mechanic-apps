@@ -13,12 +13,11 @@ export default function AdminLayout() {
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f7f8fa' } }}>
       <Stack.Screen name="dashboard" />
-      <Stack.Screen name="approvals" />
       <Stack.Screen name="appointments" />
       <Stack.Screen name="finance" />
       <Stack.Screen name="reports" />
       <Stack.Screen name="settings" />
-      <Stack.Screen name="mechanics" />
+      <Stack.Screen name="mechanics/index" />
     </Stack>
   );
 }

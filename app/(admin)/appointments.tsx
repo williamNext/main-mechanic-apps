@@ -5,7 +5,7 @@ import { AdminShell } from '@/components/admin/AdminShell';
 import {
   ActionButton,
   DataTable,
-  DateInput,
+  CalendarDateInput,
   EmptyState,
   LoadingState,
   PaginationBar,
@@ -20,6 +20,7 @@ import * as adminService from '@/services/admin-service';
 import { useAdminStore } from '@/stores/admin-store';
 import { AdminMechanicRow } from '@/types/models';
 import { appointmentsToCsv, downloadCsv } from '@/utils/csv';
+import { formatDateDisplay } from '@/utils/date';
 
 function appointmentTone(status: string) {
   if (status === 'cancelado') return 'danger' as const;
@@ -49,13 +50,13 @@ export default function AppointmentsScreen() {
 
   useEffect(() => {
     void adminService
-      .fetchMechanics({ search: '', mechanicStatus: 'all', page: 1, pageSize: 100 })
+      .fetchMechanics({ search: '', page: 1, pageSize: 100 })
       .then((result) => setMechanics(result.rows))
       .catch(() => setMechanics([]));
   }, []);
 
   const rows = appointments.rows.map((appointment) => ({
-    date: appointment.date,
+    date: formatDateDisplay(appointment.date),
     time: `${appointment.startTime} - ${appointment.endTime}`,
     client: (
       <View>
@@ -95,9 +96,9 @@ export default function AppointmentsScreen() {
           }
         />
         <View style={styles.filters}>
-          <DateInput label="De" value={filters.from} onChangeText={(from) => setFilters({ from, page: 1 })} />
-          <DateInput label="Até" value={filters.to} onChangeText={(to) => setFilters({ to, page: 1 })} />
-          <SearchField value={filters.search} placeholder="Cliente, mecânico, telefone, veículo" onChangeText={(search) => setFilters({ search, page: 1 })} />
+          <CalendarDateInput label="De" value={filters.from} onChangeDate={(from) => setFilters({ from, page: 1 })} />
+          <CalendarDateInput label="Até" value={filters.to} onChangeDate={(to) => setFilters({ to, page: 1 })} />
+          <SearchField value={filters.search} placeholder="Cliente, mecânico, telefone, veículo" onChangeText={(search) => setFilters({ search, page: 1 })} onSubmitEditing={() => fetchAppointments({ page: 1 })} />
           <SegmentedControl value={filters.status} options={appointmentStatusOptions} onChange={(status) => setFilters({ status, page: 1 })} />
           <ActionButton label="Aplicar" variant="secondary" onPress={() => fetchAppointments({ page: 1 })} />
         </View>

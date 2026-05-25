@@ -3,7 +3,6 @@ import { getDefaultFilters, sanitizeFilters } from '@/features/admin/filter-util
 import * as adminService from '@/services/admin-service';
 import {
   AdminAppointmentRow,
-  AdminApprovalAction,
   AdminDashboardSummary,
   AdminFinancialReport,
   AdminFilters,
@@ -12,7 +11,7 @@ import {
   PaginatedResult,
 } from '@/types/models';
 
-type LoadKey = 'dashboard' | 'mechanics' | 'appointments' | 'finance' | 'detail' | 'approval';
+type LoadKey = 'dashboard' | 'mechanics' | 'appointments' | 'finance' | 'detail' | 'deleteMechanics' | 'createMechanic';
 
 interface AdminState {
   filters: AdminFilters;
@@ -31,7 +30,15 @@ interface AdminState {
   fetchAppointments: (patch?: Partial<AdminFilters>) => Promise<void>;
   fetchFinancialReport: (patch?: Partial<AdminFilters>) => Promise<void>;
   fetchMechanicDetail: (mechanicId: string) => Promise<void>;
-  setApproval: (action: AdminApprovalAction) => Promise<void>;
+  deleteMechanics: (mechanicIds: string[]) => Promise<boolean>;
+  createMechanic: (params: {
+    nome: string;
+    celular: string;
+    email: string;
+    senha: string;
+    especialidade: string;
+    credenciais: string;
+  }) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -72,7 +79,8 @@ export const useAdminStore = create<AdminState>((set, get) => {
       appointments: false,
       finance: false,
       detail: false,
-      approval: false,
+      deleteMechanics: false,
+      createMechanic: false,
     },
     error: null,
 
@@ -122,15 +130,36 @@ export const useAdminStore = create<AdminState>((set, get) => {
       });
     },
 
-    setApproval: async (action) => {
-      await run('approval', async () => {
-        await adminService.setMechanicApproval(action);
+    deleteMechanics: async (mechanicIds) => {
+      setLoading('deleteMechanics', true);
+      set({ error: null });
+      try {
+        await adminService.deleteMechanics(mechanicIds);
         await get().fetchMechanics();
-        if (get().selectedMechanic?.mechanic.id === action.mechanicId) {
-          await get().fetchMechanicDetail(action.mechanicId);
-        }
         await get().fetchDashboard();
-      });
+        return true;
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : 'Falha ao excluir mecânicos' });
+        return false;
+      } finally {
+        setLoading('deleteMechanics', false);
+      }
+    },
+
+    createMechanic: async (params) => {
+      setLoading('createMechanic', true);
+      set({ error: null });
+      try {
+        await adminService.createMechanic(params);
+        await get().fetchMechanics();
+        await get().fetchDashboard();
+        return true;
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : 'Falha ao criar mecânico' });
+        return false;
+      } finally {
+        setLoading('createMechanic', false);
+      }
     },
 
     clearError: () => set({ error: null }),

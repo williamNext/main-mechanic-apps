@@ -1,6 +1,5 @@
 import { supabase } from '@/services/api';
 import {
-  AdminApprovalAction,
   AdminAppointmentRow,
   AdminDashboardSummary,
   AdminFinancialReport,
@@ -10,14 +9,22 @@ import {
   PaginatedResult,
 } from '@/types/models';
 
+function normalizePhoneToE164(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('55') && digits.length >= 12) {
+    return `+${digits}`;
+  }
+  return `+55${digits}`;
+}
+
 function raiseRpcError(error: unknown): never {
   const candidate = error as { message?: string; details?: string };
-  throw new Error(candidate?.message ?? candidate?.details ?? 'Falha na solicitação administrativa');
+  throw new Error(candidate?.message ?? candidate?.details ?? 'Falha na solicitacao administrativa');
 }
 
 function ensureData<T>(data: T | null, error: unknown): T {
   if (error) raiseRpcError(error);
-  if (data === null || data === undefined) throw new Error('Solicitação administrativa não retornou dados');
+  if (data === null || data === undefined) throw new Error('Solicitacao administrativa nao retornou dados');
   return data;
 }
 
@@ -30,10 +37,9 @@ export async function fetchDashboardSummary(filters: Pick<AdminFilters, 'from' |
   return ensureData<AdminDashboardSummary>(data as AdminDashboardSummary | null, error);
 }
 
-export async function fetchMechanics(filters: Pick<AdminFilters, 'search' | 'mechanicStatus' | 'page' | 'pageSize'>) {
+export async function fetchMechanics(filters: Pick<AdminFilters, 'search' | 'page' | 'pageSize'>) {
   const { data, error } = await supabase.rpc('admin_list_mechanics', {
     p_search: filters.search || null,
-    p_status: filters.mechanicStatus,
     p_page: filters.page,
     p_page_size: filters.pageSize,
   });
@@ -76,13 +82,41 @@ export async function fetchMechanicDetail(mechanicId: string, filters: Pick<Admi
   return ensureData<AdminMechanicDetail>(data as AdminMechanicDetail | null, error);
 }
 
-export async function setMechanicApproval(action: AdminApprovalAction) {
-  const { data, error } = await supabase.rpc('admin_set_mechanic_approval', {
-    p_mechanic_id: action.mechanicId,
-    p_approved: action.approved,
-    p_credentials: action.credentials || null,
-    p_note: action.note || null,
+export async function deleteMechanics(mechanicIds: string[]) {
+  const ids = Array.from(new Set(mechanicIds.filter(Boolean)));
+
+  if (ids.length === 0) {
+    throw new Error('Selecione ao menos um mecanico');
+  }
+
+  const { data, error } = await supabase.functions.invoke('admin-delete-mechanics', {
+    body: { mechanicIds: ids },
   });
 
-  return ensureData<Partial<AdminMechanicRow>>(data as Partial<AdminMechanicRow> | null, error);
+  return ensureData<{ deletedCount: number; requestedCount: number }>(
+    data as { deletedCount: number; requestedCount: number } | null,
+    error
+  );
+}
+
+export async function createMechanic(params: {
+  nome: string;
+  celular: string;
+  email: string;
+  senha: string;
+  especialidade: string;
+  credenciais: string;
+}) {
+  const normalizedPhone = normalizePhoneToE164(params.celular);
+
+  const { data, error } = await supabase.functions.invoke('admin-create-mechanic', {
+    body: {
+      ...params,
+      celular: normalizedPhone,
+    },
+  });
+
+  if (error) raiseRpcError(error);
+
+  return ensureData(data, error);
 }

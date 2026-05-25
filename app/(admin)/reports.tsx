@@ -2,9 +2,10 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Download } from 'lucide-react-native';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { ActionButton, DateInput, MetricCard, MiniBarChart, Panel, SectionHeader } from '@/components/ui/AdminControls';
+import { ActionButton, CalendarDateInput, MetricCard, MiniBarChart, Panel, SectionHeader } from '@/components/ui/AdminControls';
 import { useAdminStore } from '@/stores/admin-store';
 import { appointmentsToCsv, downloadCsv, financeToCsv, mechanicsToCsv } from '@/utils/csv';
+import { formatDateDayMonthDisplay } from '@/utils/date';
 
 function formatMoney(cents?: number | null) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((cents ?? 0) / 100);
@@ -36,8 +37,8 @@ export default function ReportsScreen() {
       <Panel>
         <SectionHeader title="Controles do relatorio" />
         <View style={styles.filters}>
-          <DateInput label="De" value={filters.from} onChangeText={(from) => setFilters({ from, page: 1 })} />
-          <DateInput label="Ate" value={filters.to} onChangeText={(to) => setFilters({ to, page: 1 })} />
+          <CalendarDateInput label="De" value={filters.from} onChangeDate={(from) => setFilters({ from, page: 1 })} />
+          <CalendarDateInput label="Ate" value={filters.to} onChangeDate={(to) => setFilters({ to, page: 1 })} />
           <ActionButton
             label="Atualizar"
             variant="secondary"
@@ -83,7 +84,7 @@ export default function ReportsScreen() {
           </View>
           <Panel>
             <SectionHeader title="Tendencia de volume" />
-            <MiniBarChart values={dashboard.appointmentsByDay.map((row) => ({ label: row.date, value: row.total }))} />
+            <MiniBarChart values={dashboard.appointmentsByDay.map((row) => ({ label: formatDateDayMonthDisplay(row.date), value: row.total }))} />
           </Panel>
         </>
       ) : null}

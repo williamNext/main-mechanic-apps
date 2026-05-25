@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  UserCheck,
   Wrench,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/use-auth';
@@ -22,7 +21,6 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: 'Painel', href: '/(admin)/dashboard', icon: LayoutDashboard },
-  { label: 'Aprovações', href: '/(admin)/approvals', icon: UserCheck },
   { label: 'Mecânicos', href: '/(admin)/mechanics', icon: Wrench },
   { label: 'Agendamentos', href: '/(admin)/appointments', icon: CalendarDays },
   { label: 'Financeiro', href: '/(admin)/finance', icon: CircleDollarSign },

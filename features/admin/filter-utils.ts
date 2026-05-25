@@ -1,15 +1,13 @@
 import { endOfMonth, format, startOfMonth } from 'date-fns';
 import { z } from 'zod';
-import { AdminFilters, AppointmentStatus, MechanicApprovalStatus } from '@/types/models';
+import { AdminFilters, AppointmentStatus } from '@/types/models';
 
 const appointmentStatus = z.enum(['all', 'confirmado', 'nao_finalizado', 'cancelado', 'acabado']);
-const mechanicStatus = z.enum(['all', 'pending', 'active', 'inactive']);
 
 const filtersSchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: appointmentStatus,
-  mechanicStatus,
   mechanicId: z.string().uuid().nullable().optional(),
   search: z.string().max(120),
   page: z.number().int().min(1),
@@ -23,7 +21,6 @@ export function getDefaultFilters(): AdminFilters {
     from: format(startOfMonth(now), 'yyyy-MM-dd'),
     to: format(endOfMonth(now), 'yyyy-MM-dd'),
     status: 'all',
-    mechanicStatus: 'all',
     mechanicId: null,
     search: '',
     page: 1,
@@ -65,21 +62,10 @@ export function isAppointmentStatus(value: string): value is AdminFilters['statu
   return appointmentStatus.safeParse(value).success;
 }
 
-export function isMechanicStatus(value: string): value is MechanicApprovalStatus {
-  return mechanicStatus.safeParse(value).success;
-}
-
 export const appointmentStatusOptions: Array<{ label: string; value: 'all' | AppointmentStatus }> = [
   { label: 'Todos', value: 'all' },
   { label: 'Confirmados', value: 'confirmado' },
   { label: 'Nao finalizados', value: 'nao_finalizado' },
   { label: 'Finalizados', value: 'acabado' },
   { label: 'Cancelados', value: 'cancelado' },
-];
-
-export const mechanicStatusOptions: Array<{ label: string; value: MechanicApprovalStatus }> = [
-  { label: 'Todos', value: 'all' },
-  { label: 'Pendentes', value: 'pending' },
-  { label: 'Ativos', value: 'active' },
-  { label: 'Inativos', value: 'inactive' },
 ];

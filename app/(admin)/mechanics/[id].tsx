@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Check, X } from 'lucide-react-native';
 import { AdminShell } from '@/components/admin/AdminShell';
 import {
-  ActionButton,
   DataTable,
   EmptyState,
   LoadingState,
@@ -14,6 +12,7 @@ import {
   StatusPill,
 } from '@/components/ui/AdminControls';
 import { useAdminStore } from '@/stores/admin-store';
+import { formatDateDisplay } from '@/utils/date';
 
 function safeParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -35,7 +34,7 @@ function appointmentTone(status: string) {
 
 export default function MechanicDetailScreen() {
   const id = safeParam(useLocalSearchParams<{ id: string }>().id);
-  const { selectedMechanic, loading, error, fetchMechanicDetail, setApproval } = useAdminStore();
+  const { selectedMechanic, loading, error, fetchMechanicDetail } = useAdminStore();
 
   useEffect(() => {
     if (id) void fetchMechanicDetail(id);
@@ -54,23 +53,6 @@ export default function MechanicDetailScreen() {
           <Panel>
             <SectionHeader
               title={mechanic.name}
-              action={
-                <View style={styles.actions}>
-                  <ActionButton
-                    label="Aprovar"
-                    icon={<Check size={15} color="#ffffff" />}
-                    loading={loading.approval}
-                    onPress={() => setApproval({ mechanicId: mechanic.id, approved: true, credentials: 'APROVADO' })}
-                  />
-                  <ActionButton
-                    label="Rejeitar"
-                    variant="danger"
-                    icon={<X size={15} color="#ffffff" />}
-                    loading={loading.approval}
-                    onPress={() => setApproval({ mechanicId: mechanic.id, approved: false, credentials: 'REJEITADO' })}
-                  />
-                </View>
-              }
             />
             <View style={styles.detailGrid}>
               <Info label="Especialidade" value={mechanic.specialty} />
@@ -79,7 +61,7 @@ export default function MechanicDetailScreen() {
               <Info label="Credenciais" value={mechanic.credentials} />
               <View style={styles.infoBlock}>
                 <Text style={styles.infoLabel}>Status</Text>
-                {mechanic.isActive ? <StatusPill label="Ativo" tone="good" /> : <StatusPill label={mechanic.credentials === 'PENDENTE' ? 'Pendente' : 'Inativo'} tone={mechanic.credentials === 'PENDENTE' ? 'warn' : 'neutral'} />}
+                {mechanic.isActive ? <StatusPill label="Ativo" tone="good" /> : <StatusPill label="Inativo" tone="neutral" />}
               </View>
             </View>
           </Panel>
@@ -104,7 +86,7 @@ export default function MechanicDetailScreen() {
                   { key: 'status', label: 'Status', width: 120 },
                 ]}
                 rows={selectedMechanic.recentAppointments.map((appointment) => ({
-                  date: appointment.date,
+                  date: formatDateDisplay(appointment.date),
                   time: `${appointment.startTime} - ${appointment.endTime}`,
                   client: appointment.clientName ?? 'Cliente',
                   status: <StatusPill label={appointmentLabel(appointment.status)} tone={appointmentTone(appointment.status)} />,
@@ -114,23 +96,7 @@ export default function MechanicDetailScreen() {
             )}
           </Panel>
 
-          <Panel>
-            <SectionHeader title="Histórico de aprovação" />
-            {selectedMechanic.approvalHistory.length === 0 ? (
-              <EmptyState title="Sem ações de aprovação" body="Ainda não há histórico de aprovação administrativa." />
-            ) : (
-              <View style={styles.history}>
-                {selectedMechanic.approvalHistory.map((item) => (
-                  <View key={item.id} style={styles.historyRow}>
-                    <Text style={styles.historyTitle}>{item.action === 'approve_mechanic' ? 'Aprovado' : 'Rejeitado'}</Text>
-                    <Text style={styles.historyMeta}>
-                      {item.actorName ?? 'Administrador'} · {item.createdAt}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </Panel>
+
         </>
       ) : null}
     </AdminShell>

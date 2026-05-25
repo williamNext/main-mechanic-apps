@@ -2,8 +2,6 @@ export type Role = 'admin' | 'mechanic' | 'client';
 
 export type AppointmentStatus = 'confirmado' | 'nao_finalizado' | 'cancelado' | 'acabado';
 
-export type MechanicApprovalStatus = 'all' | 'pending' | 'active' | 'inactive';
-
 export interface User {
   id: string;
   name: string;
@@ -22,7 +20,6 @@ export interface AdminFilters {
   from: string;
   to: string;
   status: 'all' | AppointmentStatus;
-  mechanicStatus: MechanicApprovalStatus;
   mechanicId?: string | null;
   search: string;
   page: number;
@@ -38,8 +35,6 @@ export interface AdminDashboardSummary {
   mechanics: {
     total: number;
     active: number;
-    pending: number;
-    inactive: number;
   };
   appointments: {
     total: number;
@@ -132,6 +127,16 @@ export interface AdminFinancialReport {
     revenueCents: number;
     averageTicketCents: number;
   };
+  revenueByDay: Array<{
+    date: string;
+    appointments: number;
+    revenueCents: number;
+  }>;
+  revenueByMonth: Array<{
+    month: string;
+    appointments: number;
+    revenueCents: number;
+  }>;
   byMechanic: Array<{
     mechanicId: string;
     mechanicName: string;
@@ -154,13 +159,6 @@ export interface AdminFinancialReport {
     totalAmountCents: number;
     closedAt: string;
   }>;
-}
-
-export interface AdminApprovalAction {
-  mechanicId: string;
-  approved: boolean;
-  credentials?: string | null;
-  note?: string | null;
 }
 
 export interface PaginatedResult<T> {
@@ -188,14 +186,4 @@ export interface AdminMechanicDetail {
     availableUpcoming: number;
   };
   recentAppointments: AdminAppointmentRow[];
-  approvalHistory: Array<{
-    id: string;
-    action: 'approve_mechanic' | 'reject_mechanic';
-    note?: string | null;
-    actorId?: string | null;
-    actorName?: string | null;
-    createdAt: string;
-    beforeState: Record<string, unknown>;
-    afterState: Record<string, unknown>;
-  }>;
 }

@@ -1,6 +1,6 @@
 # Oficina Admin
 
-Expo web-first admin console for mechanic approvals, operations dashboard, appointment exploration, and CSV reporting.
+Expo web-first admin console for mechanic account creation, operations dashboard, appointment exploration, and CSV reporting.
 
 ## Scripts
 
@@ -22,4 +22,4 @@ Admin access requires a `profiles` row with `role = 'admin'`. Admin accounts are
 
 ## Supabase
 
-Admin database additions live in `scripts/sql/2026-05-22_admin_operations.sql` and are already applied to project `tegtdwbkxkxauwtliprs`.
+Admin database additions live in `scripts/sql/` and are already applied to project `tegtdwbkxkxauwtliprs`.

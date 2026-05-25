@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { DateInput, EmptyState, LoadingState, MetricCard, MiniBarChart, Panel, SectionHeader } from '@/components/ui/AdminControls';
+import { CalendarDateInput, EmptyState, LoadingState, MetricCard, MiniBarChart, Panel, SectionHeader } from '@/components/ui/AdminControls';
 import { useAdminStore } from '@/stores/admin-store';
+import { formatDateDayMonthDisplay } from '@/utils/date';
 
 export default function DashboardScreen() {
   const { dashboard, filters, loading, error, setFilters, fetchDashboard } = useAdminStore();
@@ -16,8 +17,8 @@ export default function DashboardScreen() {
       <Panel>
         <SectionHeader title="Período do relatório" />
         <View style={styles.filters}>
-          <DateInput label="De" value={filters.from} onChangeText={(from) => setFilters({ from })} />
-          <DateInput label="Até" value={filters.to} onChangeText={(to) => setFilters({ to })} />
+          <CalendarDateInput label="De" value={filters.from} onChangeDate={(from) => setFilters({ from })} />
+          <CalendarDateInput label="Até" value={filters.to} onChangeDate={(to) => setFilters({ to })} />
         </View>
       </Panel>
 
@@ -28,7 +29,6 @@ export default function DashboardScreen() {
         <>
           <View style={styles.metrics}>
             <MetricCard label="Mecânicos" value={dashboard.mechanics.total} />
-            <MetricCard label="Aprovações pendentes" value={dashboard.mechanics.pending} tone="warn" />
             <MetricCard label="Agendamentos" value={dashboard.appointments.total} />
             <MetricCard label="Confirmados" value={dashboard.appointments.confirmed} tone="good" />
             <MetricCard label="Cancelados" value={dashboard.appointments.canceled} tone="danger" />
@@ -37,7 +37,7 @@ export default function DashboardScreen() {
 
           <Panel>
             <SectionHeader title="Agendamentos por dia" />
-            <MiniBarChart values={dashboard.appointmentsByDay.map((row) => ({ label: row.date, value: row.total }))} />
+            <MiniBarChart values={dashboard.appointmentsByDay.map((row) => ({ label: formatDateDayMonthDisplay(row.date), value: row.total }))} />
           </Panel>
 
           <Panel>

@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { ActionButton, Panel, SectionHeader } from '@/components/ui/AdminControls';
-import { env } from '@/config/env';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function SettingsScreen() {
@@ -17,11 +16,6 @@ export default function SettingsScreen() {
           <Info label="Email" value={user?.email ?? 'Nenhum'} />
           <Info label="Função" value={roleLabel} />
         </View>
-      </Panel>
-
-      <Panel>
-        <SectionHeader title="Projeto Supabase" />
-        <Info label="URL" value={env.EXPO_PUBLIC_SUPABASE_URL} />
       </Panel>
 
       <Panel>

@@ -46,6 +46,7 @@ export default function LoginScreen() {
               placeholder="11999999999"
               placeholderTextColor="#98a2b3"
               style={styles.input}
+              onSubmitEditing={submit}
             />
           </View>
         </View>
@@ -63,6 +64,7 @@ export default function LoginScreen() {
               placeholder="Senha"
               placeholderTextColor="#98a2b3"
               style={styles.input}
+              onSubmitEditing={submit}
             />
           </View>
         </View>
