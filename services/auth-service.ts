@@ -1,5 +1,5 @@
 import { supabase } from './api';
-import { User, Mechanic, Role } from '@/types/models';
+import { User, Mechanic } from '@/types/models';
 
 const AUTH_TIMEOUT_MS = 15000;
 const PROFILE_TIMEOUT_MS = 15000;
@@ -119,7 +119,7 @@ export async function getUserById(id: string): Promise<User | Mechanic | null> {
   return data as User;
 }
 
-export async function signUpWithPhone(phone: string, password: string, name: string, role: Role): Promise<void> {
+export async function signUpWithPhone(phone: string, password: string, name: string, role: 'client'): Promise<void> {
   const normalizedPhone = toE164BrPhone(phone);
   if (!normalizedPhone) {
     throw new Error('Invalid phone number');
@@ -159,23 +159,9 @@ export async function signUpWithPhone(phone: string, password: string, name: str
 
   if (profileError) throw profileError;
 
-  if (role === 'mechanic') {
-    const { error: mechanicError } = await timed('mechanic insert', () =>
-      withTimeout(
-        supabase.from('mechanics').insert({
-          id: userId,
-          specialty: 'Geral',
-          credentials: 'PENDENTE',
-        }),
-        PROFILE_TIMEOUT_MS,
-        'Mechanic profile insert request timed out',
-      ),
-    );
-    if (mechanicError) throw mechanicError;
-  }
 }
 
-export async function signUp(email: string, password: string, name: string, role: Role, phone?: string): Promise<void> {
+export async function signUp(email: string, password: string, name: string, role: 'client', phone?: string): Promise<void> {
   const { data: authData, error: authError } = await timed('signUp email', () =>
     withTimeout(
       supabase.auth.signUp({
