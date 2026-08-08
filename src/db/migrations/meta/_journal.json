@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1786191289908,
+      "tag": "0000_tranquil_kinsey_walden",
+      "breakpoints": true
+    }
+  ]
+}
