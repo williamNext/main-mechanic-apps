@@ -17,7 +17,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Data & Schema
 
 - [ ] **DATA-01**: Server defines and migrates a SQLite schema covering `profiles`, `mechanics`, `public_mechanics`, `timeslots`, `appointments`, `appointment_service_reports`, `appointment_service_items`, `admin_action_log`, `notifications`
-- [ ] **DATA-02**: `notifications` table schema is recovered via live introspection against the current Supabase project (no `CREATE TABLE` exists in any repo) before being ported
+- [ ] **DATA-02**: `notifications` table schema is inferred from client-code usage (`mechanic`/`oficina` `notification-service.ts`) and ported as a best-effort, unverified schema — live introspection is not possible (notifications were never actually implemented in production, and Supabase project access is gone; confirmed during Phase 1 discussion, see `01-CONTEXT.md`)
 - [ ] **DATA-03**: `public_mechanics` stays in sync with `profiles`/`mechanics` changes (trigger or equivalent application-level sync), preserving the read-only denormalized-projection behavior
 
 ### Booking & Appointments

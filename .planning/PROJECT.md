@@ -64,7 +64,7 @@ Clients can book a mechanic timeslot and mechanics/admins can manage it without 
 | Drop phone/SMS OTP for this migration | Cuts significant auth complexity and a paid third-party (Twilio) dependency; can be reintroduced as a later phase | ✓ Good |
 | Start with a fresh SQLite DB, no production data migration | Current Supabase data is not being preserved; avoids Postgres→SQLite type-transform work (uuid/timestamptz/jsonb) blocking the roadmap | ✓ Good |
 | Defer concrete hosting platform | Avoids premature lock-in; server built as a portable Node process instead | — Pending |
-| `notifications` table schema must be recovered via live introspection before it can be ported | No `CREATE TABLE notifications` exists in any committed repo — it was created directly against the live Supabase project | — Pending |
+| `notifications` table schema inferred from client-code usage, not live introspection | No `CREATE TABLE notifications` exists in any committed repo, and it turned out the feature was never actually implemented in production; Supabase project access is also gone entirely (confirmed during Phase 1 discussion) | ✓ Good |
 
 ## Evolution
 
