@@ -36,7 +36,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. On startup, the server has migrated the full schema — `profiles`, `mechanics`, `public_mechanics`, `timeslots`, `appointments`, `appointment_service_reports`, `appointment_service_items`, `admin_action_log`, and `notifications` (the `notifications` schema inferred from client-code usage since no `CREATE TABLE` for it exists in any repo and live introspection is not possible — see `01-CONTEXT.md`).
   3. When a `profiles` or `mechanics` record changes, `public_mechanics` reflects that change automatically without a manual sync step.
   4. A client can sign up with email/password, log in and remain authenticated across a simulated app restart (session persists and refreshes), and log out — after which the old session is no longer valid.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Tracer slice: project scaffold, env-driven config, SQLite/Drizzle wiring, `profiles` table, `GET /health` and `POST /auth/signup` (INFRA-01, INFRA-02, AUTH-01)
+- [ ] 01-02-PLAN.md — Full schema: the eight remaining tables with ported constraints and indexes, the inferred `notifications` table, and six triggers keeping `public_mechanics` self-syncing (DATA-01, DATA-02, DATA-03)
+- [ ] 01-03-PLAN.md — Session lifecycle: admin bootstrap script, `POST /auth/login`, `GET /auth/me`, auth middleware, and SQLite-backed token blocklist behind `POST /auth/logout` (AUTH-02, AUTH-03)
 
 ### Phase 2: Booking & Appointment Lifecycle
 **Goal**: Clients can book a mechanic timeslot and mechanics can manage it (cancel, complete) without double-booking, with every endpoint enforcing server-side role authorization — this is the project's core value, delivered end-to-end.
@@ -80,7 +85,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Auth Walking Skeleton | 0/TBD | Not started | - |
+| 1. Foundation & Auth Walking Skeleton | 0/3 | Planned | - |
 | 2. Booking & Appointment Lifecycle | 0/TBD | Not started | - |
 | 3. Admin Management | 0/TBD | Not started | - |
 | 4. Notifications & Cross-App Visibility | 0/TBD | Not started | - |
