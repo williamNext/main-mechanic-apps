@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. When a `profiles` or `mechanics` record changes, `public_mechanics` reflects that change automatically without a manual sync step.
   4. A client can sign up with email/password, log in and remain authenticated across a simulated app restart (session persists and refreshes), and log out — after which the old session is no longer valid.
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 **Wave 1**
@@ -49,7 +49,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Full schema: the eight remaining tables with ported constraints and indexes, the inferred `notifications` table, and six triggers keeping `public_mechanics` self-syncing (DATA-01, DATA-02, DATA-03)
+- [x] 01-02-PLAN.md — Full schema: the eight remaining tables with ported constraints and indexes, the inferred `notifications` table, and six triggers keeping `public_mechanics` self-syncing (DATA-01, DATA-02, DATA-03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Auth Walking Skeleton | 1/3 | In Progress|  |
+| 1. Foundation & Auth Walking Skeleton | 2/3 | In Progress|  |
 | 2. Booking & Appointment Lifecycle | 0/TBD | Not started | - |
 | 3. Admin Management | 0/TBD | Not started | - |
 | 4. Notifications & Cross-App Visibility | 0/TBD | Not started | - |
