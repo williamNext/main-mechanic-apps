@@ -333,3 +333,27 @@ export const notifications = sqliteTable(
     index('notifications_recipient_unread_idx').on(t.recipientId, t.readAt),
   ],
 );
+
+/**
+ * Session revocation store (D-04/D-05, AUTH-03, 01-03-PLAN.md Task 2). A single
+ * long-lived token (D-03) cannot be ended by expiry alone, so logout writes an
+ * explicit revocation record here — an in-memory store was rejected because a
+ * server restart would silently un-revoke every token. `requireAuth` consults
+ * this table on every authenticated request, after the signature verifies.
+ *
+ * Deliberate divergence from this schema's ISO-8601 TEXT timestamp convention:
+ * `expires_at` and `revoked_at` are INTEGER unix seconds, not TEXT. The only
+ * purpose of `expires_at` is to be compared against the JWT's own numeric
+ * `exp` claim, and a text/number mismatch there is exactly how a pruning job
+ * could silently un-revoke a token that is still signature-valid. `revoked_at`
+ * follows the same integer form for consistency within this one table.
+ *
+ * The primary key on `jti` gives the revocation lookup an index for free and
+ * makes double revocation a no-op (idempotent insert) rather than a duplicate
+ * row.
+ */
+export const tokenBlocklist = sqliteTable('token_blocklist', {
+  jti: text('jti').primaryKey(),
+  expiresAt: integer('expires_at').notNull(),
+  revokedAt: integer('revoked_at').notNull(),
+});

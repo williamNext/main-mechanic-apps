@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { revokeToken } from '../auth/blocklist.js';
 import { hashPassword, verifyPassword } from '../auth/hash.js';
 import { signAccessToken } from '../auth/jwt.js';
 import { requireAuth } from '../auth/middleware.js';
@@ -48,6 +49,11 @@ function isUniqueConstraintError(err: unknown): boolean {
 }
 
 export function authRoutes(app: FastifyInstance, db: Db) {
+  // A single shared instance so /auth/me and /auth/logout (and every
+  // future authenticated route in this project) pick up the same
+  // signature-then-revocation check by using this one preHandler.
+  const authenticate = requireAuth(db);
+
   app.post('/auth/signup', async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = SignupSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -117,7 +123,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
 
   app.get(
     '/auth/me',
-    { preHandler: requireAuth },
+    { preHandler: authenticate },
     async (request: FastifyRequest, reply: FastifyReply) => {
       // Read the profile fresh by the token's subject rather than echoing
       // the token payload, so a profile that has changed since the token
@@ -130,6 +136,23 @@ export function authRoutes(app: FastifyInstance, db: Db) {
       }
 
       return reply.send({ id: row.id, name: row.name, email: row.email, role: row.role });
+    },
+  );
+
+  app.post(
+    '/auth/logout',
+    { preHandler: authenticate },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      // A caller must present a currently-valid token to end it — the
+      // preHandler above already rejected a missing, forged, or
+      // already-revoked token with 401 before this handler ever runs,
+      // which is why presenting an already-revoked token on THIS route
+      // also returns 401 rather than a second success: logout is not
+      // idempotent at the HTTP layer even though revokeToken beneath it is.
+      const { jti, exp } = request.user!;
+      revokeToken(db, { jti, exp });
+
+      return reply.code(204).send();
     },
   );
 }

@@ -526,3 +526,193 @@ describe('scripts/seed-admin', () => {
     errorSpy.mockRestore();
   });
 });
+
+describe('POST /auth/logout', () => {
+  let testDb: ReturnType<typeof makeTestDb>;
+  let app: FastifyInstance;
+
+  beforeEach(() => {
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+  });
+
+  afterEach(async () => {
+    await app.close();
+    testDb.cleanup();
+  });
+
+  async function signupAndGetBody(email: string) {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/signup',
+      payload: { name: 'Ana', email, password: 'correct-horse-battery' },
+    });
+    return res.json();
+  }
+
+  it('returns a success status for a valid token', async () => {
+    const signupBody = await signupAndGetBody('logout-happy@example.com');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { authorization: `Bearer ${signupBody.token}` },
+    });
+
+    expect(res.statusCode).toBeGreaterThanOrEqual(200);
+    expect(res.statusCode).toBeLessThan(300);
+  });
+
+  it('rejects the same token on GET /auth/me immediately after logout', async () => {
+    const signupBody = await signupAndGetBody('logout-then-me@example.com');
+
+    await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { authorization: `Bearer ${signupBody.token}` },
+    });
+
+    const meRes = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${signupBody.token}` },
+    });
+
+    expect(meRes.statusCode).toBe(401);
+  });
+
+  it('rejects logging out with an already-revoked token (logout is not idempotent at the HTTP layer)', async () => {
+    const signupBody = await signupAndGetBody('logout-twice@example.com');
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { authorization: `Bearer ${signupBody.token}` },
+    });
+    expect(first.statusCode).toBeLessThan(300);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { authorization: `Bearer ${signupBody.token}` },
+    });
+    expect(second.statusCode).toBe(401);
+  });
+
+  it('rejects logging out with no token', async () => {
+    const res = await app.inject({ method: 'POST', url: '/auth/logout' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("does not affect a second user's session when the first logs out", async () => {
+    const userA = await signupAndGetBody('logout-a@example.com');
+    const userB = await signupAndGetBody('logout-b@example.com');
+
+    await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { authorization: `Bearer ${userA.token}` },
+    });
+
+    const bStillWorks = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${userB.token}` },
+    });
+
+    expect(bStillWorks.statusCode).toBe(200);
+  });
+
+  it('logging in again after logging out yields a working token, and the old token stays rejected', async () => {
+    const email = 'logout-relogin@example.com';
+    const signupBody = await signupAndGetBody(email);
+
+    await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { authorization: `Bearer ${signupBody.token}` },
+    });
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email, password: 'correct-horse-battery' },
+    });
+    const newToken = loginRes.json().token;
+
+    const newTokenWorks = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${newToken}` },
+    });
+    expect(newTokenWorks.statusCode).toBe(200);
+
+    const oldTokenStillRejected = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${signupBody.token}` },
+    });
+    expect(oldTokenStillRejected.statusCode).toBe(401);
+  });
+});
+
+describe('Revocation survives restart (AUTH-03 core claim)', () => {
+  it('rejects a logged-out token from a second app instance, while an untouched session still works', async () => {
+    const dbPath = makeRestartableDbPath();
+
+    const first = createDb(dbPath);
+    runMigrations(first.db);
+    const app1 = buildApp(first.db, first.connection);
+
+    const revokedUser = await app1.inject({
+      method: 'POST',
+      url: '/auth/signup',
+      payload: { name: 'Revoked User', email: 'revoked-restart@example.com', password: 'correct-horse-battery' },
+    });
+    const revokedToken = revokedUser.json().token;
+
+    const untouchedUser = await app1.inject({
+      method: 'POST',
+      url: '/auth/signup',
+      payload: {
+        name: 'Untouched User',
+        email: 'untouched-restart@example.com',
+        password: 'correct-horse-battery',
+      },
+    });
+    const untouchedToken = untouchedUser.json().token;
+
+    const logoutRes = await app1.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { authorization: `Bearer ${revokedToken}` },
+    });
+    expect(logoutRes.statusCode).toBeLessThan(300);
+
+    await app1.close();
+    first.connection.close();
+
+    const second = createDb(dbPath);
+    const app2 = buildApp(second.db, second.connection);
+
+    const revokedMe = await app2.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${revokedToken}` },
+    });
+    expect(revokedMe.statusCode).toBe(401);
+
+    // Persistence and revocation are shown independently correct: the
+    // restart preserves the untouched session while dropping the revoked
+    // one, rather than simply rejecting everything.
+    const untouchedMe = await app2.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${untouchedToken}` },
+    });
+    expect(untouchedMe.statusCode).toBe(200);
+
+    await app2.close();
+    second.connection.close();
+  });
+});
