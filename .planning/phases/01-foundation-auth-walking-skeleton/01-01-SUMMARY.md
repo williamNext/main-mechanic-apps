@@ -242,6 +242,13 @@ None. Every route, config path, and DB operation in this plan is fully wired —
 - One environment caveat for this specific machine only: `better-sqlite3`'s native build needs the `--clang=0` override documented in README's Troubleshooting section until this machine's VS2022 Build Tools gets a complete Clang component (or `npm install` is run on a machine/Node version where a prebuilt binary matches). This does not block other developers or CI environments where either condition holds.
 - No blockers for 01-02 or 01-03.
 
+## Self-Check: PASSED
+
+- All key files confirmed present on disk via `git ls-files` (21 created files, all tracked).
+- Commit hashes confirmed present in `git log --oneline --all`: `43a0484` (test, RED), `d0f7eb4` (feat, GREEN), `6c7c518` (feat, real-file migration), `3cf991c` (docs, SUMMARY).
+- Plan-level `<verification>` re-run and confirmed: `npx vitest run` → 14/14 pass; `npm run build` → exits 0; scoped `process.env` grep → only `src/config/index.ts`; real `DB_PATH` file confirmed to contain `profiles` + `__drizzle_migrations`; `npm run dev` answered `GET /health` (200) and `POST /auth/signup` (201) live.
+- TDD gate compliance confirmed: `test(01-01)` commit precedes `feat(01-01)` commit in git log.
+
 ---
 *Phase: 01-foundation-auth-walking-skeleton*
 *Completed: 2026-08-08*
