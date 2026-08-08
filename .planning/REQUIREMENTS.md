@@ -10,8 +10,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Authentication
 
 - [x] **AUTH-01**: Client can sign up with email and password
-- [ ] **AUTH-02**: User (any role) can log in with email and password and stay logged in across app restarts (session persisted client-side, refreshable)
-- [ ] **AUTH-03**: User can log out, invalidating their session
+- [x] **AUTH-02**: User (any role) can log in with email and password and stay logged in across app restarts (session persisted client-side, refreshable)
+- [x] **AUTH-03**: User can log out, invalidating their session
 - [ ] **AUTH-04**: Every API endpoint enforces role-based authorization (`admin`/`mechanic`/`client`) via server-side middleware — no endpoint trusts client-supplied role claims
 
 ### Data & Schema
@@ -73,8 +73,8 @@ Populated during roadmap creation. See .planning/ROADMAP.md for phase goals and 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | AUTH-01 | Phase 1 | Complete |
-| AUTH-02 | Phase 1 | Pending |
-| AUTH-03 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Complete |
+| AUTH-03 | Phase 1 | Complete |
 | AUTH-04 | Phase 2 | Pending |
 | DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Complete |

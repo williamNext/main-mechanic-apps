@@ -20,7 +20,7 @@ completing parity with the current Supabase+Postgres system's booking/notificati
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation & Auth Walking Skeleton** - Portable server boots, full schema is migrated, and a client can sign up/log in/log out end-to-end
+- [x] **Phase 1: Foundation & Auth Walking Skeleton** - Portable server boots, full schema is migrated, and a client can sign up/log in/log out end-to-end (completed 2026-08-08)
 - [ ] **Phase 2: Booking & Appointment Lifecycle** - Clients book timeslots without double-booking; mechanics cancel/complete appointments; every endpoint is role-gated
 - [ ] **Phase 3: Admin Management** - Admins create/delete mechanic accounts and retrieve dashboard, mechanic, appointment, and financial reporting data
 - [ ] **Phase 4: Notifications & Cross-App Visibility** - Booking-lifecycle events fan out as notifications visible across roles; users manage their notification inbox
@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. When a `profiles` or `mechanics` record changes, `public_mechanics` reflects that change automatically without a manual sync step.
   4. A client can sign up with email/password, log in and remain authenticated across a simulated app restart (session persists and refreshes), and log out — after which the old session is no longer valid.
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -53,7 +53,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — Session lifecycle: admin bootstrap script, `POST /auth/login`, `GET /auth/me`, auth middleware, and SQLite-backed token blocklist behind `POST /auth/logout` (AUTH-02, AUTH-03)
+- [x] 01-03-PLAN.md — Session lifecycle: admin bootstrap script, `POST /auth/login`, `GET /auth/me`, auth middleware, and SQLite-backed token blocklist behind `POST /auth/logout` (AUTH-02, AUTH-03)
 
 ### Phase 2: Booking & Appointment Lifecycle
 
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Auth Walking Skeleton | 2/3 | In Progress|  |
+| 1. Foundation & Auth Walking Skeleton | 3/3 | Complete    | 2026-08-08 |
 | 2. Booking & Appointment Lifecycle | 0/TBD | Not started | - |
 | 3. Admin Management | 0/TBD | Not started | - |
 | 4. Notifications & Cross-App Visibility | 0/TBD | Not started | - |
