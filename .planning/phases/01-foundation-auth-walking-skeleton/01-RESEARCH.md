@@ -466,17 +466,19 @@ Not applicable — this is a greenfield phase (new repo, no existing deployed ru
 
 **Risk framing:** All five assumptions are either explicitly delegated to Claude's discretion by CONTEXT.md, or already flagged as best-effort/unverified by the locked DATA-02 decision — none require new user confirmation beyond what CONTEXT.md already anticipated. A3 is the one item worth a lightweight confirmation before Phase 3 planning locks it in.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the `admin_action_log.action` CHECK constraint include `approve_mechanic`/`reject_mechanic` at all, given the approval flow was removed from the source system?**
    - What we know: The final Postgres constraint still lists all three values, but two are dead (Pitfall 4).
    - What's unclear: Whether Phase 3 needs those legacy values for historical-data compatibility (moot here since there's no data migration, per PROJECT.md) or should start clean with only `create_mechanic`/`delete_mechanic`.
    - Recommendation: Phase 1 should define the table with a CHECK permissive enough to not block Phase 3 (e.g., include `create_mechanic` and `delete_mechanic` only, since there's no historical data to preserve) — Phase 3's own research can revisit if needed.
+   - **RESOLVED:** Phase 1 defines only the two actions Phase 3 will actually use (`create_mechanic`, `delete_mechanic`), starting clean rather than preserving the dead approval-era values. Implemented in `01-02-PLAN.md` Task 1.
 
 2. **`node:sqlite`'s stabilization timeline** — should this project revisit swapping `better-sqlite3` for the zero-dependency built-in module later?
    - What we know: `node:sqlite` is release-candidate on Node 24+ as of this research [CITED: web search].
    - What's unclear: When (or if) it will reach full stability and API parity with `better-sqlite3`.
    - Recommendation: Stick with `better-sqlite3` for Phase 1; not a blocking concern, revisit opportunistically in a later phase if desired.
+   - **RESOLVED:** Stick with `better-sqlite3` for Phase 1 (locked in `01-01-PLAN.md`'s dependency choice). Revisit opportunistically in a later phase if `node:sqlite` stabilizes — not a blocker for this project.
 
 ## Environment Availability
 
