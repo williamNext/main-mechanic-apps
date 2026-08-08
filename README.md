@@ -24,6 +24,26 @@ The server starts and listens on the configured `PORT` (default `3000`). Once ru
 - `GET /health` returns `{ "status": "ok", "db": "ok" }`
 - `POST /auth/signup` with `{ "name": "...", "email": "...", "password": "..." }` creates a
   `client`-role account and returns `{ "token": "...", "user": { ... } }`
+- `POST /auth/login` with `{ "email": "...", "password": "..." }` returns the same
+  `{ "token": "...", "user": { ... } }` shape for any existing account, regardless of role
+- `GET /auth/me` with `Authorization: Bearer <token>` returns the caller's current profile
+- `POST /auth/logout` with `Authorization: Bearer <token>` ends that session; the same token is
+  rejected by every authenticated route afterwards, including after a server restart
+
+## Admin Bootstrap
+
+There is no admin signup endpoint — `POST /auth/signup` always creates a `client`-role account
+(D-07). The **only** way an admin account comes into existence is the standalone seed script:
+
+```bash
+npm run seed:admin -- "Admin Name" "admin@example.com" "a-strong-password"
+```
+
+This writes directly to the SQLite file at `DB_PATH` using the same schema and password hashing
+as the rest of the server — it is not an HTTP endpoint and is never triggered automatically at
+boot. It refuses to run (exits non-zero) if any admin-role profile already exists, so re-running
+it can never quietly create a second superuser. Run it once, right after the first
+`npm run db:migrate`, to create the account you'll use to sign in as an admin.
 
 ## Environment Variables
 

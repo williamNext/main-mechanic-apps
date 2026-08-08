@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:quick": "vitest run --reporter=dot",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "seed:admin": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {
     "argon2": "^0.45.1",
