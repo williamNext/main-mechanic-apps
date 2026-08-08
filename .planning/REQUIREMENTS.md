@@ -9,7 +9,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Authentication
 
-- [ ] **AUTH-01**: Client can sign up with email and password
+- [x] **AUTH-01**: Client can sign up with email and password
 - [ ] **AUTH-02**: User (any role) can log in with email and password and stay logged in across app restarts (session persisted client-side, refreshable)
 - [ ] **AUTH-03**: User can log out, invalidating their session
 - [ ] **AUTH-04**: Every API endpoint enforces role-based authorization (`admin`/`mechanic`/`client`) via server-side middleware — no endpoint trusts client-supplied role claims
@@ -41,8 +41,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: Server is a portable Node process configured entirely via environment variables (SQLite file path, port, JWT secret) with no hosting-platform-specific code
-- [ ] **INFRA-02**: Server runs locally against a local SQLite file for development, with a documented setup/run command
+- [x] **INFRA-01**: Server is a portable Node process configured entirely via environment variables (SQLite file path, port, JWT secret) with no hosting-platform-specific code
+- [x] **INFRA-02**: Server runs locally against a local SQLite file for development, with a documented setup/run command
 
 ## v2 Requirements
 
@@ -72,7 +72,7 @@ Populated during roadmap creation. See .planning/ROADMAP.md for phase goals and 
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Pending |
 | AUTH-03 | Phase 1 | Pending |
 | AUTH-04 | Phase 2 | Pending |
@@ -89,10 +89,11 @@ Populated during roadmap creation. See .planning/ROADMAP.md for phase goals and 
 | ADMIN-03 | Phase 3 | Pending |
 | NOTIF-01 | Phase 4 | Pending |
 | NOTIF-02 | Phase 4 | Pending |
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
 
 **Coverage:**
+
 - v1 requirements: 19 total
 - Mapped to phases: 19 (Phase 1: 8, Phase 2: 6, Phase 3: 3, Phase 4: 2)
 - Unmapped: 0 ✓
