@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Requirements**: INFRA-01, INFRA-02, DATA-01, DATA-02, DATA-03, AUTH-01, AUTH-02, AUTH-03
 **Success Criteria** (what must be TRUE):
   1. A developer can start the server locally against a local SQLite file using a documented setup/run command, with all configuration (DB file path, port, JWT secret) supplied via environment variables and no hosting-platform-specific code.
-  2. On startup, the server has migrated the full schema — `profiles`, `mechanics`, `public_mechanics`, `timeslots`, `appointments`, `appointment_service_reports`, `appointment_service_items`, `admin_action_log`, and `notifications` (the `notifications` schema recovered via live introspection against the current Supabase project, since no `CREATE TABLE` for it exists in any repo).
+  2. On startup, the server has migrated the full schema — `profiles`, `mechanics`, `public_mechanics`, `timeslots`, `appointments`, `appointment_service_reports`, `appointment_service_items`, `admin_action_log`, and `notifications` (the `notifications` schema inferred from client-code usage since no `CREATE TABLE` for it exists in any repo and live introspection is not possible — see `01-CONTEXT.md`).
   3. When a `profiles` or `mechanics` record changes, `public_mechanics` reflects that change automatically without a manual sync step.
   4. A client can sign up with email/password, log in and remain authenticated across a simulated app restart (session persists and refreshes), and log out — after which the old session is no longer valid.
 **Plans**: TBD
