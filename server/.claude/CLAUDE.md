@@ -37,6 +37,7 @@ Where any document disagrees with `PROJECT_CONTEXT.md` §8, §8 wins.
 - **Never trust a role from a token.** Re-read it from the DB row. The server forces `client` on signup and strips any supplied role (§5, D-07)
 - User-facing strings are Brazilian Portuguese; code and identifiers are English (§18.9, glossary in §19)
 - Schema changes go through a Drizzle migration. Never edit an applied migration
+- **Comments are prohibited unless the code is highly non-obvious** — a hidden constraint, a subtle invariant, a workaround for a specific bug. Never a comment explaining *what* the code does. Documentation, rationale and decision history belong in `PROJECT_CONTEXT.md` / `docs/`, never inline
 
 ## Planning
 

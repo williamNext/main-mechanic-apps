@@ -1014,9 +1014,11 @@ Handwritten migrations (triggers, data backfills) are legitimate — separate st
   the mechanism that blocks role injection.
 - Error responses are lowercase strings: `{ error: 'invalid request body' }`. Auth failures are
   deliberately indistinguishable from each other.
-- Comments explain **why**, with `file:line` citations back to the legacy SQL and to the plan
-  documents (`D-0x` = decision, `T-xx-xx` = test id, `Pitfall N` = research note). Keep that habit
-  — it is what makes this codebase auditable.
+- **Comments are prohibited by default.** Write one only when the *why* is genuinely non-obvious
+  from the code itself — a hidden constraint, a subtle invariant, a workaround for a specific bug —
+  and keep it to one line. Never comment *what* the code does; well-named identifiers already say
+  that. Design rationale, decision history (`D-0x`) and citations back to the legacy SQL belong in
+  `PROJECT_CONTEXT.md` / `docs/`, not inline — documentation lives in docs, not in comments.
 
 ---
 
@@ -1663,9 +1665,10 @@ There is also `supabase/docs/specs/easy-first-notifications.md` — read it befo
 8. **Keep error message substrings stable** — client screens match on them (§13.2).
 9. **User-facing strings are Brazilian Portuguese.** Code, comments, commits and identifiers are
    English.
-10. **Mirror the existing comment style in `server/src`:** explain *why*, cite `file:line`, and
-    record deliberate divergences. That is the project's institutional memory.
-11. **Flag assumptions.** If something is inferred, say so in the code comment and here — do not
+10. **No comments unless the *why* is genuinely non-obvious** (§9.7) — never *what*, never
+    documentation. Record decisions, rationale and `file:line` history in `PROJECT_CONTEXT.md` /
+    `docs/`, not inline. That is the project's institutional memory, not the source files.
+11. **Flag assumptions.** If something is inferred, say so here in the plan/decision docs — do not
     let it silently become fact.
 12. **Cross-app changes are now one commit** (§3, monorepo). Still state up front which apps a
     change touches — the blast-radius rule in §18.1 applies to *files*, not repos.
