@@ -3,6 +3,7 @@
 export type Role = 'admin' | 'mechanic' | 'client';
 
 export type AppointmentStatus = 'confirmado' | 'nao_finalizado' | 'cancelado' | 'acabado';
+export type NotificationType = 'appointment_confirmed' | 'appointment_canceled' | 'appointment_completed' | 'system';
 
 export interface User {
   id: string;
@@ -59,4 +60,18 @@ export interface ServiceItem {
   description: string;
   amountCents: number;
   sortOrder?: number;
+}
+
+export interface AppNotification {
+  id: string;
+  recipientId: string;
+  actorId?: string | null;
+  appointmentId?: string | null;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  readAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -1,34 +1,57 @@
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppInput } from '@/components/app/AppInput';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { TopAppBar } from '@/components/ui/TopAppBar';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { formatPhone, getInitials } from '@/utils/format';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ClientProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile, isAuthActionLoading } = useAuth();
   const router = useRouter();
+  const [showMyData, setShowMyData] = useState(false);
+  const [name, setName] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) setName(user.name ?? '');
+  }, [user]);
 
   if (!user) {
     return null;
   }
 
   const handleLogout = () => {
-          router.replace('/(auth)/login');
-
-          void logout();
-
+    router.replace('/(auth)/login');
+    void logout();
   };
 
   const handleMyData = () => {
-    Alert.alert('Meus dados', 'Tela de edição ainda não implementada.');
+    setShowMyData((current) => !current);
   };
 
   const handleNotifications = () => {
-    Alert.alert('Notificações', 'Notificações ainda não implementadas.');
+    router.push('/(client)/notifications' as any);
+  };
+
+  const handleSaveData = async () => {
+    const nextName = name.trim();
+    if (nextName.length < 2) {
+      setSaveError('Nome deve ter pelo menos 2 caracteres.');
+      return;
+    }
+
+    setSaveError(null);
+    try {
+      await updateProfile({ name: nextName });
+      Alert.alert('Dados salvos', 'Seu perfil foi atualizado.');
+    } catch (error: any) {
+      setSaveError(error?.message || 'Falha ao salvar dados.');
+    }
   };
 
   return (
@@ -46,8 +69,29 @@ export default function ClientProfileScreen() {
 
         <View style={styles.settingsList}>
           <SettingsRow icon="person" label="Meus Dados" onPress={handleMyData} />
-          <SettingsRow icon="notifications" label="Notificações" onPress={handleNotifications} />
+          <SettingsRow icon="notifications" label="Notificacoes" onPress={handleNotifications} />
         </View>
+
+        {showMyData ? (
+          <View style={styles.dataCard}>
+            <Text style={styles.sectionTitle}>Meus dados</Text>
+            <AppInput label="Nome" value={name} onChangeText={setName} placeholder="Nome completo" />
+            <AppInput
+              label="Telefone"
+              value={formatPhone(user.phone || '')}
+              editable={false}
+              placeholder="Telefone"
+            />
+            {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
+            <PrimaryButton
+              title="Salvar dados"
+              onPress={handleSaveData}
+              loading={isAuthActionLoading}
+              disabled={isAuthActionLoading}
+              variant="filled"
+            />
+          </View>
+        ) : null}
 
         <Pressable
           onPress={handleLogout}
@@ -55,7 +99,7 @@ export default function ClientProfileScreen() {
           style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
         >
           <MaterialIcons name="logout" size={20} color={colors.error} />
-          <Text style={styles.logoutText}>Encerrar sessão</Text>
+          <Text style={styles.logoutText}>Encerrar sessao</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -153,6 +197,24 @@ const styles = StyleSheet.create({
   settingsLabel: {
     ...typography.bodyMd,
     color: colors.onSurface,
+  },
+  dataCard: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: spacing.sm,
+    ...shadow.light,
+  },
+  sectionTitle: {
+    ...typography.headlineMd,
+    color: colors.onSurface,
+    marginBottom: spacing.sm,
+  },
+  errorText: {
+    ...typography.labelSm,
+    color: colors.error,
+    marginBottom: spacing.sm,
   },
   logoutButton: {
     borderRadius: radius.lg,
