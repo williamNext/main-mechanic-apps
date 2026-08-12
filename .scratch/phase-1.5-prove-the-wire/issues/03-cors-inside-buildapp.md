@@ -10,10 +10,10 @@ Allowed origins are the Expo web default on both hostnames (`http://localhost:80
 
 **Blocked by:** 02 — House error envelope. Both register into `buildApp`; sequencing them avoids two changes conflicting inside the same function for no benefit. Nothing downstream is delayed, since ticket 05 needs both regardless.
 
-**Status:** ready-for-agent
+**Status:** done — landed in `4b20680`. `npx tsc --noEmit` clean; full vitest suite green (7 files, 94 tests), including all pre-existing tests unchanged.
 
-- [ ] A preflight request from each allowed origin returns the expected CORS headers
-- [ ] A preflight request from an origin not on the list does not receive them
-- [ ] `credentials` is not enabled
-- [ ] The plugin is registered inside `buildApp`, and the tests exercise it through that same function
-- [ ] `Authorization` is an allowed request header, so an authenticated cross-origin call succeeds
+- [x] A preflight request from each allowed origin returns the expected CORS headers
+- [x] A preflight request from an origin not on the list does not receive them
+- [x] `credentials` is not enabled
+- [x] The plugin is registered inside `buildApp`, and the tests exercise it through that same function
+- [x] `Authorization` is an allowed request header, so an authenticated cross-origin call succeeds
