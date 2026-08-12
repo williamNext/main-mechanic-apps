@@ -1,0 +1,17 @@
+{
+  "name": "workshop-e2e-tests",
+  "version": "1.0.0",
+  "description": "Unified E2E tests for the mechanical workshop applications",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@supabase/supabase-js": "^2.105.4",
+    "dotenv": "^17.4.2",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}

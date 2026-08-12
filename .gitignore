@@ -27,6 +27,10 @@ playwright/.cache/
 # Agent research cache (regenerable)
 .planning/research/.cache/
 
+# Machine-local agent state (project config in .claude/ is tracked deliberately)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db
