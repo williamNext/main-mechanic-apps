@@ -1,4 +1,4 @@
-import { supabase } from './api';
+import { supabase } from './legacy-supabase-client';
 import { AppNotification } from '@/types/models';
 
 function mapNotificationRow(row: any): AppNotification {

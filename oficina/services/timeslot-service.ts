@@ -1,4 +1,4 @@
-import { supabase } from './api';
+import { supabase } from './legacy-supabase-client';
 import { TimeSlot } from '@/types/models';
 
 function mapSlot(s: any): TimeSlot {

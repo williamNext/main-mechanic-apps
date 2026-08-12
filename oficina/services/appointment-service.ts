@@ -1,4 +1,4 @@
-import { supabase } from './api';
+import { supabase } from './legacy-supabase-client';
 import { Appointment } from '@/types/models';
 
 export interface BookAppointmentInput {

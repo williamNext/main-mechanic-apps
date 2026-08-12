@@ -1,4 +1,4 @@
-import { supabase } from './api';
+import { supabase } from './legacy-supabase-client';
 import { Mechanic } from '@/types/models';
 
 export async function getAllMechanics(): Promise<Mechanic[]> {
