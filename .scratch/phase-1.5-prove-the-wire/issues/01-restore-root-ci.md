@@ -10,12 +10,12 @@ Per-app `npm ci`, `env:check` and lint jobs are deliberately **not** restored he
 
 **Blocked by:** None — can start immediately. This is the highest-priority ticket in the phase; the repository is currently unprotected.
 
-**Status:** ready-for-agent
+**Status:** done — landed in `fcd8b09`, verified against a real run on `origin/master` (run 31555238671: `changes`, `secrets-scan`, `server-typecheck`, `server-test` all succeeded).
 
-- [ ] A single workflow at the repository root triggers on pull requests and on pushes to `master`
-- [ ] gitleaks scans the full repository history and fails the run on a finding
-- [ ] The `server` typecheck and the `server` vitest suite both run and both fail the run when they fail
-- [ ] The server jobs are skipped when a change touches no server files
-- [ ] The three per-app `security-and-build.yml` files are deleted
-- [ ] No job references `EXPO_PUBLIC_SUPABASE_URL` or `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- [ ] Verified against a real run on the remote, not just by reading the YAML
+- [x] A single workflow at the repository root triggers on pull requests and on pushes to `master`
+- [x] gitleaks scans the full repository history and fails the run on a finding
+- [x] The `server` typecheck and the `server` vitest suite both run and both fail the run when they fail
+- [x] The server jobs are skipped when a change touches no server files
+- [x] The three per-app `security-and-build.yml` files are deleted
+- [x] No job references `EXPO_PUBLIC_SUPABASE_URL` or `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- [x] Verified against a real run on the remote, not just by reading the YAML
