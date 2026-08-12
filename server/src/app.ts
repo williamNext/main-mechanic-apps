@@ -17,7 +17,7 @@ export function buildApp(db: Db, connection: Connection) {
   // server runs.
   app.setErrorHandler((err: FastifyError | HttpError, _req, reply) => {
     if (err instanceof HttpError) {
-      return reply.code(err.status).send({ error: err.message });
+      return reply.code(err.status).send({ error: err.message.toLowerCase() });
     }
     // Preserve Fastify's own 4xx (malformed JSON 400, unknown route 404) —
     // without this branch they would all be flattened to 500.
