@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1786191289908,
+      "tag": "0000_tranquil_kinsey_walden",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786193653859,
+      "tag": "0001_many_senator_kelly",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786193879378,
+      "tag": "0002_public_mechanics_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786195344059,
+      "tag": "0003_thick_sleepwalker",
+      "breakpoints": true
+    }
+  ]
+}
