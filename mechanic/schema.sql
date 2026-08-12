@@ -1,0 +1,7 @@
+-- Canonical app schema lives in:
+-- scripts/sql/2026-05-16_rebuild_public_app_schema_from_scratch.sql
+--
+-- Security follow-up migration:
+-- scripts/sql/2026-05-20_fix_profile_mechanic_rls_security.sql
+--
+-- Keep this file as a pointer so older setup notes do not apply stale RLS rules.

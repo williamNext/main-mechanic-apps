@@ -1,0 +1,38 @@
+import { Redirect, Tabs } from 'expo-router';
+import { BottomNavBar } from '@/components/ui/BottomNavBar';
+import { colors } from '@/constants/theme';
+import { useAuth } from '@/hooks/use-auth';
+
+export default function MechanicLayout() {
+  const { isAuthenticated, isBootstrappingSession, isMechanic } = useAuth();
+
+  if (isBootstrappingSession) {
+    return null;
+  }
+
+  if (!isAuthenticated || !isMechanic) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  return (
+    <Tabs
+      tabBar={(props) => <BottomNavBar {...props} />}
+      screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: colors.background },
+      }}
+    >
+      <Tabs.Screen name="agenda" options={{ title: 'Agenda' }} />
+      <Tabs.Screen name="availability" options={{ title: 'Horários' }} />
+      <Tabs.Screen name="notifications" options={{ title: 'Notificacoes' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
+      <Tabs.Screen
+        name="appointment/[id]"
+        options={{
+          href: null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+    </Tabs>
+  );
+}
