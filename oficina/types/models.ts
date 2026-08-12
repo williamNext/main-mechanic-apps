@@ -21,6 +21,14 @@ export interface Mechanic extends User {
   credentials: string;
 }
 
+export interface PublicMechanic {
+  id: string;
+  name: string;
+  specialty: string;
+  avatarUrl: string | null;
+  updatedAt: string;
+}
+
 export interface TimeSlot {
   id: string;
   mechanicId: string;
