@@ -45,6 +45,30 @@ boot. It refuses to run (exits non-zero) if any admin-role profile already exist
 it can never quietly create a second superuser. Run it once, right after the first
 `npm run db:migrate`, to create the account you'll use to sign in as an admin.
 
+## Seed Dev Data
+
+`npm run seed:dev` populates an empty development database with a believable, clickable workshop:
+3 mechanics (Carlos Silva — Motor e Câmbio, Ana Souza — Freios e Suspensão, João Pereira — Elétrica
+Automotiva), 1 client (Mariana Costa), 1 admin (Admin Dev), and 45 timeslots (3 mechanics × 5
+upcoming days × 3 slots/day). Every seeded account shares one documented password:
+
+```
+SenhaDev123!
+```
+
+Example login emails: `carlos.silva@oficina.dev` (mechanic), `mariana.costa@oficina.dev` (client),
+`admin@oficina.dev` (admin).
+
+The script uses fixed IDs and upserts, so running it twice leaves the database in the same state
+as running it once, and all writes happen inside a single transaction so an interrupted run never
+leaves a half-seeded database. As a safety rail against ever running this against something that
+matters, it refuses to run unless `DB_PATH`'s filename starts with `dev` (e.g. `dev.db`,
+`dev-workshop.sqlite`) — it exits non-zero and touches nothing otherwise.
+
+```bash
+DB_PATH=./dev.db npm run seed:dev
+```
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |

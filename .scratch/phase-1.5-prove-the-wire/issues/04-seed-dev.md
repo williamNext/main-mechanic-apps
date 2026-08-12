@@ -12,14 +12,14 @@ Passwords are hashed through the same path the signup endpoint uses, so a seeded
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
-- [ ] `npm run seed:dev` populates an empty development database in one command
-- [ ] Seeded mechanics have Brazilian names and Portuguese specialties
-- [ ] Seeded timeslots fall across several upcoming days
-- [ ] A client, a mechanic and an admin account each exist with a documented known password
-- [ ] A seeded account can log in through `POST /auth/login`
-- [ ] Running the script twice leaves the database in the same state as running it once
-- [ ] Interrupting the script never leaves a partially seeded database
-- [ ] The script exits with an error, changing nothing, when `DB_PATH` is not a development database
-- [ ] The known passwords are documented where a developer will find them
+- [x] `npm run seed:dev` populates an empty development database in one command
+- [x] Seeded mechanics have Brazilian names and Portuguese specialties
+- [x] Seeded timeslots fall across several upcoming days
+- [x] A client, a mechanic and an admin account each exist with a documented known password
+- [x] A seeded account can log in through `POST /auth/login`
+- [x] Running the script twice leaves the database in the same state as running it once
+- [x] Interrupting the script never leaves a partially seeded database
+- [x] The script exits with an error, changing nothing, when `DB_PATH` is not a development database
+- [x] The known passwords are documented where a developer will find them
