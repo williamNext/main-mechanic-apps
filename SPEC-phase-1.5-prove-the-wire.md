@@ -1,8 +1,8 @@
 # Spec — Phase 1.5: Prove the Wire
 
-> **Status:** draft, awaiting confirmation of the four assumptions in [Unconfirmed Assumptions](#unconfirmed-assumptions).
-> **Companion docs:** [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) (normative — §8 rules, §10.3 decisions, §16 rewire plan), [`DESIGN_GUIDE.md`](DESIGN_GUIDE.md) (visual only).
-> **Repos touched:** `server/`, `oficina/`. Two separate git repos, two coordinated commits (§18.12).
+> **Status:** ready. Three of four opening assumptions confirmed on 2026-08-11, the fourth reversed — see [Assumption status](#assumption-status). Only the hosting target remains open, and it does not block this phase.
+> **Companion docs:** [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) (normative — §8 rules, §10.3 decisions incl. D-J…D-M, §16 rewire plan), [`DESIGN_GUIDE.md`](DESIGN_GUIDE.md) (visual only).
+> **Scope:** `server/` and `oficina/`, plus root-level CI and e2e. One repository, one commit (§3 — monorepo since 2026-08-11).
 
 ---
 
@@ -117,6 +117,23 @@ It also converts the project from "no app can run" to "one app runs", which rest
 46. As a developer, I want a server test proving an unmapped exception returns the house error envelope, so that the global handler cannot silently regress.
 47. As a developer, I want the existing `oficina` Playwright spec repointed at the local server, so that the wire has an automated guard and not just a manual checklist.
 48. As a developer, I want the e2e suite to boot the server itself, so that a green run means the whole stack works and not just the app.
+49. As a developer, I want the four dead Supabase-bound suites deleted in the same commit that adds the new one, so that nobody mistakes a broken suite for a failing feature.
+
+**Seed data**
+
+50. As a developer, I want a `seed:dev` script that fills an empty database with a believable workshop, so that I can click through the app instead of staring at empty lists.
+51. As a developer, I want seeded accounts to have known passwords, so that I can log in as a client, a mechanic or an admin on demand.
+52. As a developer, I want seeded mechanics to have Brazilian names and Portuguese specialties, so that the app looks like itself while I work on it.
+53. As a developer, I want seeded timeslots spread across upcoming days, so that the booking screens have something to render once Phase 2 lands.
+54. As a developer, I want `seed:dev` to refuse to run against a non-development database, so that it can never overwrite something that matters.
+55. As a developer, I want re-running `seed:dev` to be safe, so that I never end up half-seeded after an interrupted run.
+
+**CI**
+
+56. As a developer, I want gitleaks running at the repository root, so that the monorepo does not become the thing that leaks the four `.env` files sitting beside it.
+57. As a developer, I want the server test suite to gate merges, so that the only meaningful automated signal in the project is not advisory.
+58. As a developer, I want CI to skip app jobs when only server files changed, so that feedback stays fast.
+59. As a developer, I want the dead per-app workflows removed rather than left in place looking active, so that nobody assumes they are protected when they are not.
 
 ## Implementation Decisions
 
@@ -196,6 +213,25 @@ Boot sequence becomes: read the stored token → if absent, unauthenticated → 
 
 `.github/workflows/security-and-build.yml` and the GitHub repo secrets are updated **in the same commit**. §14.5 is explicit that omitting this fails `eas-build-check` on the next push to `master`.
 
+### Seed data
+
+The database starts empty and there is no production data to import (D-L). A `seed:dev` script writes a believable workshop directly to SQLite: a handful of mechanics with Brazilian names and PT-BR specialties, upcoming timeslots across the next several days, and one client account — all with **known passwords**, so any role can be logged into by hand.
+
+This is separate from `tests/helpers/fixtures.ts` (§15.1) and neither replaces the other: fixtures make vitest work, `seed:dev` makes the app clickable. Given §14.3 records that nothing has been visually verifiable for months, the clickable half is the one that unblocks people.
+
+`seed:dev` must be idempotent or explicitly destructive — never half-seeded — and must refuse to run against a non-development `DB_PATH`.
+
+### Repository and CI
+
+The four repositories were absorbed into one monorepo on 2026-08-11 (§3), pushed to `williamNext/main-mechanic-apps`. This phase is therefore **one commit**, not the two the original §16 plan implied.
+
+The absorb silently disabled all CI: GitHub reads `.github/workflows/` only at the repository root, so the three app workflows are now inert. gitleaks is not running, on a repository that now contains all four apps and sits next to four untracked `.env` files. Restoring a root workflow is in scope for this phase and is the highest-priority item in it:
+
+- **gitleaks across the whole repo** — the one job that cannot be allowed to stay missing
+- **`server` typecheck and vitest**, path-filtered — the only meaningful automated signal the project has today, and it should gate
+
+Per-app `npm ci` / `env:check` / lint jobs are deliberately **not** restored yet. The old `eas-build-check` injects the two Supabase secrets that this phase deletes; rebuilding it now would wire CI to credentials that are about to stop existing.
+
 ### Naming
 
 The server emits camelCase (§10.3 D-A). The auth responses are already flat and camelCase, so `oficina/types/models.ts` needs no change and no mapper is required for this phase. Later phases delete the `map*Row` helpers as each service is rewired.
@@ -215,11 +251,17 @@ The server emits camelCase (§10.3 D-A). The auth responses are already flat and
 
 Prior art: `tests/routes/auth.test.ts` already covers signup, login, me and logout end to end through this seam and is the pattern to follow. The skeleton is in §15.1.
 
-*Client: `oficina/tests/e2e/` Playwright.* Currently one spec (`status`), bound to Supabase, pinned to port 19007. Repointed at the local server: the `webServer` block boots `server/` alongside the app, and `src/helpers/db.ts`'s service-role Supabase client is replaced by direct SQLite access or a server-side reset endpoint for test data. Coverage: register → land in the app; log out → land on login; log in → land in the app; reload mid-session → still authenticated; log in with a wrong password → Portuguese error message shown.
+*Client: one new Playwright spec at the monorepo root.* The four legacy suites are deleted, not repointed (D-M) — they were Supabase-bound and asserted against screens being rewired. This phase writes **one** replacement spec: `e2e/auth.spec.ts`, with a `webServer` block that boots `server/` and `oficina` together and seeds a known client via `seed:dev`.
 
-That last one is the whole phase in a single assertion. It cannot pass unless the env var resolves, CORS permits the request, the wrapper decodes the envelope, the token persists and the screen renders the message.
+Coverage: register → land in the app; log out → land on login; log in → land in the app; reload mid-session → still authenticated; log in with a wrong password → Portuguese error message shown.
 
-Note the existing Playwright `webServer` commands are PowerShell-only with hard-coded ports (§15.2) — this repointing inherits that constraint and does not fix it.
+That last assertion is the whole phase in one line. It cannot pass unless the env var resolves, CORS permits the request, the wrapper decodes the envelope, the token persists and the screen renders the message.
+
+**The harness is the deliverable, not the coverage.** Booting server + app together, seeding a known user and driving a browser is the expensive part, and it is far cheaper to build while the surface is one login screen than later against five. The deleted suites are salvaged for their harness pattern — the PowerShell `webServer` commands and pinned ports (19007 `oficina` / 19006 `mechanic` / 19008 `admin`) — not their assertions. That pattern is PowerShell-only and runs on no other OS; this phase inherits that limitation and does not fix it.
+
+Deleting the four dead suite folders happens in this phase, in the same commit as the new spec. Dead tests that look alive are worse than absent ones.
+
+**Acknowledged coverage debt.** `mechanic/tests/e2e/availability.spec.ts` was the only automated guard on the 756-line availability screen (UC-M2). Nothing guards it now, and nothing will until the new suite reaches Phase 2. That is an accepted cost of D-M, recorded here so it is a decision rather than an oversight.
 
 **Deliberately not tested.** No vitest suite is added to `oficina`. A faked `globalThis.fetch` cannot reproduce a CORS rejection, an Android DNS failure, a SecureStore permission error or a lost token across a reload — every real risk in this phase lives above that seam, and a suite that misses all of them while requiring maintenance is a net cost. If client unit tests are wanted, the moment is when there is pure logic worth isolating; there is none here.
 
@@ -230,26 +272,32 @@ Note the existing Playwright `webServer` commands are PowerShell-only with hard-
 - **Every non-auth `oficina` service.** Mechanic browsing, timeslots, appointments and notifications keep their Supabase imports and keep failing.
 - **The `mechanic` and `admin` apps.** Untouched. They are rewired after the endpoints they need exist (§16 order of operations).
 - **All Phase 2 endpoints** — booking, cancellation, completion, the lazy status sync, the role guard middleware (`requireRole`). The role guard is Phase 2's first task; no route in this phase needs a role check.
-- **All Phase 3 admin endpoints** and all Phase 4 notification endpoints.
+- **All Phase 3 admin endpoints**, and all notification endpoints and fan-out — the latter now land inside Phases 2–3 per D-K rather than in a Phase 4 of their own.
+- **Reshaping the `notifications` table** to match the built client UI (D-K). That is Phase 2 work; this phase does not touch the schema.
 - **Removing `@supabase/supabase-js`** from `oficina/package.json`, and `pg` from `admin`. Both wait until nothing imports them (§16 step 8).
-- **The three other Playwright suites** — `tests-e2e/`, `mechanic/tests/e2e/`, `admin/tests/e2e/`. All remain Supabase-bound and broken (§15.2).
+- **Rebuilding e2e coverage for anything but auth.** The four legacy suites are deleted in this phase (D-M), but the new suite only covers register/login/reload/logout. Availability, booking, closure and the admin flows stay uncovered until later phases reach them.
 - **Password recovery (UC-A6).** Not implemented anywhere, and the requested design was phone-based while phone auth is being dropped. It needs an email-based design decision first, and needs one before any real user depends on this system.
 - **Rate limiting on `/auth/login`** (§10.3 D-H, §17.4). A `TODO` is left at the route so it is not forgotten.
 - **Structured logging.** `Fastify({ logger: false })` stands (§17.4).
 - **HTTPS, hosting, and SQLite backups.** Deferred with the hosting decision — but see the assumption below.
 - **The `profiles.role` CHECK constraint** (§17.2). A genuinely valuable small migration, but it needs a table rebuild and is independent of this phase.
-- **Server-side seed data beyond `seed:admin`.** Mechanics and timeslots cannot be created through any UI until Phase 2 and 3 exist, so there is nothing to seed that this phase can exercise.
+- **Per-app CI jobs** (`npm ci`, `env:check`, lint). Deferred until the env var swap has settled across all three apps.
+- **Extracting a shared package** for the copy-pasted `types/models.ts`, `constants/theme.ts` and `notification-service.ts`. Newly *possible* thanks to the monorepo, but not this phase.
 
 ## Further Notes
 
-### Unconfirmed assumptions
+### Assumption status
 
-This spec was written from a grilling session whose first round was not answered. Four assumptions are load-bearing; if any is wrong, re-scope before starting.
+All four opening assumptions were resolved on 2026-08-11 and are recorded as decisions in §10.3.
 
-1. **This is a rebuild, not a migration.** No production data, no live users, no cutover, no rollback to Supabase. §4.3 and §17.1 support this. If real data exists and the Supabase project is revivable rather than dead, export it read-only *before* anything else — that option expires quietly.
-2. **Hosting is a dev machine for now.** If the destination is a workshop LAN box, then a 30-day JWT crossing an unencrypted network and a single unbacked-up SQLite file both become real problems, and both are currently unbudgeted. If it is a deployed host, CORS needs origins that do not exist yet. §4.3 defers this; deferring it past Phase 3 is where it starts to hurt.
-3. **This phase precedes Phase 2**, against the §16 order. §16's ordering is not wrong, only riskier — it defers the same work to a point where failures are harder to attribute.
-4. **Notifications are not in v1.** §17.1 says the `notifications` table shape was reverse-engineered from a mapper function for a feature that appears never to have shipped, and the Supabase project cannot confirm it. Phase 4 is therefore new feature design wearing a port's clothing, and should be re-scoped as such rather than estimated as a migration.
+1. **Rebuild, not migration — ✅ confirmed (D-L).** Not in production, no users, no data worth keeping. No cutover, no dual-run, no rollback. The Supabase export question is closed: there is nothing to export.
+2. **Hosting: dev machine — ⚠️ still open.** Deliberately deferred, and the only genuinely unresolved item left. It stops being deferrable around the end of Phase 3: a workshop LAN box makes a 30-day JWT on an unencrypted network and an unbacked-up SQLite file into real problems, and a deployed host needs CORS origins that do not exist yet. Neither is budgeted.
+3. **Phase 1.5 precedes Phase 2 — ✅ confirmed.** Recorded in the §4.2 roadmap.
+4. **Notifications — ❌ assumption was wrong, and the reversal matters.** The notification UI already exists in `oficina` and `mechanic` (screen, service and store, committed 2026-08-11). The original recommendation to stub `GET /notifications` as `[]` is therefore withdrawn: it would ship a real screen wired to a permanently empty list. **D-K** makes the built UI the specification for the table shape and folds fan-out into the Phase 2 transactions that cause it. Phase 4 is dissolved.
+
+### Change log
+
+- **2026-08-11** — Testing section rewritten: the client seam is now one new root-level spec, not a repointed `oficina/tests/e2e/` (D-M deleted all four legacy suites). Assumptions 1, 3, 4 resolved; 4 reversed. Root CI added to scope. Repo is now a monorepo (§3), so this phase is one commit rather than two.
 
 ### Terminology
 

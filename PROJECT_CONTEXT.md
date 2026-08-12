@@ -127,9 +127,26 @@ planned.
 
 ## 3. Repository map
 
-`C:\Users\Pichau\Desktop\projetos\` is a *container folder*, **not** a monorepo and **not** a git
-repo. Each subfolder is its own independent git repository with its own `package.json`,
-`node_modules`, CI and deploy config.
+**As of 2026-08-11 this is a monorepo.** `C:\Users\Pichau\Desktop\projetos\` is a single git
+repository pushed to **`https://github.com/williamNext/main-mechanic-apps`** (branch `master`).
+The four formerly independent repos were absorbed with `git subtree`, so all 80 original commits
+are preserved. Each subfolder still has its own `package.json`, `node_modules` and deploy config —
+only version control was unified.
+
+A cross-cutting change is now **one commit**, which is the point: `types/models.ts`,
+`constants/theme.ts` and `notification-service.ts` are copy-pasted between apps and were drifting
+(§17.4).
+
+⚠️ **Consequences of the absorb, both live:**
+- **The three app CI workflows no longer run.** GitHub reads `.github/workflows/` only at the
+  repository *root*; `oficina/.github/`, `mechanic/.github/` and `admin/.github/` are now inert.
+  gitleaks and `eas-build-check` are **not running**. A root workflow (gitleaks + `server`
+  typecheck/vitest, path-filtered) is Phase 1.5 scope.
+- **The old `.git` directories were moved, not deleted**, to
+  `C:\Users\Pichau\Desktop\projetos-git-archive\`. The three GitHub repos `williamNext/oficina`,
+  `/mechanic` and `/admin` are fully pushed and should be archived read-only so there is no
+  ambiguity about which repo is canonical. `williamNext/server` never existed — the monorepo and
+  that local archive are the only copies of its history.
 
 | Folder | What it is | Git repo | Status |
 |---|---|---|---|
@@ -252,9 +269,12 @@ functions spread across three repos' `scripts/sql/` folders.
 | Phase | Scope | State |
 |---|---|---|
 | **1. Foundation & Auth Walking Skeleton** | Portable server, full schema + triggers, signup/login/me/logout, admin seed script | ✅ **Complete** (2026-08-08) |
-| **2. Booking & Appointment Lifecycle** | Role middleware, book/cancel/complete, status auto-transitions | ⬜ Not started (current phase, planning) |
+| **1.5 Prove the Wire** | Rewire `oficina` **auth only** onto the existing Phase 1 endpoints; global error handler; CORS; `seed:dev`; root CI; first new e2e spec | ⬜ Not started (**current phase**) — see [`SPEC-phase-1.5-prove-the-wire.md`](SPEC-phase-1.5-prove-the-wire.md) |
+| **2. Booking & Appointment Lifecycle** | Role middleware, book/cancel/complete, status auto-transitions, **timeslot overlap (D-J)**, **notification fan-out (D-K)** | ⬜ Not started |
 | **3. Admin Management** | create/delete mechanic, dashboard, lists, details, financial report | ⬜ Not started |
-| **4. Notifications & Cross-App Visibility** | notification fan-out, list, mark read | ⬜ Not started |
+| ~~**4. Notifications**~~ | **Dissolved into Phases 2–3 by D-K.** The client UI already exists; fan-out belongs inside the transactions that cause it | — |
+
+**Phase 1.5 was inserted on 2026-08-11.** §16's original ordering (finish Phase 2, *then* rewire) is not wrong, only riskier: it defers every unproven cross-cutting assumption — `fetch` wrapper, token storage, CORS, `EXPO_PUBLIC_API_URL`, the CI secret swap, the `_layout.tsx` bootstrap — to a single late change landing on top of brand-new booking endpoints. Phase 1.5 proves all of them against endpoints that already work, with one screen of blast radius.
 
 Requirement IDs used throughout `server/.planning/`: `AUTH-01..05`, `DATA-01..04`, `BOOK-01..05`,
 `ADMIN-01..03`, `NOTIF-01..02`, `INFRA-01..02`. Complete: AUTH-01/02/03, DATA-01/02/03,
@@ -1064,6 +1084,10 @@ user available must not invent its own answer. **Apply the default below, then r
 | D-G | CORS | `@fastify/cors` registered **inside `buildApp`** | Registering in `server.ts` would leave tests unable to exercise it (§14.4) |
 | D-H | Login rate limiting | Defer, but leave a `TODO` at the route | Out of Phase 2 scope; recorded so it is not forgotten (§17.4) |
 | D-I | Who may write `mechanics.credentials` / `is_active` | **Admin only** | Post-approval-removal the guard trigger treated these as admin-owned (UC-M5); no shipped mechanic path writes them today |
+| **D-J** | Timeslot **overlap** enforcement | **Enforced server-side** in `POST /timeslots`, inside the write transaction | ⚠️ **New behavior, not a port.** Legacy validates overlap only in the mechanic UI (§17.2); the DB's unique index catches exact duplicates but permits 09:00–10:00 alongside 09:30–10:30, which double-books a physical hour — the exact failure class the concurrency design (§8.1.7) exists to prevent. Ratified 2026-08-11 |
+| **D-K** | `notifications` table shape and phasing | **The built client UI is the specification.** Read `notifications.tsx` / `notification-service.ts` / `notification-store.ts` in `oficina` and `mechanic`, reshape the table to match, and land fan-out inside the Phase 2 book/cancel/complete transactions | The notification UI **already exists** in both apps (committed 2026-08-11) — it is a more reliable statement of intent than the reverse-engineered mapper §17.1 was inferred from. Nothing is in production, so reshaping is a free `DROP`/recreate, not the table-rebuild dance §7.2 warns about. Deferring fan-out to a separate phase means reopening all three handlers later. **Phase 4 is therefore dissolved into Phases 2–3** |
+| **D-L** | Framing | **This is a rebuild, not a migration** | Confirmed 2026-08-11: no production data, no live users, project not yet in production. There is no cutover, no dual-run and no rollback to Supabase. Calling it a migration invites planning a cutover that cannot exist. "Migration" in this repo means a Drizzle SQL migration file and nothing else |
+| **D-M** | The four legacy Playwright suites | **Dead. Deleted, not repointed.** Replaced by one fresh spec at the monorepo root, grown per phase | Decided 2026-08-11. They are Supabase-bound and assert against screens that are being rewired. ⚠️ Consequence: `mechanic/tests/e2e/availability.spec.ts` was the only automated guard on the 756-line availability screen (UC-M2) — that screen is now unguarded until the new suite reaches it |
 
 **Cross-cutting reminder:** §13.2's status codes (403/404/409) follow from these defaults and
 should be treated as the intended contract, not as competing proposals.
@@ -1437,9 +1461,24 @@ test — every later test needs the same three.
 validation failure, each authorization failure (unauthenticated → 401, wrong role → 403), and —
 for booking — a **concurrency test proving only one of two racing bookings wins**.
 
-### 15.2 End-to-end — there are FOUR Playwright suites, not one
+### 15.2 End-to-end — the four legacy suites are DEAD (D-M)
 
-| Suite | Config | Specs | Port |
+> **All four suites below were deleted on 2026-08-11.** They are Supabase-bound and assert against
+> screens being rewired. They are replaced by **one fresh spec at the monorepo root**, driving the
+> real app against the local server, grown one phase at a time (starting with register / login /
+> reload / logout in Phase 1.5).
+>
+> The table is kept as a record of what existed and what was given up. Two things were genuinely
+> lost and should be re-earned as the new suite grows:
+> - **`mechanic/…/availability.spec.ts`** — the only automated guard on the 756-line availability
+>   screen (UC-M2), and the consumer of the `availability-slot-…` testIDs.
+> - **`tests-e2e/workshop-journey`** — the only test that ever exercised all three apps together.
+>
+> What was *salvaged* is the harness pattern: PowerShell `webServer` commands and pinned ports
+> (19007 `oficina` / 19006 `mechanic` / 19008 `admin`), which the new spec reuses. Note these
+> commands are PowerShell-only and run on no other OS.
+
+| ~~Suite~~ (deleted) | Config | Specs | Port |
 |---|---|---|---|
 | `tests-e2e/` | `tests-e2e/playwright.config.ts` | cross-app journeys: `workshop-journey`, `cancellations`, `admin-delete-recreate`, `debug` | boots **all three** apps: 19007 / 19006 / 19008 |
 | `mechanic/tests/e2e/` | `mechanic/playwright.config.ts` | **`availability`**, `closure` | 19006 |
@@ -1523,7 +1562,12 @@ Do not rewire an app before the endpoints it needs exist and are tested.
 
 ### 17.1 Data
 
-- **`notifications` exists, but its shape is a guess.** The table **is** created — migration
+- **`notifications` exists, but its shape is a guess.** ✅ **Resolved by D-K (§10.3):** the
+  notification UI already exists in `oficina` and `mechanic` (screen + service + store, committed
+  2026-08-11) and *it* is now the specification — reshape the table to match what those files
+  render. Because nothing is in production (D-L), reshaping is a free `DROP`/recreate, so the
+  SQLite table-rebuild warning below no longer applies. Original finding, kept for context:
+  The table **is** created — migration
   `0001` — so every developer's SQLite file has it, and Phase 4 must **not** write a
   `CREATE TABLE` for it. What is unverifiable is the *shape*: it was reverse-engineered from
   `mapNotificationRow()`, no `CREATE TABLE notifications` exists in any legacy repo, the feature
@@ -1580,10 +1624,11 @@ There is also `supabase/docs/specs/easy-first-notifications.md` — read it befo
 - **No logging**: `Fastify({ logger: false })`. Add structured logging deliberately, never logging
   password hashes or full tokens.
 - **Hosting undecided** — keep the server free of platform-specific code.
-- **Three separate git repos plus this container folder** means a cross-cutting change is 2–4
-  coordinated commits in different repos. There is no shared package; `types/models.ts`,
-  `constants/theme.ts` and `notification-service.ts` are **copy-pasted** between apps and can drift
-  (they already do, slightly).
+- ~~Three separate git repos~~ **Resolved 2026-08-11 by the monorepo (§3)** — a cross-cutting change
+  is now one commit. Still true, and now *fixable*: there is no shared package, so
+  `types/models.ts`, `constants/theme.ts` and `notification-service.ts` remain **copy-pasted**
+  between apps and have already drifted. Extracting a shared package is now a realistic option
+  where before it was not; it is not yet scheduled.
 - Each app repo carries `.agents/AGENT_RULES.md` (terse-response style rules, security rules,
   "confirm before touching >3 files"), `.Jules/` learning notes, and `.planning/codebase/`
   analysis docs. `server/.claude/CLAUDE.md` additionally requires that repo changes go through a
@@ -1613,8 +1658,8 @@ There is also `supabase/docs/specs/easy-first-notifications.md` — read it befo
     record deliberate divergences. That is the project's institutional memory.
 11. **Flag assumptions.** If something is inferred, say so in the code comment and here — do not
     let it silently become fact.
-12. **Cross-repo changes:** state up front which repos a change touches, and commit each repo
-    separately with matching messages.
+12. **Cross-app changes are now one commit** (§3, monorepo). Still state up front which apps a
+    change touches — the blast-radius rule in §18.1 applies to *files*, not repos.
 13. **Design changes go through [`DESIGN_GUIDE.md`](DESIGN_GUIDE.md)** — change tokens, not
     hard-coded hexes.
 14. **Screen markup changes can break e2e.** The Playwright suites select on `testID`s (§15.2).
