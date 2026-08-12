@@ -16,12 +16,12 @@ The `HttpError` class and helper shapes are specified in `PROJECT_CONTEXT.md` §
 
 **Blocked by:** None — can start immediately. Independent of ticket 01, though landing 01 first means this ships behind a gate that actually runs its tests.
 
-**Status:** ready-for-agent
+**Status:** done — landed in `b5f05aa`. `npx tsc --noEmit` clean; full vitest suite green (6 files, 85 tests), including `tests/routes/auth.test.ts` unchanged.
 
-- [ ] A route that throws an `HttpError` responds with that error's status and its message in the envelope
-- [ ] A route that throws an unexpected exception responds `500 { error: 'internal error' }` and the original message appears nowhere in the response
-- [ ] A malformed JSON request body still returns Fastify's 400, not a 500
-- [ ] A request to an unknown route still returns 404
-- [ ] Every message in the envelope is lowercase
-- [ ] The handler is registered inside `buildApp`, and the tests build the app through that same function
-- [ ] The existing auth route tests still pass unchanged
+- [x] A route that throws an `HttpError` responds with that error's status and its message in the envelope
+- [x] A route that throws an unexpected exception responds `500 { error: 'internal error' }` and the original message appears nowhere in the response
+- [x] A malformed JSON request body still returns Fastify's 400, not a 500
+- [x] A request to an unknown route still returns 404
+- [x] Every message in the envelope is lowercase
+- [x] The handler is registered inside `buildApp`, and the tests build the app through that same function
+- [x] The existing auth route tests still pass unchanged
