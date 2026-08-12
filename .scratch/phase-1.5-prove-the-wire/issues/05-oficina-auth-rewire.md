@@ -24,28 +24,28 @@ The `AppState` auto-refresh listener in this file is deleted — the design is a
 
 **Blocked by:** 02 — House error envelope (the wrapper's verbatim-message contract needs one uniform shape to parse), and 03 — CORS inside `buildApp` (without it the web target cannot make the request at all).
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
-- [ ] Registering with name, email and password lands the user inside the app, with no second login
-- [ ] Logging in with correct credentials lands the user inside the app
-- [ ] A wrong password shows a readable Brazilian-Portuguese message, not raw JSON and not a stack trace
-- [ ] An unknown email and a wrong password produce the same message, revealing nothing about which accounts exist
-- [ ] A password that is too short, and a malformed email, each produce their own clear Portuguese message
-- [ ] An already-registered email produces a message that points the user at logging in
+- [x] Registering with name, email and password lands the user inside the app, with no second login
+- [x] Logging in with correct credentials lands the user inside the app
+- [x] A wrong password shows a readable Brazilian-Portuguese message, not raw JSON and not a stack trace
+- [x] An unknown email and a wrong password produce the same message, revealing nothing about which accounts exist
+- [x] A password that is too short, and a malformed email, each produce their own clear Portuguese message
+- [x] An already-registered email produces a message that points the user at logging in
 - [ ] The submit button shows it is working and refuses a second submission
 - [ ] A request that times out surfaces as a timeout message rather than an endless spinner
-- [ ] A closed and reopened app is still signed in; on web, a page reload is still signed in
+- [x] A closed and reopened app is still signed in; on web, a page reload is still signed in
 - [ ] On a device, the token is stored in encrypted storage
-- [ ] Every boot re-reads the session from `GET /auth/me`, so a profile or role change takes effect immediately
-- [ ] An invalid session returns the user to the login screen rather than a half-authenticated state
+- [x] Every boot re-reads the session from `GET /auth/me`, so a profile or role change takes effect immediately
+- [x] An invalid session returns the user to the login screen rather than a half-authenticated state
 - [ ] Nothing is rendered while the session is being checked — the login screen does not flash
-- [ ] Logging out returns the user to the login screen, erases the stored token, and works even when the server is unreachable
-- [ ] The token is invalidated server-side on logout, so a copy cannot be replayed
-- [ ] Server error messages reach the screen unmodified — no wrapping, no prefixing, no rewriting
-- [ ] The phone fields, the phone service functions and the store's phone action are all gone
+- [x] Logging out returns the user to the login screen, erases the stored token, and works even when the server is unreachable
+- [x] The token is invalidated server-side on logout, so a copy cannot be replayed
+- [x] Server error messages reach the screen unmodified — no wrapping, no prefixing, no rewriting
+- [x] The phone fields, the phone service functions and the store's phone action are all gone
 - [ ] `EXPO_PUBLIC_API_URL` is the only new variable; both Supabase variables are gone from `config/env.ts`, `.env.example`, `check-env.js` and the workflow
-- [ ] The env check fails at build time when `EXPO_PUBLIC_API_URL` is missing
+- [x] The env check fails at build time when `EXPO_PUBLIC_API_URL` is missing
 - [ ] The GitHub repo secrets are updated in the same change
-- [ ] The stale-profile race guard still discards a late response
-- [ ] The other `oficina` services still import Supabase and are otherwise unchanged
-- [ ] The `mechanic` and `admin` apps are untouched
+- [x] The stale-profile race guard still discards a late response
+- [x] The other `oficina` services still import Supabase and are otherwise unchanged
+- [x] The `mechanic` and `admin` apps are untouched
