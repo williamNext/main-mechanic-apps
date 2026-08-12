@@ -1,19 +1,20 @@
 # Oficina Mobile
 
+Client-facing Expo app. Talks to `server/` (see the [root README](../README.md) for the combined
+setup and Android/physical-device connectivity guidance) — `mechanic-service.ts`,
+`timeslot-service.ts`, `appointment-service.ts` and `notification-service.ts` still point at a
+dead Supabase project and are out of scope until later phases.
+
 ## Secret model
 - `public-build-vars`: safe in client bundle.
-  - `EXPO_PUBLIC_SUPABASE_URL`
-  - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+  - `EXPO_PUBLIC_API_URL`
 - `private-server-secrets`: never ship to mobile app.
-  - service-role keys
-  - admin tokens
+  - anything under `server/.env`
 
 ## Environment setup
 1. Create `.env` from `.env.example`.
-2. Set:
-   - `EXPO_PUBLIC_SUPABASE_URL`
-   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-3. In Netlify, set same keys in Site configuration > Environment variables.
+2. Set `EXPO_PUBLIC_API_URL` — see the [root README](../README.md#connectivity--talking-to-the-server-from-something-that-isnt-a-browser-on-this-machine)
+   for what to set it to on an emulator or a physical device.
 
 ## Local development
 ```bash
@@ -22,10 +23,9 @@ npm run hooks:setup
 npm run start
 ```
 
-## Validation and seed
+## Validation
 ```bash
 npm run env:check
-npm run seed
 ```
 
 Workflow file runs:

@@ -53,6 +53,7 @@ export function TopAppBar({
         </Text>
 
         <Pressable
+          testID="topbar-profile"
           onPress={onProfilePress}
           android_ripple={{ color: colors.surfaceContainer }}
           style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}

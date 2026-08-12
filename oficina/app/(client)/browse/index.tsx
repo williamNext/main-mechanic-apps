@@ -41,6 +41,7 @@ export default function BrowseMechanicsScreen() {
       <TopAppBar showBackButton={false} onProfilePress={() => router.push('/(client)/profile')} />
       <View style={styles.container}>
         <InputField
+          testID="browse-search"
           label="Buscar"
           value={search}
           onChangeText={setSearch}

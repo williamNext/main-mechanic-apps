@@ -23,6 +23,9 @@ function mapRegisterError(message: string): string {
   if (message.includes('email already registered')) {
     return 'Este e-mail já está cadastrado. Faça login.';
   }
+  if (message.includes('network request failed')) {
+    return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
+  }
   if (message.includes('timed out')) {
     return 'A solicitação demorou demais. Tente novamente.';
   }
@@ -102,9 +105,10 @@ export default function RegisterScreen() {
               </View>
             </View>
 
-            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+            {errorMsg ? <Text testID="register-error" style={styles.errorText}>{errorMsg}</Text> : null}
             <View style={styles.form}>
               <InputField
+                testID="register-name"
                 label="Nome completo"
                 value={name}
                 onChangeText={setName}
@@ -114,6 +118,7 @@ export default function RegisterScreen() {
               />
 
               <InputField
+                testID="register-email"
                 label="E-mail"
                 value={email}
                 onChangeText={setEmail}
@@ -126,6 +131,7 @@ export default function RegisterScreen() {
               />
 
               <InputField
+                testID="register-password"
                 label="Senha"
                 value={password}
                 onChangeText={setPassword}
@@ -140,7 +146,14 @@ export default function RegisterScreen() {
                 leftIcon={<MaterialIcons name="lock" size={18} color={colors.outline} />}
               />
 
-              <PrimaryButton title="Cadastrar" onPress={handleRegister} loading={loading} disabled={!canSubmit} variant="filled" />
+              <PrimaryButton
+                testID="register-submit"
+                title="Cadastrar"
+                onPress={handleRegister}
+                loading={loading}
+                disabled={!canSubmit}
+                variant="filled"
+              />
             </View>
 
             <View style={styles.bottomLinkRow}>

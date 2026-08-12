@@ -10,12 +10,12 @@ The app should also fail loudly and specifically when the server is unreachable,
 
 **Blocked by:** 05 — `oficina` signs users in against the local server. There is nothing to verify on a device until the web path works.
 
-**Status:** ready-for-agent
+**Status:** partially done — the documentation and the two app-behavior items are built and verified; the two hand-verification items are **not done** and cannot be done from this environment (no Android emulator or physical device available here). A root [`README.md`](../../../README.md) now carries the combined quickstart, the connectivity table, and the unreachable-server/backend-indicator behavior; `oficina/README.md` was also fixed — it still described the old Supabase env vars. The unreachable-message and backend-indicator items were verified by scripting a throwaway Playwright check against `oficina` pointed at a closed port (not by hand on a device, but exercises the real code path): the login screen showed *"Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente."* and the "Servidor: http://..." line under the login form.
 
-- [ ] One documented sequence brings up the server and `oficina` together from a clean checkout
-- [ ] The documentation states that an Android emulator must use `10.0.2.2` rather than `localhost`
-- [ ] The documentation states that a physical device must use the host's LAN IP, and how to find it
-- [ ] Register, restart, log out and log in are all verified by hand on an Android emulator, and the result recorded
-- [ ] The same flow is verified by hand on at least one physical device, and the result recorded
-- [ ] With the server stopped, the app shows a specific unreachable-server message rather than a generic failure
-- [ ] It is evident from the running app which backend it is talking to
+- [x] One documented sequence brings up the server and `oficina` together from a clean checkout
+- [x] The documentation states that an Android emulator must use `10.0.2.2` rather than `localhost`
+- [x] The documentation states that a physical device must use the host's LAN IP, and how to find it
+- [ ] Register, restart, log out and log in are all verified by hand on an Android emulator, and the result recorded — **needs a human with an emulator**
+- [ ] The same flow is verified by hand on at least one physical device, and the result recorded — **needs a human with a device**
+- [x] With the server stopped, the app shows a specific unreachable-server message rather than a generic failure
+- [x] It is evident from the running app which backend it is talking to

@@ -15,12 +15,16 @@ import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
+import { env } from '@/config/env';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function mapLoginError(message: string): string {
   if (message.includes('invalid email or password')) {
     return 'E-mail ou senha inválidos.';
+  }
+  if (message.includes('network request failed')) {
+    return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
   }
   if (message.includes('timed out')) {
     return 'A solicitação demorou demais. Tente novamente.';
@@ -110,10 +114,11 @@ export default function LoginScreen() {
               </Pressable>
             </View>
 
-            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+            {errorMsg ? <Text testID="login-error" style={styles.errorText}>{errorMsg}</Text> : null}
 
             <View style={styles.form}>
               <InputField
+                testID="login-email"
                 label="E-mail"
                 value={email}
                 onChangeText={setEmail}
@@ -126,6 +131,7 @@ export default function LoginScreen() {
               />
 
               <InputField
+                testID="login-password"
                 label="Senha"
                 value={password}
                 onChangeText={setPassword}
@@ -149,6 +155,7 @@ export default function LoginScreen() {
               </Pressable>
 
               <PrimaryButton
+                testID="login-submit"
                 title="Entrar"
                 onPress={handleLogin}
                 loading={isAuthActionLoading || isSubmitting}
@@ -166,6 +173,10 @@ export default function LoginScreen() {
                 <Text style={styles.bottomActionText}>Cadastrar</Text>
               </Pressable>
             </View>
+
+            <Text testID="backend-indicator" style={styles.backendText}>
+              Servidor: {env.EXPO_PUBLIC_API_URL}
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -278,6 +289,12 @@ const styles = StyleSheet.create({
     ...typography.labelSm,
     color: colors.error,
     marginTop: spacing.xs,
+  },
+  backendText: {
+    ...typography.labelSm,
+    color: colors.outline,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
   pressed: {
     opacity: 0.8,

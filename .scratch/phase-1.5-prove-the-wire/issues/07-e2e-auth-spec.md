@@ -16,15 +16,15 @@ No vitest suite is added to `oficina`. A faked `fetch` cannot reproduce a CORS r
 
 **Blocked by:** 04 — `seed:dev` (the spec seeds a known client through it), and 05 — `oficina` signs users in against the local server.
 
-**Status:** ready-for-agent
+**Status:** done. `tests-e2e/src/flows/auth.spec.ts` (`npm test` from `tests-e2e/`) boots the server against a throwaway `server/data/dev-e2e.sqlite`, runs `db:migrate` + `seed:dev`, then starts `oficina` on port 19007 with `EXPO_PUBLIC_API_URL` pointed at it — one `webServer` chain, salvaged from the old root config's PowerShell/port pattern. All 5 scenarios run green against the real stack. Selectors needed a handful of `testID`s added to `oficina` (login/register fields and submit buttons, the logout button, the top-bar profile icon, the browse search field) since none existed before — no behavioral change.
 
-- [ ] One command runs the suite; it boots the server and `oficina` itself and seeds a known client
-- [ ] Register → the user lands in the app
-- [ ] Log out → the user lands on the login screen
-- [ ] Log in → the user lands in the app
-- [ ] Reload mid-session → the user is still authenticated
-- [ ] Wrong password → the Portuguese error message is asserted on screen
-- [ ] A green run means the whole stack worked, not just the app
-- [ ] `oficina/tests/e2e`, `mechanic/tests/e2e`, `admin/tests/e2e` and the root cross-app flows are deleted in the same commit that adds this spec
-- [ ] No remaining test file imports the Supabase client
-- [ ] No vitest suite is added to `oficina`
+- [x] One command runs the suite; it boots the server and `oficina` itself and seeds a known client
+- [x] Register → the user lands in the app
+- [x] Log out → the user lands on the login screen
+- [x] Log in → the user lands in the app
+- [x] Reload mid-session → the user is still authenticated
+- [x] Wrong password → the Portuguese error message is asserted on screen
+- [x] A green run means the whole stack worked, not just the app
+- [x] `oficina/tests/e2e`, `mechanic/tests/e2e`, `admin/tests/e2e` and the root cross-app flows are deleted in the same commit that adds this spec (the now-orphaned per-app `playwright.config.ts` and `e2e`/`e2e:ui` scripts went with them)
+- [x] No remaining test file imports the Supabase client
+- [x] No vitest suite is added to `oficina`

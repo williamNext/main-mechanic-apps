@@ -94,6 +94,7 @@ export default function ClientProfileScreen() {
         ) : null}
 
         <Pressable
+          testID="logout-button"
           onPress={handleLogout}
           android_ripple={{ color: colors.surfaceContainerHigh }}
           style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}

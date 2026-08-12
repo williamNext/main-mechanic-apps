@@ -84,15 +84,27 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await withTimeout(
-    fetch(`${env.EXPO_PUBLIC_API_URL}${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    }),
-    REQUEST_TIMEOUT_MS,
-    'Request timed out',
-  );
+  let res: Response;
+  try {
+    res = await withTimeout(
+      fetch(`${env.EXPO_PUBLIC_API_URL}${path}`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      }),
+      REQUEST_TIMEOUT_MS,
+      'Request timed out',
+    );
+  } catch (err) {
+    // A timed-out request already carries its own message; anything else
+    // here is fetch itself rejecting (connection refused, DNS failure, no
+    // network) — surfaced as its own status so screens can tell "server
+    // unreachable" apart from a normal HTTP failure.
+    if (err instanceof Error && err.message === 'Request timed out') {
+      throw err;
+    }
+    throw new ApiError('network request failed', 0);
+  }
 
   if (!res.ok) {
     if (res.status === 401 && token) {
