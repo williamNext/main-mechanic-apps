@@ -12,7 +12,7 @@ Passwords are hashed through the same path the signup endpoint uses, so a seeded
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-review
+**Status:** done — landed in d1d7c88
 
 - [x] `npm run seed:dev` populates an empty development database in one command
 - [x] Seeded mechanics have Brazilian names and Portuguese specialties
