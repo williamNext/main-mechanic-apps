@@ -57,7 +57,8 @@
 - `server/` today implements **Phase 1 only**: config, SQLite schema (all 10 tables — one,
   `notifications`, has an inferred shape, §7.2), migrations,
   `public_mechanics` sync triggers, and email+password auth (`signup`/`login`/`me`/`logout`).
-  **Booking, mechanic, admin and notification endpoints do not exist yet** — they are Phases 2–4.
+  **Booking, mechanic, admin and notification endpoints do not exist yet** — they are Phases 2–3
+  (Phase 4 was dissolved by D-K).
 - The three client apps **still call Supabase directly**. Nothing has been rewired yet.
 - **Phone/SMS auth is being dropped** in the migration, but login/register UIs and
   `auth-service.ts` still contain phone paths. Treat phone auth as legacy.
@@ -250,7 +251,7 @@ server/
       auth.ts          signup, login, me, logout
   scripts/seed-admin.ts   The ONLY way an admin account is created
   tests/                  vitest: config, schema, triggers, blocklist, auth routes
-  .planning/              GSD planning: PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md, phases/
+  .planning/              FROZEN (2026-08-11). Phase 1 GSD build record only — see its README.md
   drizzle.config.ts, vitest.config.ts, tsconfig.json, README.md
 ```
 
@@ -264,7 +265,7 @@ Self-hosting removes the paid third-party dependency, removes the Twilio/SMS cos
 dropped), and puts business logic in reviewable TypeScript instead of Postgres `SECURITY DEFINER`
 functions spread across three repos' `scripts/sql/` folders.
 
-### 4.2 Roadmap (from `server/.planning/ROADMAP.md`)
+### 4.2 Roadmap
 
 | Phase | Scope | State |
 |---|---|---|
@@ -276,9 +277,16 @@ functions spread across three repos' `scripts/sql/` folders.
 
 **Phase 1.5 was inserted on 2026-08-11.** §16's original ordering (finish Phase 2, *then* rewire) is not wrong, only riskier: it defers every unproven cross-cutting assumption — `fetch` wrapper, token storage, CORS, `EXPO_PUBLIC_API_URL`, the CI secret swap, the `_layout.tsx` bootstrap — to a single late change landing on top of brand-new booking endpoints. Phase 1.5 proves all of them against endpoints that already work, with one screen of blast radius.
 
-Requirement IDs used throughout `server/.planning/`: `AUTH-01..05`, `DATA-01..04`, `BOOK-01..05`,
-`ADMIN-01..03`, `NOTIF-01..02`, `INFRA-01..02`. Complete: AUTH-01/02/03, DATA-01/02/03,
-INFRA-01/02. Everything else is pending.
+Requirement IDs cited throughout this document — `AUTH-01..05`, `DATA-01..04`, `BOOK-01..05`,
+`ADMIN-01..03`, `NOTIF-01..02`, `INFRA-01..07` — are defined in [`REQUIREMENTS.md`](REQUIREMENTS.md), which also
+carries the per-phase traceability table. Complete: AUTH-01/02/03, DATA-01/02/03, INFRA-01/02.
+Everything else is pending.
+
+⚠️ **`server/.planning/` is frozen** (2026-08-11). The GSD workflow that produced it was abandoned;
+its `ROADMAP.md` predates Phase 1.5 and still lists the dissolved Phase 4, and its `STATE.md`
+reports a stale current phase. It is kept only as the build record of Phase 1 — see
+[`server/.planning/README.md`](server/.planning/README.md). This section and `REQUIREMENTS.md` are
+the live sources.
 
 ### 4.3 Explicit scope decisions (do not re-litigate without the user)
 
@@ -1071,7 +1079,8 @@ cheapest available contract test.
 
 These choices affect every endpoint. They are **not yet ratified**, but an agent working without a
 user available must not invent its own answer. **Apply the default below, then record it as a
-`D-xx` note in `server/.planning/` so the next agent inherits it.** Only the user may override.
+`D-xx` row in the §10.3 decision table in this file, so the next agent inherits it.** Only the user
+may override.
 
 | # | Decision | Default to apply | Rationale |
 |---|---|---|---|
@@ -1631,8 +1640,8 @@ There is also `supabase/docs/specs/easy-first-notifications.md` — read it befo
   where before it was not; it is not yet scheduled.
 - Each app repo carries `.agents/AGENT_RULES.md` (terse-response style rules, security rules,
   "confirm before touching >3 files"), `.Jules/` learning notes, and `.planning/codebase/`
-  analysis docs. `server/.claude/CLAUDE.md` additionally requires that repo changes go through a
-  GSD command (`/gsd-quick`, `/gsd-execute-phase`, …) unless the user says otherwise.
+  analysis docs. Those `codebase/` docs are still useful reference. `server/.planning/` is
+  different: it is frozen GSD workflow state, deprecated 2026-08-11 (§4.2).
 
 ---
 
@@ -1676,9 +1685,9 @@ document; resolve as follows:
 | "**Blast Radius Control:** confirm before changing more than 3 files simultaneously" | The multi-file workflows *documented here* — §16's per-app rewire and `DESIGN_GUIDE.md` §13.2's three-repo token edit — are **pre-approved in shape**, because they are indivisible: a partial rewire leaves the app broken. Still announce the file list before starting. Anything **not** described in these two documents keeps the 3-file confirmation rule. |
 | Terse "smart caveman" response style; security warnings exempt | Style preference for that repo's chat output. It does not apply to code, commits, PRs, or to these documents. |
 
-`server/.claude/CLAUDE.md` additionally asks that repo changes start through a GSD command
-(`/gsd-quick`, `/gsd-execute-phase`, …) unless the user says otherwise. Honor it when working
-inside `server/`.
+`server/.claude/CLAUDE.md` **used to** require that changes inside `server/` start through a GSD
+command. That requirement was removed on 2026-08-11 when GSD was deprecated — there is no workflow
+gate on `server/` any more. If you find that instruction quoted anywhere else, it is stale.
 
 ---
 

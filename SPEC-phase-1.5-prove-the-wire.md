@@ -305,7 +305,7 @@ The word "migration" is doing two unrelated jobs in this project: a Drizzle SQL 
 
 ### Recording the decisions
 
-Per §10.3, decisions that affect every endpoint are recorded as `D-xx` notes in `server/.planning/` so the next agent inherits them rather than re-litigating. This phase ratifies D-A (camelCase), D-C (error envelope), D-D (no path versioning) and D-G (CORS inside `buildApp`) by being the first code to depend on them, and leaves D-H (rate limiting) explicitly deferred.
+Per §10.3, decisions that affect every endpoint are recorded as `D-xx` rows in the `PROJECT_CONTEXT.md` §10.3 table so the next agent inherits them rather than re-litigating them. (They lived in `server/.planning/` until 2026-08-11; that directory is now frozen.) This phase ratifies D-A (camelCase), D-C (error envelope), D-D (no path versioning) and D-G (CORS inside `buildApp`) by being the first code to depend on them, and leaves D-H (rate limiting) explicitly deferred.
 
 ### Definition of done
 

@@ -1,71 +1,45 @@
-<!-- GSD:project-start source:PROJECT.md -->
-
 ## Project
 
-**Workshop Backend Server (Supabase Replacement)**
+**Workshop backend server** — the self-hosted replacement for the shared Supabase project.
 
-A self-hosted Node.js API server backed by SQLite that replaces the shared Supabase project currently used by three sibling Expo/React Native apps — `admin`, `mechanic`, and `oficina` (client-facing) — in a car-workshop booking system. It is the single shared backend for all three apps: one database, one auth system, one set of business-logic endpoints, segmented by role (`admin` / `mechanic` / `client`).
+A Node.js API server backed by SQLite, serving all three sibling Expo apps — `admin`, `mechanic`, and `oficina` (client-facing) — in a car-workshop booking system. One database, one auth system, one set of business-logic endpoints, segmented by role (`admin` / `mechanic` / `client`).
 
-**Core Value:** Clients can book a mechanic timeslot and mechanics/admins can manage it without double-booking or losing cross-app visibility (a booking, cancellation, or completion made in one app must be correctly visible to the others) — with the same correctness guarantees the current Supabase+Postgres setup provides, just self-hosted on SQLite.
+**Core value:** Clients can book a mechanic timeslot and mechanics/admins can manage it without double-booking or losing cross-app visibility — a booking, cancellation or completion made in one app is correctly visible to the others — with the same correctness guarantees the Supabase+Postgres setup provided, self-hosted on SQLite.
 
-### Constraints
+Since 2026-08-11 this directory is part of the `main-mechanic-apps` monorepo, not its own repository. Changes here routinely land alongside changes in `oficina/`, `mechanic/`, `admin/` and root-level CI.
 
-- **Tech stack**: Node.js server, SQLite as the storage engine (better-sqlite3 + Drizzle ORM recommended) — chosen specifically to replace Postgres/Supabase, not negotiable for this project
-- **Compatibility**: Must preserve current multi-role (`admin`/`mechanic`/`client`), multi-app (3 separate Expo apps) shared-backend behavior — no per-device/offline-only architecture
-- **Concurrency**: Booking must remain safe against concurrent double-booking of the same timeslot, without Postgres-style row locking
-- **Auth surface**: Email+password only for this migration; no phone/SMS OTP
-- **Data**: No production data carryover — schema-only port, fresh database
-- **Hosting**: Must not hard-code assumptions about a specific host/platform; hosting decision deferred
+## Read these, in this order
 
-<!-- GSD:project-end -->
+| Doc | Why |
+|---|---|
+| [`../PROJECT_CONTEXT.md`](../PROJECT_CONTEXT.md) | **Normative.** §8 business rules, §9 this server, §10 API contracts and §10.3 decisions (`D-A`…`D-M`), §15.1 test skeleton. Use its §1.1 table — it is ~1700 lines, do not read it whole |
+| [`../REQUIREMENTS.md`](../REQUIREMENTS.md) | The `AUTH-`/`DATA-`/`BOOK-`/`ADMIN-`/`NOTIF-`/`INFRA-` requirement register, and which phase each belongs to |
+| [`../SPEC-phase-1.5-prove-the-wire.md`](../SPEC-phase-1.5-prove-the-wire.md) | The current phase |
 
-<!-- GSD:stack-start source:STACK.md -->
+Where any document disagrees with `PROJECT_CONTEXT.md` §8, §8 wins.
 
-## Technology Stack
+## Constraints
 
-Technology stack not yet documented. Will populate after codebase mapping or first phase.
-<!-- GSD:stack-end -->
-
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
+- **Tech stack**: Node.js + SQLite (better-sqlite3 + Drizzle ORM) — chosen specifically to replace Postgres/Supabase, not negotiable
+- **Compatibility**: preserve the multi-role, multi-app shared-backend behaviour — no per-device or offline-only architecture
+- **Concurrency**: booking must stay safe against concurrent double-booking of the same timeslot, without Postgres-style row locking. A write transaction plus a unique constraint replaces `SELECT … FOR UPDATE` plus a partial unique index
+- **Auth surface**: email and password only. No phone or SMS OTP
+- **Data**: no production data carryover — schema-only port, fresh database
+- **Hosting**: no hard-coded assumptions about a host or platform. The hosting decision is deferred and is the last open design question
 
 ## Conventions
 
-Conventions not yet established. Will populate as patterns emerge during development.
-<!-- GSD:conventions-end -->
+- **Every endpoint ships with a test.** `tests/routes/auth.test.ts` is the pattern; the skeleton and helper names are in `PROJECT_CONTEXT.md` §15.1
+- **Build through `buildApp(db, connection)`.** Both the real server and every test assemble the app through that one function — there is no test-only code path. Cross-cutting plugins (CORS, the error handler) register *inside* it so tests exercise the same configuration the server runs (**D-G**)
+- **One error envelope**: `{ error: '<lowercase message>' }` on every failure (**D-C**). Clients substring-match these messages, so wording is a contract — never rewrite, wrap or prefix one
+- **camelCase JSON** on the wire (**D-A**), so clients can delete their `map*Row` helpers
+- **No path versioning** (**D-D**)
+- **Never trust a role from a token.** Re-read it from the DB row. The server forces `client` on signup and strips any supplied role (§5, D-07)
+- User-facing strings are Brazilian Portuguese; code and identifiers are English (§18.9, glossary in §19)
+- Schema changes go through a Drizzle migration. Never edit an applied migration
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Planning
 
-## Architecture
+Planning artifacts live at the repository root: `PROJECT_CONTEXT.md`, `REQUIREMENTS.md`, the current `SPEC-*.md`, and tickets under `.scratch/<phase>/issues/`.
 
-Architecture not yet mapped. Follow existing patterns found in the codebase.
-<!-- GSD:architecture-end -->
-
-<!-- GSD:skills-start source:skills/ -->
-
-## Project Skills
-
-No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
-<!-- GSD:skills-end -->
-
-<!-- GSD:workflow-start source:GSD defaults -->
-
-## GSD Workflow Enforcement
-
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
-
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
-
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
-
-<!-- GSD:profile-start -->
-
-## Developer Profile
-
-> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
+`.planning/` in this directory is a **frozen historical record** of the GSD workflow used to build Phase 1 — deprecated 2026-08-11, read-only. See [`.planning/README.md`](.planning/README.md). Do not update it, and do not treat its `ROADMAP.md` or `STATE.md` as current; both predate Phase 1.5 and the dissolution of Phase 4.
