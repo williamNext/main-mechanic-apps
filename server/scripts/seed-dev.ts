@@ -3,9 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { hashPassword } from '../src/auth/hash.js';
 import { config } from '../src/config/index.js';
 import { createDb, type Db } from '../src/db/client.js';
-import { mechanics, profiles, timeslots } from '../src/db/schema.js';
-
-export class SeedDevError extends Error {}
+import { mechanics, profiles, timeslots, type Role } from '../src/db/schema.js';
 
 const SHARED_PASSWORD = 'SenhaDev123!';
 
@@ -50,28 +48,24 @@ export interface SeedDevResult {
   password: string;
 }
 
+function upsertProfile(
+  tx: Parameters<Parameters<Db['transaction']>[0]>[0],
+  seed: { id: string; name: string; email: string },
+  role: Role,
+  passwordHash: string,
+) {
+  const values = { id: seed.id, name: seed.name, email: seed.email, role, passwordHash };
+  tx.insert(profiles).values(values).onConflictDoUpdate({ target: profiles.id, set: values }).run();
+}
+
 export async function seedDev(db: Db): Promise<SeedDevResult> {
-  const mechanicHashes = await Promise.all(MECHANIC_SEEDS.map(() => hashPassword(SHARED_PASSWORD)));
-  const clientHash = await hashPassword(SHARED_PASSWORD);
-  const adminHash = await hashPassword(SHARED_PASSWORD);
+  const sharedHash = await hashPassword(SHARED_PASSWORD);
 
   const dates = Array.from({ length: DAYS_AHEAD }, (_, dayOffset) => dateOffset(dayOffset + 1));
 
   db.transaction((tx) => {
     MECHANIC_SEEDS.forEach((mechanic, i) => {
-      tx.insert(profiles)
-        .values({
-          id: mechanic.id,
-          name: mechanic.name,
-          email: mechanic.email,
-          role: 'mechanic',
-          passwordHash: mechanicHashes[i],
-        })
-        .onConflictDoUpdate({
-          target: profiles.id,
-          set: { name: mechanic.name, email: mechanic.email, role: 'mechanic', passwordHash: mechanicHashes[i] },
-        })
-        .run();
+      upsertProfile(tx, mechanic, 'mechanic', sharedHash);
 
       tx.insert(mechanics)
         .values({ id: mechanic.id, specialty: mechanic.specialty, isActive: true })
@@ -108,33 +102,8 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       });
     });
 
-    tx.insert(profiles)
-      .values({
-        id: CLIENT_SEED.id,
-        name: CLIENT_SEED.name,
-        email: CLIENT_SEED.email,
-        role: 'client',
-        passwordHash: clientHash,
-      })
-      .onConflictDoUpdate({
-        target: profiles.id,
-        set: { name: CLIENT_SEED.name, email: CLIENT_SEED.email, role: 'client', passwordHash: clientHash },
-      })
-      .run();
-
-    tx.insert(profiles)
-      .values({
-        id: ADMIN_SEED.id,
-        name: ADMIN_SEED.name,
-        email: ADMIN_SEED.email,
-        role: 'admin',
-        passwordHash: adminHash,
-      })
-      .onConflictDoUpdate({
-        target: profiles.id,
-        set: { name: ADMIN_SEED.name, email: ADMIN_SEED.email, role: 'admin', passwordHash: adminHash },
-      })
-      .run();
+    upsertProfile(tx, CLIENT_SEED, 'client', sharedHash);
+    upsertProfile(tx, ADMIN_SEED, 'admin', sharedHash);
   });
 
   const mechanicIds = MECHANIC_SEEDS.map((m) => m.id);
@@ -162,7 +131,7 @@ if (isMainModule) {
   const { db, connection } = createDb(config.DB_PATH);
   seedDev(db)
     .catch((err) => {
-      console.error(err instanceof SeedDevError ? err.message : 'Failed to seed dev data');
+      console.error(err instanceof Error ? err.message : 'Failed to seed dev data');
       process.exitCode = 1;
     })
     .finally(() => {
