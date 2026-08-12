@@ -12,25 +12,14 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as authService from '@/services/auth-service';
+import { isApiError } from '@/services/api';
+import { getApiErrorMessage } from '@/services/error-messages';
 import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function mapRegisterError(message: string): string {
-  if (message.includes('email already registered')) {
-    return 'Este e-mail já está cadastrado. Faça login.';
-  }
-  if (message.includes('network request failed')) {
-    return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
-  }
-  if (message.includes('timed out')) {
-    return 'A solicitação demorou demais. Tente novamente.';
-  }
-  return 'Falha ao criar conta. Tente novamente.';
-}
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -68,9 +57,8 @@ export default function RegisterScreen() {
       const user = await authService.signUp(trimmedName, trimmedEmail, password);
       useAuthStore.getState().setUser(user);
       router.replace('/(client)/browse');
-    } catch (error: any) {
-      const message = error instanceof Error ? error.message : '';
-      setErrorMsg(mapRegisterError(message));
+    } catch (error: unknown) {
+      setErrorMsg(getApiErrorMessage(isApiError(error) ? error.code : null));
     } finally {
       setLoading(false);
     }

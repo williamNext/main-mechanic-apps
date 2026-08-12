@@ -1,7 +1,10 @@
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import { eq } from 'drizzle-orm';
+import type { FastifyRequest } from 'fastify';
 import { isTokenRevoked } from './blocklist.js';
 import { verifyAccessToken, type AccessTokenPayload } from './jwt.js';
 import type { Db } from '../db/client.js';
+import { profiles, type Role } from '../db/schema.js';
+import { HttpError } from '../errors.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -17,7 +20,7 @@ const BEARER_PREFIX = 'Bearer ';
  * token all look identical to the caller, so none of them discloses which
  * reason applied.
  */
-const UNAUTHORIZED = { error: 'unauthorized' };
+const unauthorized = () => new HttpError(401, 'unauthorized', 'UNAUTHENTICATED');
 
 /**
  * Builds the Fastify preHandler that authenticates a bearer token against
@@ -35,10 +38,10 @@ const UNAUTHORIZED = { error: 'unauthorized' };
  * duplicated per route) is what makes AUTH-03 apply uniformly.
  */
 export function requireAuth(db: Db) {
-  return async function authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  return async function authenticate(request: FastifyRequest): Promise<void> {
     const header = request.headers.authorization;
     if (!header || !header.startsWith(BEARER_PREFIX)) {
-      return reply.code(401).send(UNAUTHORIZED);
+      throw unauthorized();
     }
 
     const token = header.slice(BEARER_PREFIX.length);
@@ -47,13 +50,31 @@ export function requireAuth(db: Db) {
     try {
       payload = verifyAccessToken(token);
     } catch {
-      return reply.code(401).send(UNAUTHORIZED);
+      throw unauthorized();
     }
 
     if (isTokenRevoked(db, payload.jti)) {
-      return reply.code(401).send(UNAUTHORIZED);
+      throw unauthorized();
     }
 
     request.user = payload;
+  };
+}
+
+export function requireRole(db: Db, role: Role) {
+  return async function authorize(request: FastifyRequest): Promise<void> {
+    if (!request.user) {
+      throw unauthorized();
+    }
+
+    const row = db
+      .select({ role: profiles.role })
+      .from(profiles)
+      .where(eq(profiles.id, request.user.sub))
+      .get();
+
+    if (!row || row.role !== role) {
+      throw new HttpError(403, 'forbidden', 'FORBIDDEN');
+    }
   };
 }

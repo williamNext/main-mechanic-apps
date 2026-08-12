@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { User, Mechanic, Role } from '@/types/models';
 import * as authService from '@/services/auth-service';
 import * as mechanicService from '@/services/mechanic-service';
+import { isApiError } from '@/services/api';
 
 interface AuthState {
   user: User | Mechanic | null;
@@ -11,6 +12,7 @@ interface AuthState {
   isAuthenticated: boolean;
   role: Role | null;
   error: string | null;
+  errorCode: string | null;
 
   loginByEmail: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -21,7 +23,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => {
   const setLoadingState = (
-    patch: Partial<Pick<AuthState, 'isBootstrappingSession' | 'isAuthActionLoading' | 'error'>>,
+    patch: Partial<Pick<AuthState, 'isBootstrappingSession' | 'isAuthActionLoading' | 'error' | 'errorCode'>>,
   ) => {
     set((state) => {
       const isBootstrappingSession = patch.isBootstrappingSession ?? state.isBootstrappingSession;
@@ -42,18 +44,21 @@ export const useAuthStore = create<AuthState>((set, get) => {
     isAuthenticated: false,
     role: null,
     error: null,
+    errorCode: null,
 
     loginByEmail: async (email, password) => {
-      setLoadingState({ isAuthActionLoading: true, error: null });
+      setLoadingState({ isAuthActionLoading: true, error: null, errorCode: null });
       try {
         const user = await authService.login(email, password);
         if (user) {
-          set({ user, isAuthenticated: true, role: user.role, error: null });
+          set({ user, isAuthenticated: true, role: user.role, error: null, errorCode: null });
           return true;
         }
       } catch (e) {
-// Error handled internally
-        set({ error: e instanceof Error ? e.message : 'Login failed' });
+        set({
+          error: e instanceof Error ? e.message : 'Login failed',
+          errorCode: isApiError(e) ? e.code ?? null : null,
+        });
       } finally {
         setLoadingState({ isAuthActionLoading: false });
       }
@@ -62,12 +67,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     logout: async () => {
-      setLoadingState({ isAuthActionLoading: true, error: null });
-      set({ user: null, isAuthenticated: false, role: null, error: null });
+      setLoadingState({ isAuthActionLoading: true, error: null, errorCode: null });
+      set({ user: null, isAuthenticated: false, role: null, error: null, errorCode: null });
       try {
         await authService.logout();
-      } catch (e) {
-// Error handled internally
+      } catch {
       } finally {
         setLoadingState({ isAuthActionLoading: false });
       }
@@ -81,6 +85,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         isBootstrappingSession: false,
         isLoading: state.isAuthActionLoading,
         error: null,
+        errorCode: null,
       }));
     },
 
@@ -92,10 +97,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const { user } = get();
       if (!user) return;
 
-      setLoadingState({ isAuthActionLoading: true, error: null });
+      setLoadingState({ isAuthActionLoading: true, error: null, errorCode: null });
       try {
         await mechanicService.updateMechanicProfile(user.id, data);
-        set({ user: { ...user, ...data } as User | Mechanic, error: null });
+        set({ user: { ...user, ...data } as User | Mechanic, error: null, errorCode: null });
       } finally {
         setLoadingState({ isAuthActionLoading: false });
       }

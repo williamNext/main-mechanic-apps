@@ -8,6 +8,7 @@ import { signAccessToken } from '../auth/jwt.js';
 import { requireAuth } from '../auth/middleware.js';
 import type { Db } from '../db/client.js';
 import { profiles } from '../db/schema.js';
+import { HttpError } from '../errors.js';
 
 // Unknown keys (including a client-supplied `role`) are stripped by zod's
 // default "strip" behavior — they never reach the insert (D-07, T-01-03).
@@ -28,7 +29,7 @@ const LoginSchema = z.object({
 // One shared, identically-constructed response for both login failure
 // paths — unknown email and known email/wrong password — so a caller
 // cannot use the response body to tell which was wrong (T-03-04).
-const INVALID_LOGIN = { error: 'invalid email or password' };
+const invalidLogin = () => new HttpError(401, 'invalid email or password', 'INVALID_CREDENTIALS');
 
 /**
  * A fixed dummy argon2id hash, generated once at module load rather than
@@ -57,7 +58,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
   app.post('/auth/signup', async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = SignupSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'invalid request body' });
+      throw new HttpError(400, 'invalid request body', 'VALIDATION_FAILED');
     }
 
     const { name, email, password } = parsed.data;
@@ -77,7 +78,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
         .run();
     } catch (err) {
       if (isUniqueConstraintError(err)) {
-        return reply.code(409).send({ error: 'email already registered' });
+        throw new HttpError(409, 'email already registered', 'EMAIL_TAKEN');
       }
       throw err;
     }
@@ -93,7 +94,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
   app.post('/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = LoginSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'invalid request body' });
+      throw new HttpError(400, 'invalid request body', 'VALIDATION_FAILED');
     }
 
     const { email, password } = parsed.data;
@@ -108,7 +109,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
     const passwordValid = await verifyPassword(row?.passwordHash ?? DUMMY_PASSWORD_HASH, password);
 
     if (!row || !passwordValid) {
-      return reply.code(401).send(INVALID_LOGIN);
+      throw invalidLogin();
     }
 
     // The role in the token and in the response comes from the stored
@@ -132,7 +133,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
       const row = db.select().from(profiles).where(eq(profiles.id, userId)).get();
 
       if (!row) {
-        return reply.code(401).send({ error: 'unauthorized' });
+        throw new HttpError(401, 'unauthorized', 'UNAUTHENTICATED');
       }
 
       return reply.send({ id: row.id, name: row.name, email: row.email, role: row.role });

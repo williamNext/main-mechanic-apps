@@ -1,4 +1,4 @@
-import { request, getStoredToken, setStoredToken, clearStoredToken, ApiError } from './api';
+import { request, getStoredToken, setStoredToken, clearStoredToken, isApiError } from './api';
 import { User } from '@/types/models';
 
 interface AuthResponse {
@@ -47,7 +47,7 @@ export async function getCurrentSessionUser(): Promise<User | null> {
   try {
     return await request<User>('/auth/me', { token });
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
+    if (isApiError(error) && error.status === 401) {
       return null;
     }
     throw error;

@@ -31,14 +31,14 @@ export function buildApp(db: Db, connection: Connection) {
   // server runs.
   app.setErrorHandler((err: FastifyError | HttpError, _req, reply) => {
     if (err instanceof HttpError) {
-      return reply.code(err.status).send({ error: err.message.toLowerCase() });
+      return reply.code(err.status).send({ error: err.message.toLowerCase(), code: err.code });
     }
     // Preserve Fastify's own 4xx (malformed JSON 400, unknown route 404) —
     // without this branch they would all be flattened to 500.
     if (err.statusCode && err.statusCode < 500) {
       return reply.code(err.statusCode).send({ error: err.message.toLowerCase() });
     }
-    return reply.code(500).send({ error: 'internal error' });
+    return reply.code(500).send({ error: 'internal error', code: 'INTERNAL_ERROR' });
   });
 
   // Fastify's default 404 body doesn't go through setErrorHandler and isn't

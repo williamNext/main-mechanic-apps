@@ -16,21 +16,9 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
 import { env } from '@/config/env';
+import { getApiErrorMessage } from '@/services/error-messages';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function mapLoginError(message: string): string {
-  if (message.includes('invalid email or password')) {
-    return 'E-mail ou senha inválidos.';
-  }
-  if (message.includes('network request failed')) {
-    return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
-  }
-  if (message.includes('timed out')) {
-    return 'A solicitação demorou demais. Tente novamente.';
-  }
-  return 'Não foi possível entrar. Tente novamente.';
-}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -74,8 +62,8 @@ export default function LoginScreen() {
         return;
       }
 
-      const storeError = useAuthStore.getState().error;
-      setErrorMsg(storeError ? mapLoginError(storeError) : 'Não foi possível entrar. Tente novamente.');
+      const storeErrorCode = useAuthStore.getState().errorCode;
+      setErrorMsg(getApiErrorMessage(storeErrorCode));
     } finally {
       setIsSubmitting(false);
     }

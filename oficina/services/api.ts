@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { SecureStorage } from '@/utils/secure-storage';
 import { env } from '@/config/env';
+import type { ApiErrorCode } from './error-messages';
 
 export const AUTH_TOKEN_KEY = 'auth_token';
 
@@ -41,11 +42,26 @@ export async function clearStoredToken(): Promise<void> {
   await SecureStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
+export class ApiError extends Error {
+  status: number;
+  code: string | undefined;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError;
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+    timeoutId = setTimeout(() => reject(new ApiError(message, 0, 'REQUEST_TIMEOUT' satisfies ApiErrorCode)), timeoutMs);
   });
 
   try {
@@ -55,27 +71,13 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
   }
 }
 
-export class ApiError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
-
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   token?: string | null;
 }
 
-// Typed fetch wrapper that replaces the Supabase client (Phase 1.5 ticket 05).
-// Reads the stored token itself when `options.token` is not supplied, so call
-// sites stay simple. Every request shares one timeout, and a non-2xx response
-// throws an Error whose message is the server's `error` string verbatim —
-// screens elsewhere match on substrings of these exact English strings, so
-// this wrapper must never wrap, prefix or translate them.
+// Server English messages must reach clients verbatim.
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body } = options;
   const token = options.token !== undefined ? options.token : await getStoredToken();
@@ -96,14 +98,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       'Request timed out',
     );
   } catch (err) {
-    // A timed-out request already carries its own message; anything else
-    // here is fetch itself rejecting (connection refused, DNS failure, no
-    // network) — surfaced as its own status so screens can tell "server
-    // unreachable" apart from a normal HTTP failure.
-    if (err instanceof Error && err.message === 'Request timed out') {
+    if (err instanceof ApiError) {
       throw err;
     }
-    throw new ApiError('network request failed', 0);
+    throw new ApiError('network request failed', 0, 'NETWORK_UNAVAILABLE' satisfies ApiErrorCode);
   }
 
   if (!res.ok) {
@@ -112,15 +110,18 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
 
     let message = res.statusText || 'Request failed';
+    let code: string | undefined;
     try {
       const data = await res.json();
       if (data && typeof data.error === 'string') {
         message = data.error;
       }
+      if (data && typeof data.code === 'string') {
+        code = data.code;
+      }
     } catch {
-      // body wasn't JSON (or was empty) — fall back to statusText above
     }
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, code);
   }
 
   if (res.status === 204) {

@@ -108,6 +108,7 @@ describe('POST /auth/signup', () => {
 
     const second = await app.inject({ method: 'POST', url: '/auth/signup', payload });
     expect(second.statusCode).toBe(409);
+    expect(second.json()).toEqual({ error: 'email already registered', code: 'EMAIL_TAKEN' });
 
     const count = testDb.connection
       .prepare('SELECT COUNT(*) as c FROM profiles WHERE email = ?')
@@ -138,6 +139,7 @@ describe('POST /auth/signup', () => {
       payload: { name: 'Ana', email: 'not-an-email', password: 'correct-horse-battery' },
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'invalid request body', code: 'VALIDATION_FAILED' });
   });
 
   it('responds 400 for a password shorter than 8 characters', async () => {
@@ -147,6 +149,7 @@ describe('POST /auth/signup', () => {
       payload: { name: 'Ana', email: 'shortpw@example.com', password: 'short' },
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'invalid request body', code: 'VALIDATION_FAILED' });
   });
 });
 
@@ -276,6 +279,7 @@ describe('POST /auth/login', () => {
 
     expect(unknownRes.statusCode).toBe(wrongPasswordRes.statusCode);
     expect(unknownRes.body).toBe(wrongPasswordRes.body);
+    expect(unknownRes.json()).toEqual({ error: 'invalid email or password', code: 'INVALID_CREDENTIALS' });
   });
 
   it('responds 400 for a malformed email', async () => {
@@ -285,6 +289,7 @@ describe('POST /auth/login', () => {
       payload: { email: 'not-an-email', password: 'whatever-password' },
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'invalid request body', code: 'VALIDATION_FAILED' });
   });
 
   it('responds 400 for an absent password', async () => {
@@ -294,6 +299,7 @@ describe('POST /auth/login', () => {
       payload: { email: 'someone@example.com' },
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'invalid request body', code: 'VALIDATION_FAILED' });
   });
 
   it('never returns password or password_hash in the response body', async () => {
@@ -354,6 +360,7 @@ describe('GET /auth/me', () => {
   it('returns 401 with no Authorization header', async () => {
     const res = await app.inject({ method: 'GET', url: '/auth/me' });
     expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthorized', code: 'UNAUTHENTICATED' });
   });
 
   it('returns 401 with a header lacking the Bearer scheme', async () => {
@@ -364,6 +371,7 @@ describe('GET /auth/me', () => {
       headers: { authorization: signupBody.token },
     });
     expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthorized', code: 'UNAUTHENTICATED' });
   });
 
   it('returns 401 for a syntactically invalid token', async () => {
@@ -373,6 +381,7 @@ describe('GET /auth/me', () => {
       headers: { authorization: 'Bearer not-a-real-jwt' },
     });
     expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthorized', code: 'UNAUTHENTICATED' });
   });
 
   it('returns 401 for a well-formed token signed with a different secret', async () => {
@@ -385,6 +394,7 @@ describe('GET /auth/me', () => {
       headers: { authorization: `Bearer ${forged}` },
     });
     expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthorized', code: 'UNAUTHENTICATED' });
   });
 
   it('returns 401 for a token whose payload segment was edited after signing', async () => {
@@ -401,6 +411,7 @@ describe('GET /auth/me', () => {
       headers: { authorization: `Bearer ${tamperedToken}` },
     });
     expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthorized', code: 'UNAUTHENTICATED' });
   });
 
   it('rejects a token whose header declares algorithm none', async () => {
@@ -411,6 +422,33 @@ describe('GET /auth/me', () => {
       headers: { authorization: `Bearer ${noneToken}` },
     });
     expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthorized', code: 'UNAUTHENTICATED' });
+  });
+
+  it('keeps missing, malformed, forged, and revoked tokens indistinguishable', async () => {
+    const signupBody = await signupAndGetBody('me-generic-401@example.com');
+    await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { authorization: `Bearer ${signupBody.token}` },
+    });
+
+    const forged = jwt.sign({ sub: 'someone', role: 'client', jti: 'x' }, 'a-completely-different-secret-32-chars', {
+      algorithm: 'HS256',
+    });
+
+    const responses = await Promise.all([
+      app.inject({ method: 'GET', url: '/auth/me' }),
+      app.inject({ method: 'GET', url: '/auth/me', headers: { authorization: signupBody.token } }),
+      app.inject({ method: 'GET', url: '/auth/me', headers: { authorization: `Bearer ${forged}` } }),
+      app.inject({ method: 'GET', url: '/auth/me', headers: { authorization: `Bearer ${signupBody.token}` } }),
+    ]);
+
+    for (const res of responses) {
+      expect(res.statusCode).toBe(401);
+      expect(res.body).toBe(responses[0].body);
+    }
+    expect(responses[0].json()).toEqual({ error: 'unauthorized', code: 'UNAUTHENTICATED' });
   });
 });
 

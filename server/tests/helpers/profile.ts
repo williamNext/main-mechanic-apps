@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { makeTestDb } from './db.js';
+import { signAccessToken } from '../../src/auth/jwt.js';
+import type { Role } from '../../src/db/schema.js';
 
 type TestDb = ReturnType<typeof makeTestDb>;
 
@@ -31,4 +33,28 @@ export function insertProfile(
       overrides.passwordHash ?? 'hash',
     );
   return id;
+}
+
+export function makeMechanicToken(
+  testDb: TestDb,
+  overrides: Partial<{
+    id: string;
+    name: string;
+    email: string;
+    tokenRole: Role;
+    specialty: string;
+    credentials: string;
+  }> = {},
+) {
+  const id = insertProfile(testDb, {
+    id: overrides.id,
+    name: overrides.name ?? 'Mechanic Person',
+    email: overrides.email,
+    role: 'mechanic',
+  });
+  testDb.connection
+    .prepare('INSERT INTO mechanics (id, specialty, credentials, is_active) VALUES (?, ?, ?, ?)')
+    .run(id, overrides.specialty ?? 'Freios', overrides.credentials ?? 'ASE', 1);
+  const { token } = signAccessToken({ userId: id, role: overrides.tokenRole ?? 'mechanic' });
+  return { id, token };
 }
