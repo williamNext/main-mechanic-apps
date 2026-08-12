@@ -1,38 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeTestDb } from '../helpers/db.js';
+import { insertProfile } from '../helpers/profile.js';
 
 type TestDb = ReturnType<typeof makeTestDb>;
-
-function insertProfile(
-  testDb: TestDb,
-  overrides: Partial<{
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    phone: string | null;
-    avatarUrl: string | null;
-    passwordHash: string;
-  }> = {},
-): string {
-  const id = overrides.id ?? randomUUID();
-  testDb.connection
-    .prepare(
-      `INSERT INTO profiles (id, name, email, role, phone, avatar_url, password_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      id,
-      overrides.name ?? 'Test Mechanic',
-      overrides.email ?? `${id}@example.com`,
-      overrides.role ?? 'client',
-      overrides.phone ?? null,
-      overrides.avatarUrl ?? null,
-      overrides.passwordHash ?? 'hash',
-    );
-  return id;
-}
 
 function insertMechanic(
   testDb: TestDb,
@@ -58,13 +28,6 @@ function getPublicMechanic(testDb: TestDb, id: string) {
     | undefined;
 }
 
-function triggerCount(testDb: TestDb): number {
-  const row = testDb.connection
-    .prepare("SELECT count(*) as c FROM sqlite_master WHERE type = 'trigger'")
-    .get() as { c: number };
-  return row.c;
-}
-
 describe('DATA-03: public_mechanics self-maintaining projection', () => {
   let testDb: TestDb;
 
@@ -77,8 +40,11 @@ describe('DATA-03: public_mechanics self-maintaining projection', () => {
   });
 
   describe('installation', () => {
-    it('installs exactly 6 triggers via the real migration path', () => {
-      expect(triggerCount(testDb)).toBe(6);
+    it('installs the six public_mechanics projection triggers via the real migration path', () => {
+      const row = testDb.connection
+        .prepare("SELECT count(*) as c FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_public_mechanics_%'")
+        .get() as { c: number };
+      expect(row.c).toBe(6);
     });
   });
 

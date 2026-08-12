@@ -1,0 +1,1087 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "486f955e-c04f-4f9b-a486-336094fa866b",
+  "prevId": "7accd0ed-6c7d-409d-aa38-10286158a857",
+  "tables": {
+    "admin_action_log": {
+      "name": "admin_action_log",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_mechanic_id": {
+          "name": "target_mechanic_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "before_state": {
+          "name": "before_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "after_state": {
+          "name": "after_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "admin_action_log_target_created_idx": {
+          "name": "admin_action_log_target_created_idx",
+          "columns": [
+            "target_mechanic_id",
+            "\"created_at\" desc"
+          ],
+          "isUnique": false
+        },
+        "admin_action_log_actor_created_idx": {
+          "name": "admin_action_log_actor_created_idx",
+          "columns": [
+            "actor_id",
+            "\"created_at\" desc"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "admin_action_log_actor_id_profiles_id_fk": {
+          "name": "admin_action_log_actor_id_profiles_id_fk",
+          "tableFrom": "admin_action_log",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "admin_action_log_target_mechanic_id_mechanics_id_fk": {
+          "name": "admin_action_log_target_mechanic_id_mechanics_id_fk",
+          "tableFrom": "admin_action_log",
+          "tableTo": "mechanics",
+          "columnsFrom": [
+            "target_mechanic_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "admin_action_log_action_check": {
+          "name": "admin_action_log_action_check",
+          "value": "\"admin_action_log\".\"action\" IN ('create_mechanic', 'delete_mechanic')"
+        },
+        "admin_action_log_note_length_check": {
+          "name": "admin_action_log_note_length_check",
+          "value": "length(coalesce(\"admin_action_log\".\"note\", '')) <= 500"
+        }
+      }
+    },
+    "appointment_service_items": {
+      "name": "appointment_service_items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "appointment_id": {
+          "name": "appointment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "appointment_service_items_appointment_order_idx": {
+          "name": "appointment_service_items_appointment_order_idx",
+          "columns": [
+            "appointment_id",
+            "sort_order"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "appointment_service_items_appointment_id_appointment_service_reports_appointment_id_fk": {
+          "name": "appointment_service_items_appointment_id_appointment_service_reports_appointment_id_fk",
+          "tableFrom": "appointment_service_items",
+          "tableTo": "appointment_service_reports",
+          "columnsFrom": [
+            "appointment_id"
+          ],
+          "columnsTo": [
+            "appointment_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "appointment_service_items_description_length_check": {
+          "name": "appointment_service_items_description_length_check",
+          "value": "length(trim(\"appointment_service_items\".\"description\")) BETWEEN 2 AND 160"
+        },
+        "appointment_service_items_amount_cents_check": {
+          "name": "appointment_service_items_amount_cents_check",
+          "value": "\"appointment_service_items\".\"amount_cents\" >= 0"
+        },
+        "appointment_service_items_sort_order_check": {
+          "name": "appointment_service_items_sort_order_check",
+          "value": "\"appointment_service_items\".\"sort_order\" >= 0"
+        }
+      }
+    },
+    "appointment_service_reports": {
+      "name": "appointment_service_reports",
+      "columns": {
+        "appointment_id": {
+          "name": "appointment_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mechanic_id": {
+          "name": "mechanic_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "diagnosis": {
+          "name": "diagnosis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "work_performed": {
+          "name": "work_performed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parts_used": {
+          "name": "parts_used",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "recommendations": {
+          "name": "recommendations",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "total_amount_cents": {
+          "name": "total_amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "appointment_service_reports_mechanic_closed_idx": {
+          "name": "appointment_service_reports_mechanic_closed_idx",
+          "columns": [
+            "mechanic_id",
+            "\"closed_at\" desc"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "appointment_service_reports_appointment_id_appointments_id_fk": {
+          "name": "appointment_service_reports_appointment_id_appointments_id_fk",
+          "tableFrom": "appointment_service_reports",
+          "tableTo": "appointments",
+          "columnsFrom": [
+            "appointment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "appointment_service_reports_mechanic_id_mechanics_id_fk": {
+          "name": "appointment_service_reports_mechanic_id_mechanics_id_fk",
+          "tableFrom": "appointment_service_reports",
+          "tableTo": "mechanics",
+          "columnsFrom": [
+            "mechanic_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "appointment_service_reports_summary_length_check": {
+          "name": "appointment_service_reports_summary_length_check",
+          "value": "length(trim(\"appointment_service_reports\".\"summary\")) BETWEEN 3 AND 240"
+        },
+        "appointment_service_reports_diagnosis_length_check": {
+          "name": "appointment_service_reports_diagnosis_length_check",
+          "value": "length(coalesce(\"appointment_service_reports\".\"diagnosis\", '')) <= 1000"
+        },
+        "appointment_service_reports_work_performed_length_check": {
+          "name": "appointment_service_reports_work_performed_length_check",
+          "value": "length(trim(\"appointment_service_reports\".\"work_performed\")) BETWEEN 3 AND 2000"
+        },
+        "appointment_service_reports_parts_used_length_check": {
+          "name": "appointment_service_reports_parts_used_length_check",
+          "value": "length(coalesce(\"appointment_service_reports\".\"parts_used\", '')) <= 1000"
+        },
+        "appointment_service_reports_recommendations_length_check": {
+          "name": "appointment_service_reports_recommendations_length_check",
+          "value": "length(coalesce(\"appointment_service_reports\".\"recommendations\", '')) <= 1000"
+        },
+        "appointment_service_reports_total_amount_cents_check": {
+          "name": "appointment_service_reports_total_amount_cents_check",
+          "value": "\"appointment_service_reports\".\"total_amount_cents\" >= 0"
+        }
+      }
+    },
+    "appointments": {
+      "name": "appointments",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mechanic_id": {
+          "name": "mechanic_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timeslot_id": {
+          "name": "timeslot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'confirmado'"
+        },
+        "vehicle_info": {
+          "name": "vehicle_info",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "appointments_client_date_desc_idx": {
+          "name": "appointments_client_date_desc_idx",
+          "columns": [
+            "client_id",
+            "\"date\" desc"
+          ],
+          "isUnique": false
+        },
+        "appointments_mechanic_date_desc_idx": {
+          "name": "appointments_mechanic_date_desc_idx",
+          "columns": [
+            "mechanic_id",
+            "\"date\" desc"
+          ],
+          "isUnique": false
+        },
+        "appointments_date_status_mechanic_idx": {
+          "name": "appointments_date_status_mechanic_idx",
+          "columns": [
+            "\"date\" desc",
+            "status",
+            "mechanic_id"
+          ],
+          "isUnique": false
+        },
+        "appointments_one_active_per_timeslot": {
+          "name": "appointments_one_active_per_timeslot",
+          "columns": [
+            "timeslot_id"
+          ],
+          "isUnique": true,
+          "where": "\"appointments\".\"status\" IN ('confirmado', 'nao_finalizado') AND \"appointments\".\"timeslot_id\" IS NOT NULL"
+        }
+      },
+      "foreignKeys": {
+        "appointments_client_id_profiles_id_fk": {
+          "name": "appointments_client_id_profiles_id_fk",
+          "tableFrom": "appointments",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "appointments_mechanic_id_mechanics_id_fk": {
+          "name": "appointments_mechanic_id_mechanics_id_fk",
+          "tableFrom": "appointments",
+          "tableTo": "mechanics",
+          "columnsFrom": [
+            "mechanic_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "appointments_timeslot_id_timeslots_id_fk": {
+          "name": "appointments_timeslot_id_timeslots_id_fk",
+          "tableFrom": "appointments",
+          "tableTo": "timeslots",
+          "columnsFrom": [
+            "timeslot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "appointments_status_check": {
+          "name": "appointments_status_check",
+          "value": "\"appointments\".\"status\" IN ('confirmado', 'nao_finalizado', 'cancelado', 'acabado')"
+        },
+        "appointments_time_order_check": {
+          "name": "appointments_time_order_check",
+          "value": "\"appointments\".\"end_time\" > \"appointments\".\"start_time\""
+        },
+        "appointments_vehicle_info_length_check": {
+          "name": "appointments_vehicle_info_length_check",
+          "value": "length(coalesce(\"appointments\".\"vehicle_info\", '')) <= 120"
+        },
+        "appointments_notes_length_check": {
+          "name": "appointments_notes_length_check",
+          "value": "length(coalesce(\"appointments\".\"notes\", '')) <= 1000"
+        }
+      }
+    },
+    "mechanics": {
+      "name": "mechanics",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "specialty": {
+          "name": "specialty",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "credentials": {
+          "name": "credentials",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'PENDENTE'"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        }
+      },
+      "indexes": {
+        "mechanics_active_credentials_idx": {
+          "name": "mechanics_active_credentials_idx",
+          "columns": [
+            "is_active",
+            "credentials"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "mechanics_id_profiles_id_fk": {
+          "name": "mechanics_id_profiles_id_fk",
+          "tableFrom": "mechanics",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "notifications": {
+      "name": "notifications",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "recipient_id": {
+          "name": "recipient_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "appointment_id": {
+          "name": "appointment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "data": {
+          "name": "data",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "notifications_recipient_created_idx": {
+          "name": "notifications_recipient_created_idx",
+          "columns": [
+            "recipient_id",
+            "\"created_at\" desc"
+          ],
+          "isUnique": false
+        },
+        "notifications_recipient_unread_idx": {
+          "name": "notifications_recipient_unread_idx",
+          "columns": [
+            "recipient_id",
+            "read_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "notifications_recipient_id_profiles_id_fk": {
+          "name": "notifications_recipient_id_profiles_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "recipient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "notifications_actor_id_profiles_id_fk": {
+          "name": "notifications_actor_id_profiles_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "notifications_appointment_id_appointments_id_fk": {
+          "name": "notifications_appointment_id_appointments_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "appointments",
+          "columnsFrom": [
+            "appointment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "profiles": {
+      "name": "profiles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "avatar_url": {
+          "name": "avatar_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "profiles_email_unique": {
+          "name": "profiles_email_unique",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "public_mechanics": {
+      "name": "public_mechanics",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "specialty": {
+          "name": "specialty",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "avatar_url": {
+          "name": "avatar_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "public_mechanics_id_mechanics_id_fk": {
+          "name": "public_mechanics_id_mechanics_id_fk",
+          "tableFrom": "public_mechanics",
+          "tableTo": "mechanics",
+          "columnsFrom": [
+            "id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "timeslots": {
+      "name": "timeslots",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mechanic_id": {
+          "name": "mechanic_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_available": {
+          "name": "is_available",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "timeslots_mechanic_date_time_unique_idx": {
+          "name": "timeslots_mechanic_date_time_unique_idx",
+          "columns": [
+            "mechanic_id",
+            "date",
+            "start_time",
+            "end_time"
+          ],
+          "isUnique": true
+        },
+        "timeslots_mechanic_date_available_start_idx": {
+          "name": "timeslots_mechanic_date_available_start_idx",
+          "columns": [
+            "mechanic_id",
+            "date",
+            "is_available",
+            "start_time"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "timeslots_mechanic_id_mechanics_id_fk": {
+          "name": "timeslots_mechanic_id_mechanics_id_fk",
+          "tableFrom": "timeslots",
+          "tableTo": "mechanics",
+          "columnsFrom": [
+            "mechanic_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "timeslots_time_order_check": {
+          "name": "timeslots_time_order_check",
+          "value": "\"timeslots\".\"end_time\" > \"timeslots\".\"start_time\""
+        }
+      }
+    },
+    "token_blocklist": {
+      "name": "token_blocklist",
+      "columns": {
+        "jti": {
+          "name": "jti",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {
+      "admin_action_log_target_created_idx": {
+        "columns": {
+          "\"created_at\" desc": {
+            "isExpression": true
+          }
+        }
+      },
+      "admin_action_log_actor_created_idx": {
+        "columns": {
+          "\"created_at\" desc": {
+            "isExpression": true
+          }
+        }
+      },
+      "appointment_service_reports_mechanic_closed_idx": {
+        "columns": {
+          "\"closed_at\" desc": {
+            "isExpression": true
+          }
+        }
+      },
+      "appointments_client_date_desc_idx": {
+        "columns": {
+          "\"date\" desc": {
+            "isExpression": true
+          }
+        }
+      },
+      "appointments_mechanic_date_desc_idx": {
+        "columns": {
+          "\"date\" desc": {
+            "isExpression": true
+          }
+        }
+      },
+      "appointments_date_status_mechanic_idx": {
+        "columns": {
+          "\"date\" desc": {
+            "isExpression": true
+          }
+        }
+      },
+      "notifications_recipient_created_idx": {
+        "columns": {
+          "\"created_at\" desc": {
+            "isExpression": true
+          }
+        }
+      }
+    }
+  }
+}

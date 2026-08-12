@@ -39,7 +39,7 @@ export const profiles = sqliteTable('profiles', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
-  role: text('role', { enum: ROLES }).notNull(),
+  role: text('role', { enum: ROLES }).notNull(), // Enforced by 0004_profiles_role_triggers.sql.
   phone: text('phone'),
   avatarUrl: text('avatar_url'),
   passwordHash: text('password_hash').notNull(),

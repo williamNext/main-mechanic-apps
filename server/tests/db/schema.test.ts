@@ -1,41 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeTestDb } from '../helpers/db.js';
+import { insertProfile } from '../helpers/profile.js';
 
 type TestDb = ReturnType<typeof makeTestDb>;
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function insertProfile(
-  testDb: TestDb,
-  overrides: Partial<{
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    phone: string | null;
-    avatarUrl: string | null;
-    passwordHash: string;
-  }> = {},
-): string {
-  const id = overrides.id ?? randomUUID();
-  testDb.connection
-    .prepare(
-      `INSERT INTO profiles (id, name, email, role, phone, avatar_url, password_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      id,
-      overrides.name ?? 'Test Person',
-      overrides.email ?? `${id}@example.com`,
-      overrides.role ?? 'client',
-      overrides.phone ?? null,
-      overrides.avatarUrl ?? null,
-      overrides.passwordHash ?? 'hash',
-    );
-  return id;
 }
 
 function insertMechanic(
@@ -56,7 +27,6 @@ function insertMechanic(
   return id;
 }
 
-/** Inserts a profile with role=mechanic and a matching mechanics row, returns the shared id. */
 function insertMechanicWithProfile(testDb: TestDb): string {
   const id = insertProfile(testDb, { role: 'mechanic' });
   insertMechanic(testDb, { id });

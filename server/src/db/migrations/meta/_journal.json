@@ -29,6 +29,13 @@
       "when": 1786195344059,
       "tag": "0003_thick_sleepwalker",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786556995322,
+      "tag": "0004_profiles_role_triggers",
+      "breakpoints": true
     }
   ]
 }
