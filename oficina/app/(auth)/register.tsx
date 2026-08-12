@@ -15,33 +15,59 @@ import * as authService from '@/services/auth-service';
 import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
-import { formatPhone } from '@/utils/format';
+import { useAuthStore } from '@/stores/auth-store';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function mapRegisterError(message: string): string {
+  if (message.includes('email already registered')) {
+    return 'Este e-mail já está cadastrado. Faça login.';
+  }
+  if (message.includes('timed out')) {
+    return 'A solicitação demorou demais. Tente novamente.';
+  }
+  return 'Falha ao criar conta. Tente novamente.';
+}
 
 export default function RegisterScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const canSubmit = !!name.trim() && !!phone.replace(/\D/g, '') && !!password;
+  const canSubmit = !!name.trim() && !!email.trim() && !!password;
 
   async function handleRegister() {
     if (loading) return;
 
     setErrorMsg(null);
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
 
-    if (!name || !phone || !password) {
+    if (!trimmedName || !trimmedEmail || !password) {
       setErrorMsg('Preencha todos os campos.');
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(trimmedEmail)) {
+      setErrorMsg('E-mail inválido.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setErrorMsg('A senha deve ter pelo menos 8 caracteres.');
       return;
     }
 
     setLoading(true);
     try {
-      await authService.signUpWithPhone(phone, password, name, 'client');
+      const user = await authService.signUp(trimmedName, trimmedEmail, password);
+      useAuthStore.getState().setUser(user);
       router.replace('/(client)/browse');
     } catch (error: any) {
-      setErrorMsg(error.message || 'Falha ao criar conta.');
+      const message = error instanceof Error ? error.message : '';
+      setErrorMsg(mapRegisterError(message));
     } finally {
       setLoading(false);
     }
@@ -88,13 +114,15 @@ export default function RegisterScreen() {
               />
 
               <InputField
-                label="Telefone"
-                value={phone}
-                onChangeText={(text) => setPhone(formatPhone(text))}
-                placeholder="(51) 99999-9999"
-                keyboardType="phone-pad"
+                label="E-mail"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="voce@email.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
                 returnKeyType="next"
-                leftIcon={<MaterialIcons name="call" size={18} color={colors.outline} />}
+                leftIcon={<MaterialIcons name="mail" size={18} color={colors.outline} />}
               />
 
               <InputField

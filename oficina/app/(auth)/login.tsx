@@ -15,36 +15,52 @@ import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
-import { formatPhone } from '@/utils/format';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function mapLoginError(message: string): string {
+  if (message.includes('invalid email or password')) {
+    return 'E-mail ou senha inválidos.';
+  }
+  if (message.includes('timed out')) {
+    return 'A solicitação demorou demais. Tente novamente.';
+  }
+  return 'Não foi possível entrar. Tente novamente.';
+}
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { loginByPhone, isAuthActionLoading } = useAuthStore();
-  const [phone, setPhone] = useState('');
+  const { loginByEmail, isAuthActionLoading } = useAuthStore();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const canSubmit = !!phone.replace(/\D/g, '') && !!password;
+  const canSubmit = !!email.trim() && !!password;
 
   async function handleLogin() {
     if (isSubmitting) return;
 
     setErrorMsg(null);
-    const digits = phone.replace(/\D/g, '');
+    const trimmedEmail = email.trim();
 
-    if (!digits || !password) {
-      setErrorMsg('Preencha telefone e senha.');
+    if (!trimmedEmail || !password) {
+      setErrorMsg('Preencha e-mail e senha.');
       return;
     }
 
-    if (digits.length < 10 || digits.length > 13) {
-      setErrorMsg('Telefone inválido.');
+    if (!EMAIL_REGEX.test(trimmedEmail)) {
+      setErrorMsg('E-mail inválido.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setErrorMsg('A senha deve ter pelo menos 8 caracteres.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const success = await loginByPhone(phone, password);
+      const success = await loginByEmail(trimmedEmail, password);
       if (success) {
         const routeStart = Date.now();
         router.replace('/(client)/browse');
@@ -54,7 +70,8 @@ export default function LoginScreen() {
         return;
       }
 
-      setErrorMsg('Credenciais inválidas ou erro de conexão.');
+      const storeError = useAuthStore.getState().error;
+      setErrorMsg(storeError ? mapLoginError(storeError) : 'Não foi possível entrar. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -97,13 +114,15 @@ export default function LoginScreen() {
 
             <View style={styles.form}>
               <InputField
-                label="Telefone"
-                value={phone}
-                onChangeText={(text) => setPhone(formatPhone(text))}
-                placeholder="(51) 99999-9999"
-                keyboardType="phone-pad"
+                label="E-mail"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="voce@email.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
                 returnKeyType="next"
-                leftIcon={<MaterialIcons name="call" size={18} color={colors.outline} />}
+                leftIcon={<MaterialIcons name="mail" size={18} color={colors.outline} />}
               />
 
               <InputField

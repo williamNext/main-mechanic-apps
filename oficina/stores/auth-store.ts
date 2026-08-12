@@ -3,8 +3,6 @@ import { User, Mechanic, Role } from '@/types/models';
 import * as authService from '@/services/auth-service';
 import * as mechanicService from '@/services/mechanic-service';
 
-const LOGIN_TIMEOUT_MS = 15000;
-
 interface AuthState {
   user: User | Mechanic | null;
   isLoading: boolean;
@@ -14,7 +12,6 @@ interface AuthState {
   role: Role | null;
   error: string | null;
 
-  loginByPhone: (phone: string, password: string) => Promise<boolean>;
   loginByEmail: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<Mechanic>) => Promise<void>;
@@ -46,36 +43,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
     role: null,
     error: null,
 
-    loginByPhone: async (phone, password) => {
-      setLoadingState({ isAuthActionLoading: true, error: null });
-      try {
-        const user = await authService.withTimeout(
-          authService.loginByPhone(phone, password),
-          LOGIN_TIMEOUT_MS,
-          'Login request timed out',
-        );
-        if (user) {
-          set({ user, isAuthenticated: true, role: user.role, error: null });
-          return true;
-        }
-      } catch (e) {
-        console.error('Login error:', e);
-        set({ error: e instanceof Error ? e.message : 'Login failed' });
-      } finally {
-        setLoadingState({ isAuthActionLoading: false });
-      }
-
-      return false;
-    },
-
     loginByEmail: async (email, password) => {
       setLoadingState({ isAuthActionLoading: true, error: null });
       try {
-        const user = await authService.withTimeout(
-          authService.login(email, password),
-          LOGIN_TIMEOUT_MS,
-          'Login request timed out',
-        );
+        const user = await authService.login(email, password);
         if (user) {
           set({ user, isAuthenticated: true, role: user.role, error: null });
           return true;

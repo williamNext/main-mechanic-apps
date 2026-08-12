@@ -12,7 +12,7 @@ export interface User {
   role: Role;
   avatarUrl?: string;
   phone?: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface Mechanic extends User {
