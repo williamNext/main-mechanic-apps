@@ -17,6 +17,7 @@ const QUICK_INTERVALS = [
   { label: '+1h30', minutes: 90 },
   { label: '+2h', minutes: 120 },
 ] as const;
+const DEFAULT_BATCH_START_TIME = '08:00';
 
 function compareTime(start: string, end: string) {
   return start.localeCompare(end);
@@ -78,6 +79,10 @@ function findLastEndTimeForDate(date: string, slots: TimeSlot[], fallback: strin
   if (sameDate.length === 0) return fallback;
   const ordered = [...sameDate].sort((a, b) => compareTime(a.endTime, b.endTime));
   return ordered[ordered.length - 1].endTime;
+}
+
+function hasSlotsForDate(date: string, slots: TimeSlot[]) {
+  return slots.some((slot) => slot.date === date);
 }
 
 function getSlotTestId(slot: TimeSlot) {
@@ -146,6 +151,8 @@ export default function AvailabilityScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [batchDuration, setBatchDuration] = useState<60 | 90 | 120>(60);
   const [batchCount, setBatchCount] = useState('1');
+  const [batchStartTime, setBatchStartTime] = useState(DEFAULT_BATCH_START_TIME);
+  const [batchStartDirty, setBatchStartDirty] = useState(false);
   const [mode, setMode] = useState<'single' | 'batch'>('single');
   const [slotPendingDelete, setSlotPendingDelete] = useState<TimeSlot | null>(null);
   const [deletingSlotId, setDeletingSlotId] = useState<string | null>(null);
@@ -170,6 +177,11 @@ export default function AvailabilityScreen() {
     if (user?.role === 'mechanic') {
       void fetchByMechanic(user.id, { force: true });
     }
+  };
+
+  const resetBatchStart = () => {
+    setBatchStartTime(DEFAULT_BATCH_START_TIME);
+    setBatchStartDirty(false);
   };
 
   const handleAdd = async () => {
@@ -224,7 +236,17 @@ export default function AvailabilityScreen() {
       return;
     }
 
-    let currentStart = findLastEndTimeForDate(date.trim(), orderedSlots, maskTimeInput(endTime.trim()));
+    const normalizedBatchStart = maskTimeInput(batchStartTime.trim());
+    if (!TIME_PATTERN.test(normalizedBatchStart)) {
+      setFormError('Use horario no formato HH:mm.');
+      return;
+    }
+
+    const batchDate = date.trim();
+    const currentDateHasSlots = hasSlotsForDate(batchDate, orderedSlots);
+    let currentStart = batchStartDirty || !currentDateHasSlots
+      ? normalizedBatchStart
+      : findLastEndTimeForDate(batchDate, orderedSlots, normalizedBatchStart);
     const stagedSlots: TimeSlot[] = [];
     setSaving(true);
     setFormError(null);
@@ -237,14 +259,14 @@ export default function AvailabilityScreen() {
         }
 
         const combined = [...orderedSlots, ...stagedSlots];
-        const validation = validateSlot(date.trim(), currentStart, nextEnd, combined);
+        const validation = validateSlot(batchDate, currentStart, nextEnd, combined);
         if (validation) {
           throw new Error(`Parou no item ${index + 1}: ${validation}`);
         }
 
         const created = await addSlot({
           mechanicId: user.id,
-          date: date.trim(),
+          date: batchDate,
           startTime: currentStart,
           endTime: nextEnd,
           isAvailable: true,
@@ -257,6 +279,7 @@ export default function AvailabilityScreen() {
         const lastSlot = stagedSlots[stagedSlots.length - 1];
         setStartTime(lastSlot.startTime);
         setEndTime(lastSlot.endTime);
+        setBatchStartTime(normalizedBatchStart);
       }
     } catch (slotError: any) {
       setFormError(slotError.message || 'Falha ao criar intervalos em lote.');
@@ -277,12 +300,14 @@ export default function AvailabilityScreen() {
       return;
     }
     setDate(nextDate);
+    resetBatchStart();
     setFormError(null);
   };
 
   const handleWebDateChange = (value: string) => {
     const nextDate = value.replace(/[^\d-]/g, '').slice(0, 10);
     setDate(nextDate);
+    resetBatchStart();
     if (DATE_PATTERN.test(nextDate) && isPastDate(nextDate)) {
       setFormError('Nao pode usar data no passado.');
       return;
@@ -438,6 +463,19 @@ export default function AvailabilityScreen() {
                   </Pressable>
                 ))}
               </View>
+              <AppInput
+                label="Inicio do lote"
+                value={batchStartTime}
+                onChangeText={(value) => {
+                  setBatchStartTime(maskTimeInput(value));
+                  setBatchStartDirty(true);
+                }}
+                placeholder="08:00"
+                autoCapitalize="none"
+                keyboardType="number-pad"
+                maxLength={5}
+                testID="availability-batch-start-input"
+              />
               <AppInput
                 label="Quantidade de slots"
                 value={batchCount}

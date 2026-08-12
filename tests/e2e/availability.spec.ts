@@ -51,6 +51,25 @@ async function fillTimeFields(page: import('@playwright/test').Page, start: stri
   await endInput.type(end);
 }
 
+async function createBatch(
+  page: import('@playwright/test').Page,
+  options: { duration: 60 | 90 | 120; count: string; start?: string },
+) {
+  await page.getByText('Adicionar em lote').click();
+  await page.getByTestId(`availability-duration-${options.duration}`).click();
+
+  if (options.start) {
+    const batchStartInput = page.getByTestId('availability-batch-start-input');
+    await batchStartInput.fill('');
+    await batchStartInput.type(options.start.replace(':', ''));
+  }
+
+  const countInput = page.getByTestId('availability-batch-count-input');
+  await countInput.fill('');
+  await countInput.type(options.count);
+  await page.getByTestId('availability-create-batch-button').click();
+}
+
 test('availability flow smoke', async ({ page }) => {
   test.skip(!(await loginAsMechanic(page)), 'Default mechanic E2E account unavailable.');
   await page.goto('/(mechanic)/availability');
@@ -107,10 +126,11 @@ test('availability flow smoke', async ({ page }) => {
 
   const overflowDate = isoDateDaysFromToday(36 + smokeSeed);
   await openAndSetDate(page, overflowDate);
-  await page.getByText('Horario individual').click();
-  await fillTimeFields(page, '2200', '2330');
   await page.getByText('Adicionar em lote').click();
   await page.getByTestId('availability-duration-90').click();
+  const overflowStartInput = page.getByTestId('availability-batch-start-input');
+  await overflowStartInput.fill('');
+  await overflowStartInput.type('2230');
   await page.getByPlaceholder('3').fill('3');
   await page.getByTestId('availability-create-batch-button').click();
   await expect(page.getByText('Parou no item 1: intervalo passou de 23:59.')).toBeVisible();
@@ -148,4 +168,31 @@ test('availability deletes an available slot and keeps it deleted after refresh'
   await expect(page.getByText('Gerenciar horarios')).toBeVisible();
   await openAndSetDate(page, targetDate);
   await expect(createdSlot).toHaveCount(0);
+});
+
+test('batch creation uses default, append, and manual start rules', async ({ page }) => {
+  test.skip(!(await loginAsMechanic(page)), 'Default mechanic E2E account unavailable.');
+  await page.goto('/(mechanic)/availability');
+  await expect(page.getByText('Gerenciar horarios')).toBeVisible();
+
+  const seed = Date.now() % 50;
+  const firstDate = isoDateDaysFromToday(80 + seed);
+  const secondDate = isoDateDaysFromToday(140 + seed);
+  const manualDate = isoDateDaysFromToday(200 + seed);
+
+  await openAndSetDate(page, firstDate);
+  await createBatch(page, { duration: 120, count: '4', start: '0800' });
+  await expect(page.getByTestId(slotTestId(firstDate, '14:00', '16:00'))).toBeVisible({ timeout: 30000 });
+
+  await openAndSetDate(page, secondDate);
+  await expect(page.getByTestId('availability-batch-start-input')).toHaveValue('08:00');
+  await createBatch(page, { duration: 60, count: '1' });
+  await expect(page.getByTestId(slotTestId(secondDate, '08:00', '09:00'))).toBeVisible({ timeout: 30000 });
+
+  await createBatch(page, { duration: 60, count: '1' });
+  await expect(page.getByTestId(slotTestId(secondDate, '09:00', '10:00'))).toBeVisible({ timeout: 30000 });
+
+  await openAndSetDate(page, manualDate);
+  await createBatch(page, { duration: 60, count: '1', start: '1030' });
+  await expect(page.getByTestId(slotTestId(manualDate, '10:30', '11:30'))).toBeVisible({ timeout: 30000 });
 });

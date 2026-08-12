@@ -73,9 +73,11 @@ export default function MechanicProfileScreen() {
         </View>
 
         <View style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Perfil publico</Text>
+          <Text style={styles.sectionTitle}>Meus dados</Text>
           <AppInput label="Nome" value={name} onChangeText={setName} placeholder="Nome completo" />
           <AppInput label="Especialidade" value={specialty} onChangeText={setSpecialty} placeholder="Eletrica, freios, motor" />
+          <AppInput label="Telefone" value={mechanic?.phone ?? 'Telefone nao definido'} editable={false} placeholder="Telefone" />
+          <Text style={styles.helperText}>Alteracao de telefone vai exigir verificacao por codigo. Funcao fica para proxima etapa.</Text>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <PrimaryButton title="Salvar perfil" onPress={handleSave} loading={isLoading} disabled={isLoading} variant="filled" />
         </View>
@@ -138,5 +140,6 @@ const styles = StyleSheet.create({
     ...shadow.light,
   },
   sectionTitle: { ...typography.headlineMd, color: colors.onSurface },
+  helperText: { ...typography.bodyMd, color: colors.onSurfaceVariant },
   errorText: { ...typography.labelSm, color: colors.error },
 });

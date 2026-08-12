@@ -1,18 +1,28 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { useAuthStore } from '@/stores/auth-store';
+import { useNotificationStore } from '@/stores/notification-store';
 
 const tabMeta: Record<string, { label: string; icon: keyof typeof MaterialIcons.glyphMap }> = {
   agenda: { label: 'Agenda', icon: 'event-note' },
   availability: { label: 'Horarios', icon: 'schedule' },
+  notifications: { label: 'Avisos', icon: 'notifications' },
   profile: { label: 'Perfil', icon: 'person' },
 };
 
 export function BottomNavBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const user = useAuthStore((store) => store.user);
+  const unreadCount = useNotificationStore((store) => store.unreadCount);
+  const fetchUnreadCount = useNotificationStore((store) => store.fetchUnreadCount);
+
+  useEffect(() => {
+    if (user?.id) void fetchUnreadCount(user.id);
+  }, [fetchUnreadCount, user?.id]);
 
   return (
     <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, spacing.base) }]}>
@@ -57,6 +67,11 @@ export function BottomNavBar({ state, descriptors, navigation }: BottomTabBarPro
                     size={22}
                     color={isFocused ? colors.secondary : colors.onSurfaceVariant}
                   />
+                  {route.name === 'notifications' && unreadCount > 0 ? (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                    </View>
+                  ) : null}
                   <Text style={[styles.tabLabel, isFocused ? styles.tabLabelActive : styles.tabLabelInactive]}>
                     {meta.label}
                   </Text>
@@ -97,6 +112,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: 'center',
     gap: spacing.xs,
+    position: 'relative',
   },
   tabInnerActive: {
     backgroundColor: colors.secondaryContainer,
@@ -112,6 +128,22 @@ const styles = StyleSheet.create({
   tabLabelInactive: {
     color: colors.onSurfaceVariant,
     opacity: 0.7,
+  },
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: radius.full,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    ...typography.labelSm,
+    color: colors.onPrimary,
   },
 });
 

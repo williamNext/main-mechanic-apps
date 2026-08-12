@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Appointment } from '@/types/models';
 import * as appointmentService from '@/services/appointment-service';
+import { useNotificationStore } from '@/stores/notification-store';
 import { useTimeSlotStore } from '@/stores/timeslot-store';
 
 interface AppointmentState {
@@ -55,21 +56,26 @@ export const useAppointmentStore = create<AppointmentState>((set) => ({
   book: async (data) => {
     const appointment = await appointmentService.createAppointment(data);
     useTimeSlotStore.getState().invalidateCache();
+    void useNotificationStore.getState().fetchUnreadCount(appointment.clientId);
     set((state) => ({ appointments: [...state.appointments, appointment] }));
     return appointment;
   },
 
   cancelByClient: async (id) => {
+    const appointment = useAppointmentStore.getState().appointments.find((item) => item.id === id);
     await appointmentService.cancelClientAppointment(id);
     useTimeSlotStore.getState().invalidateCache();
+    if (appointment?.clientId) void useNotificationStore.getState().fetchUnreadCount(appointment.clientId);
     set((state) => ({
       appointments: state.appointments.map((a) => (a.id === id ? { ...a, status: 'cancelado' } : a)),
     }));
   },
 
   cancelByMechanic: async (id) => {
+    const appointment = useAppointmentStore.getState().appointments.find((item) => item.id === id);
     await appointmentService.cancelMechanicAppointment(id);
     useTimeSlotStore.getState().invalidateCache();
+    if (appointment?.mechanicId) void useNotificationStore.getState().fetchUnreadCount(appointment.mechanicId);
     set((state) => ({
       appointments: state.appointments.map((a) => (a.id === id ? { ...a, status: 'cancelado' } : a)),
     }));

@@ -24,6 +24,7 @@ export default function MechanicLayout() {
     >
       <Tabs.Screen name="agenda" options={{ title: 'Agenda' }} />
       <Tabs.Screen name="availability" options={{ title: 'Horários' }} />
+      <Tabs.Screen name="notifications" options={{ title: 'Notificacoes' }} />
       <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
       <Tabs.Screen
         name="appointment/[id]"
