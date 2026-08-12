@@ -24,7 +24,7 @@ The `AppState` auto-refresh listener in this file is deleted — the design is a
 
 **Blocked by:** 02 — House error envelope (the wrapper's verbatim-message contract needs one uniform shape to parse), and 03 — CORS inside `buildApp` (without it the web target cannot make the request at all).
 
-**Status:** ready-for-review
+**Status:** done — landed in 61b94a9. Verified by `tsc`/lint + a throwaway Playwright smoke pass against a real server+web build (register, reload-persists, logout, re-login, wrong-password, malformed-email, short-password, duplicate-email, stale-token-on-boot). Unchecked boxes below need a physical device/simulator (native force-quit-reopen, encrypted storage) or manual eyeballing (button double-submit guard, no-flash-on-boot, timeout path) that this session couldn't exercise — not known failures, just unverified.
 
 - [x] Registering with name, email and password lands the user inside the app, with no second login
 - [x] Logging in with correct credentials lands the user inside the app
@@ -43,9 +43,9 @@ The `AppState` auto-refresh listener in this file is deleted — the design is a
 - [x] The token is invalidated server-side on logout, so a copy cannot be replayed
 - [x] Server error messages reach the screen unmodified — no wrapping, no prefixing, no rewriting
 - [x] The phone fields, the phone service functions and the store's phone action are all gone
-- [ ] `EXPO_PUBLIC_API_URL` is the only new variable; both Supabase variables are gone from `config/env.ts`, `.env.example`, `check-env.js` and the workflow
+- [x] `EXPO_PUBLIC_API_URL` is the only new variable; both Supabase variables are gone from `config/env.ts`, `.env.example`, `check-env.js` (no workflow references these vars — `.github/workflows/` only has `ci.yml`, which doesn't build/test `oficina` at all; `PROJECT_CONTEXT.md` §16 step 7's `security-and-build.yml` doesn't exist in this repo)
 - [x] The env check fails at build time when `EXPO_PUBLIC_API_URL` is missing
-- [ ] The GitHub repo secrets are updated in the same change
+- [ ] The GitHub repo secrets are updated in the same change — N/A this session: no live workflow consumes these vars to update secrets against; flagged for the user
 - [x] The stale-profile race guard still discards a late response
 - [x] The other `oficina` services still import Supabase and are otherwise unchanged
 - [x] The `mechanic` and `admin` apps are untouched
