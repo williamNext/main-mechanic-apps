@@ -1,8 +1,17 @@
 import Fastify, { type FastifyError } from 'fastify';
+import cors from '@fastify/cors';
 import type { Db, Connection } from './db/client.js';
 import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { HttpError } from './errors.js';
+
+export const ALLOWED_ORIGINS = [
+  'http://localhost:8081',
+  'http://127.0.0.1:8081',
+  'http://127.0.0.1:19007',
+  'http://127.0.0.1:19006',
+  'http://127.0.0.1:19008',
+];
 
 /**
  * Assembles the Fastify instance. Both the real server (src/server.ts) and
@@ -11,6 +20,11 @@ import { HttpError } from './errors.js';
  */
 export function buildApp(db: Db, connection: Connection) {
   const app = Fastify({ logger: false });
+
+  app.register(cors, {
+    origin: ALLOWED_ORIGINS,
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   // D-C: every failure returns { error: '<lowercase message>' }. Registered
   // here (not in server.ts) so tests exercise the same handler the real
