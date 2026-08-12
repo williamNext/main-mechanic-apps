@@ -1,0 +1,4 @@
+-- Admin schema additions live in:
+-- scripts/sql/2026-05-22_admin_operations.sql
+--
+-- Base client/mechanic schema remains owned by existing sibling apps.
