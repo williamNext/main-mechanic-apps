@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit. .env.example files are tracked deliberately.
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+web-build/
+.expo/
+.next/
+
+# Local databases (server/)
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+data/
+
+# Test output
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Agent research cache (regenerable)
+.planning/research/.cache/
+
+# OS
+.DS_Store
+Thumbs.db
