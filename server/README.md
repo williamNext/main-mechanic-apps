@@ -49,15 +49,15 @@ it can never quietly create a second superuser. Run it once, right after the fir
 
 `npm run seed:dev` populates an empty development database with a believable, clickable workshop:
 3 mechanics (Carlos Silva — Motor e Câmbio, Ana Souza — Freios e Suspensão, João Pereira — Elétrica
-Automotiva), 1 client (Mariana Costa), 1 admin (Admin Dev), and 45 timeslots (3 mechanics × 5
-upcoming days × 3 slots/day). Every seeded account shares one documented password:
+Automotiva), 2 clients (Mariana Costa and Rafael Lima), 1 admin (Admin Dev), and 66 timeslots.
+Every seeded account shares one documented password:
 
 ```
 SenhaDev123!
 ```
 
 Example login emails: `carlos.silva@oficina.dev` (mechanic), `mariana.costa@oficina.dev` (client),
-`admin@oficina.dev` (admin).
+`admin@oficina.dev` (admin). Second seeded client: `rafael.lima@oficina.dev`, password `SenhaDev123!`.
 
 The script uses fixed IDs and upserts, so running it twice leaves the database in the same state
 as running it once, and all writes happen inside a single transaction so an interrupted run never
