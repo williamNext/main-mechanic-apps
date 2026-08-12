@@ -2,3 +2,6 @@ node_modules
 .env
 data/
 *.sqlite*
+
+# Agent research cache (regenerable)
+.planning/research/.cache/
