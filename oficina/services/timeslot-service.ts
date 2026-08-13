@@ -1,80 +1,15 @@
 import { supabase } from './legacy-supabase-client';
 import { TimeSlot } from '@/types/models';
-
-function mapSlot(s: any): TimeSlot {
-  return {
-    id: s.id,
-    mechanicId: s.mechanic_id,
-    date: s.date,
-    startTime: s.start_time,
-    endTime: s.end_time,
-    isAvailable: s.is_available,
-  };
-}
-
-function getSaoPauloDateTimeParts(): { date: string; time: string } {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(new Date());
-
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-
-  return {
-    date: `${values.year}-${values.month}-${values.day}`,
-    time: `${values.hour}:${values.minute}:${values.second}`,
-  };
-}
+import { request } from './api';
 
 export async function getSlotsByMechanic(mechanicId: string, date?: string): Promise<TimeSlot[]> {
-  let query = supabase
-    .from('timeslots')
-    .select('*')
-    .eq('mechanic_id', mechanicId);
-
-  if (date) {
-    query = query.eq('date', date);
-  }
-
-  const { data, error } = await query.order('start_time', { ascending: true });
-
-  if (error) throw error;
-  return data.map(mapSlot);
+  const dateQuery = date ? `?date=${encodeURIComponent(date)}` : '';
+  return request<TimeSlot[]>(`/mechanics/${encodeURIComponent(mechanicId)}/timeslots${dateQuery}`);
 }
 
 export async function getAvailableSlotsByMechanic(mechanicId: string, date?: string): Promise<TimeSlot[]> {
-  const now = getSaoPauloDateTimeParts();
-
-  if (date && date < now.date) {
-    return [];
-  }
-
-  let query = supabase
-    .from('timeslots')
-    .select('*')
-    .eq('mechanic_id', mechanicId)
-    .eq('is_available', true);
-
-  if (date) {
-    query = query.eq('date', date);
-
-    if (date === now.date) {
-      query = query.gt('start_time', now.time);
-    }
-  } else {
-    query = query.gte('date', now.date);
-  }
-
-  const { data, error } = await query.order('start_time', { ascending: true });
-
-  if (error) throw error;
-  return data.map(mapSlot).filter((slot) => slot.date > now.date || slot.startTime > now.time);
+  const dateQuery = date ? `?date=${encodeURIComponent(date)}` : '';
+  return request<TimeSlot[]>(`/mechanics/${encodeURIComponent(mechanicId)}/timeslots${dateQuery}`);
 }
 
 export async function createSlot(slot: Omit<TimeSlot, 'id'>): Promise<TimeSlot> {
@@ -91,7 +26,7 @@ export async function createSlot(slot: Omit<TimeSlot, 'id'>): Promise<TimeSlot> 
     .single();
 
   if (error) throw error;
-  return mapSlot(data);
+  return data as TimeSlot;
 }
 
 export async function updateSlotAvailability(id: string, isAvailable: boolean): Promise<void> {

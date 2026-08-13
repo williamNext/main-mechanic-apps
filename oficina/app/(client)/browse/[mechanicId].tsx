@@ -23,7 +23,9 @@ import { useAuth } from '@/hooks/use-auth';
 import { useAppointmentStore } from '@/stores/appointment-store';
 import { useMechanicStore } from '@/stores/mechanic-store';
 import { useTimeSlotStore } from '@/stores/timeslot-store';
-import { Mechanic, TimeSlot } from '@/types/models';
+import { isApiError } from '@/services/api';
+import { getApiErrorMessage } from '@/services/error-messages';
+import { PublicMechanic, TimeSlot } from '@/types/models';
 import { getNextDays } from '@/utils/date';
 import { getInitials } from '@/utils/format';
 
@@ -35,7 +37,8 @@ export default function BookMechanicScreen() {
   const { slots, fetchAvailable } = useTimeSlotStore();
   const { book } = useAppointmentStore();
 
-  const [mechanic, setMechanic] = useState<Mechanic | null>(null);
+  const [mechanic, setMechanic] = useState<PublicMechanic | null>(null);
+  const [mechanicError, setMechanicError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0]);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [vehicleModel, setVehicleModel] = useState('');
@@ -46,7 +49,19 @@ export default function BookMechanicScreen() {
 
   useEffect(() => {
     if (mechanicId) {
-      getById(mechanicId).then((mechanicData) => setMechanic(mechanicData));
+      setMechanic(null);
+      setMechanicError(null);
+      getById(mechanicId)
+        .then((mechanicData) => {
+          if (mechanicData) {
+            setMechanic(mechanicData);
+          } else {
+            setMechanicError(getApiErrorMessage('MECHANIC_NOT_FOUND'));
+          }
+        })
+        .catch((error: unknown) => {
+          setMechanicError(getApiErrorMessage(isApiError(error) ? error.code : null));
+        });
     }
   }, [mechanicId, getById]);
 
@@ -98,7 +113,12 @@ export default function BookMechanicScreen() {
       <TopAppBar showBackButton title="Agendar" />
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {!mechanic ? (
+          {mechanicError ? (
+            <View style={styles.mechanicError}>
+              <MaterialIcons name="error-outline" size={20} color={colors.error} />
+              <Text style={styles.mechanicErrorText}>{mechanicError}</Text>
+            </View>
+          ) : !mechanic ? (
             <View style={styles.skeletonProfile} />
           ) : (
             <View style={styles.profileCard}>
@@ -203,6 +223,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceContainer,
     marginBottom: spacing.md,
+  },
+  mechanicError: {
+    borderRadius: radius.md,
+    backgroundColor: colors.errorContainer,
+    padding: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+  },
+  mechanicErrorText: {
+    ...typography.bodyMd,
+    color: colors.error,
+    flex: 1,
   },
   profileCard: {
     borderRadius: radius.lg,

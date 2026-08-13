@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { User, Mechanic, Role } from '@/types/models';
 import * as authService from '@/services/auth-service';
-import * as mechanicService from '@/services/mechanic-service';
+import * as profileService from '@/services/profile-service';
 import { isApiError } from '@/services/api';
 
 interface AuthState {
@@ -16,7 +16,7 @@ interface AuthState {
 
   loginByEmail: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  updateProfile: (data: Partial<Mechanic>) => Promise<void>;
+  updateProfile: (data: Pick<User, 'name'>) => Promise<void>;
   setUser: (user: User | Mechanic | null) => void;
   setBootstrappingSession: (isBootstrappingSession: boolean) => void;
 }
@@ -99,8 +99,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
       setLoadingState({ isAuthActionLoading: true, error: null, errorCode: null });
       try {
-        await mechanicService.updateMechanicProfile(user.id, data);
-        set({ user: { ...user, ...data } as User | Mechanic, error: null, errorCode: null });
+        const updatedUser = await profileService.updateMyProfile(data);
+        set({ user: updatedUser, role: updatedUser.role, error: null, errorCode: null });
       } finally {
         setLoadingState({ isAuthActionLoading: false });
       }

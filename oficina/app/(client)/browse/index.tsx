@@ -14,7 +14,7 @@ import { InputField } from '@/components/ui/InputField';
 import { TopAppBar } from '@/components/ui/TopAppBar';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useMechanicStore } from '@/stores/mechanic-store';
-import { Mechanic } from '@/types/models';
+import { PublicMechanic } from '@/types/models';
 import { getInitials } from '@/utils/format';
 
 export default function BrowseMechanicsScreen() {
@@ -78,7 +78,7 @@ export default function BrowseMechanicsScreen() {
   );
 }
 
-function MechanicListCard({ mechanic, onPress }: { mechanic: Mechanic; onPress: () => void }) {
+function MechanicListCard({ mechanic, onPress }: { mechanic: PublicMechanic; onPress: () => void }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {

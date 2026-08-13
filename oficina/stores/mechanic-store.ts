@@ -1,17 +1,17 @@
 import { create } from 'zustand';
-import { Mechanic } from '@/types/models';
+import { PublicMechanic } from '@/types/models';
 import * as mechanicService from '@/services/mechanic-service';
 
 const MECHANICS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface MechanicState {
-  mechanics: Mechanic[];
+  mechanics: PublicMechanic[];
   isLoading: boolean;
   error: string | null;
   fetchedAt: number | null;
 
   fetchAll: (options?: { force?: boolean }) => Promise<void>;
-  getById: (id: string) => Promise<Mechanic | null>;
+  getById: (id: string) => Promise<PublicMechanic | null>;
 }
 
 export const useMechanicStore = create<MechanicState>((set, get) => ({
