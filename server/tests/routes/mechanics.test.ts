@@ -5,6 +5,7 @@ import { buildApp } from '../../src/app.js';
 import { signAccessToken } from '../../src/auth/jwt.js';
 import { makeTestDb } from '../helpers/db.js';
 import { insertProfile } from '../helpers/profile.js';
+import { insertAppointment, insertMechanic, insertTimeslot } from '../helpers/appointments.js';
 
 type TestDb = ReturnType<typeof makeTestDb>;
 
@@ -15,94 +16,6 @@ function makeClientToken(testDb: TestDb): string {
     role: 'client',
   });
   return signAccessToken({ userId: id, role: 'client' }).token;
-}
-
-function insertMechanic(
-  testDb: TestDb,
-  overrides: Partial<{
-    id: string;
-    name: string;
-    email: string;
-    phone: string | null;
-    avatarUrl: string | null;
-    specialty: string;
-    credentials: string;
-    isActive: number;
-  }> = {},
-): string {
-  const id = insertProfile(testDb, {
-    id: overrides.id,
-    name: overrides.name ?? 'Mechanic Person',
-    email: overrides.email ?? `${randomUUID()}@example.com`,
-    role: 'mechanic',
-    phone: overrides.phone ?? '+5511999999999',
-    avatarUrl: overrides.avatarUrl ?? null,
-  });
-  testDb.connection
-    .prepare('INSERT INTO mechanics (id, specialty, credentials, is_active) VALUES (?, ?, ?, ?)')
-    .run(id, overrides.specialty ?? 'Freios', overrides.credentials ?? 'ASE', overrides.isActive ?? 1);
-  return id;
-}
-
-function insertTimeslot(
-  testDb: TestDb,
-  overrides: Partial<{
-    id: string;
-    mechanicId: string;
-    date: string;
-    startTime: string;
-    endTime: string;
-    isAvailable: number;
-  }> = {},
-): string {
-  const id = overrides.id ?? randomUUID();
-  testDb.connection
-    .prepare(
-      `INSERT INTO timeslots (id, mechanic_id, date, start_time, end_time, is_available)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      id,
-      overrides.mechanicId,
-      overrides.date ?? '2026-09-01',
-      overrides.startTime ?? '09:00',
-      overrides.endTime ?? '10:00',
-      overrides.isAvailable ?? 1,
-    );
-  return id;
-}
-
-function insertAppointment(
-  testDb: TestDb,
-  overrides: Partial<{
-    id: string;
-    clientId: string;
-    mechanicId: string;
-    timeslotId: string | null;
-    date: string;
-    startTime: string;
-    endTime: string;
-    status: string;
-  }> = {},
-): string {
-  const id = overrides.id ?? randomUUID();
-  testDb.connection
-    .prepare(
-      `INSERT INTO appointments
-         (id, client_id, mechanic_id, timeslot_id, date, start_time, end_time, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      id,
-      overrides.clientId,
-      overrides.mechanicId,
-      overrides.timeslotId === undefined ? null : overrides.timeslotId,
-      overrides.date ?? '2026-09-01',
-      overrides.startTime ?? '09:00',
-      overrides.endTime ?? '10:00',
-      overrides.status ?? 'confirmado',
-    );
-  return id;
 }
 
 function addDays(date: string, days: number): string {

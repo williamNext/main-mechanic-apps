@@ -2,6 +2,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import type { Db, Connection } from './db/client.js';
 import { authRoutes } from './routes/auth.js';
+import { appointmentRoutes } from './routes/appointments.js';
 import { healthRoutes } from './routes/health.js';
 import { mechanicsRoutes } from './routes/mechanics.js';
 import { notificationRoutes } from './routes/notifications.js';
@@ -52,6 +53,7 @@ export function buildApp(db: Db, connection: Connection) {
 
   healthRoutes(app, connection);
   authRoutes(app, db);
+  appointmentRoutes(app, db);
   mechanicsRoutes(app, db);
   notificationRoutes(app, db);
   profileRoutes(app, db);
