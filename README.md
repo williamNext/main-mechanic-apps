@@ -3,11 +3,10 @@
 A car-workshop booking system: a self-hosted Node.js/SQLite API (`server/`) and three Expo
 apps — `oficina` (client-facing), `mechanic`, and `admin`.
 
-**As of Phase 1.5, only `oficina`'s authentication is wired to `server/`.** Everything else in
-`mechanic`, `admin`, and the rest of `oficina` still points at a dead Supabase project and will
-fail — that isn't a regression from this setup, it's the current state of the rewire. This README
-covers what actually works: register, login, logout, and staying signed in, end to end, on
-`oficina`.
+**As of Phase 2, `oficina` is fully off Supabase and wired to `server/`.** Register, login, logout,
+session restore, mechanic browsing, appointment booking and cancellation, appointment list/detail,
+notifications, and profile editing work against the local server. `mechanic` and `admin` still
+point at the dead Supabase project and remain out of scope until Phases 2b and 3.
 
 ## Quickstart — server + `oficina` together
 
@@ -46,6 +45,18 @@ npm run web        # or: npm run android / npm run ios
 Open the app, log in with `mariana.costa@oficina.dev` / `SenhaDev123!` (or register a new
 account), and you're in. Logging out returns you to the login screen; reloading the page (web) or
 force-quitting and reopening the app (native) keeps you signed in.
+
+To verify the appointment flow with seeded data:
+
+1. Log in as `mariana.costa@oficina.dev` with `SenhaDev123!`.
+2. Open **Explorar**, choose a mechanic, select a day, then select an available time under
+   **Horários Disponíveis**.
+3. Fill **Modelo do Veículo** and **Descrição do Problema**, then press **Confirmar Agendamento**.
+4. Confirm that **Agendamento Confirmado!** appears on the confirmation screen.
+5. Open the **Reservas** tab, find the appointment under **Próximos**, and open it.
+6. On **Detalhes**, press **Cancelar Agendamento**, then **Sim, cancelar**.
+7. Return to the same mechanic and day under **Explorar**; the cancelled appointment's time must
+   appear as available again.
 
 Confirming the wire actually works end to end, automatically, without touching an emulator: see
 [`tests-e2e/`](tests-e2e/) — `npm test` from that directory boots both halves itself, seeds a known
@@ -88,6 +99,6 @@ record the result (device/OS version, what was checked, pass/fail) here or in th
 | Path | What it is |
 |---|---|
 | `server/` | The API — see [`server/README.md`](server/README.md) for env vars, seeding, and troubleshooting native-addon builds |
-| `oficina/` | Client-facing app — the only app currently wired to `server/` |
-| `mechanic/`, `admin/` | Still wired to the dead Supabase project; untouched by this phase |
+| `oficina/` | Client-facing app — fully wired to `server/` |
+| `mechanic/`, `admin/` | Still wired to the dead Supabase project; scheduled for Phases 2b and 3 |
 | `tests-e2e/` | The one Playwright spec guarding the whole auth wire — server + `oficina` together |

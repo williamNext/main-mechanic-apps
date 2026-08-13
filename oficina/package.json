@@ -12,9 +12,6 @@
     "vercel-build": "node scripts/export-web.js",
     "lint": "expo lint",
     "env:check": "node scripts/check-env.js",
-    "seed": "node scripts/seed.js",
-    "seed:mechanics:auth": "node scripts/create-mechanic-auth-users.js",
-    "seed:mechanics:data": "node scripts/seed-mechanics-data.js",
     "hooks:setup": "node scripts/setup-git-hooks.js"
   },
   "dependencies": {
@@ -23,7 +20,6 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
-    "@supabase/supabase-js": "^2.105.4",
     "date-fns": "^4.1.0",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",

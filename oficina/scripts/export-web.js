@@ -10,24 +10,13 @@ for (const file of ['.env', '.env.local']) {
   }
 }
 
-const required = {
-  EXPO_PUBLIC_SUPABASE_URL: ['SUPABASE_URL'],
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: ['SUPABASE_ANON_KEY'],
-};
+const required = ['EXPO_PUBLIC_API_URL'];
 
-for (const [name, aliases] of Object.entries(required)) {
-  const value = [name, ...aliases]
-    .map((candidate) => process.env[candidate])
-    .find(Boolean);
-
-  if (!value) {
-    console.error(
-      `Missing required env var: ${name}. Also checked aliases: ${aliases.join(', ')}. Set it in Vercel Environment Variables.`,
-    );
+for (const name of required) {
+  if (!process.env[name]) {
+    console.error(`Missing required env var: ${name}. Set it in Vercel Environment Variables.`);
     process.exit(1);
   }
-
-  process.env[name] = value;
 }
 
 const result = spawnSync('npx expo export -p web', {

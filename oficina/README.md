@@ -1,9 +1,7 @@
 # Oficina Mobile
 
-Client-facing Expo app. Talks to `server/` (see the [root README](../README.md) for the combined
-setup and Android/physical-device connectivity guidance) — `mechanic-service.ts`,
-`timeslot-service.ts`, `appointment-service.ts` and `notification-service.ts` still point at a
-dead Supabase project and are out of scope until later phases.
+Client-facing Expo app. Fully backed by `server/`; see the [root README](../README.md) for combined
+setup, appointment-flow walkthrough, and Android/physical-device connectivity guidance.
 
 ## Secret model
 - `public-build-vars`: safe in client bundle.

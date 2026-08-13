@@ -4,7 +4,7 @@
 
 **[Critical] Unsecured Local Storage of Authentication Tokens**
 File: `services/api.ts` — Line: 9
-Description: The application uses `@react-native-async-storage/async-storage` for storing Supabase authentication tokens. `AsyncStorage` stores data in plain text, making it vulnerable to local device compromise or unauthorized access via backups.
+Description: The application used `@react-native-async-storage/async-storage` for storing authentication tokens. `AsyncStorage` stores data in plain text, making it vulnerable to local device compromise or unauthorized access via backups.
 Impact: An attacker with physical access or exploit on the device could easily read the user's authentication token and impersonate them.
 Fix: Replaced `AsyncStorage` with `expo-secure-store` which encrypts data locally using the iOS Keychain / Android Keystore.
 

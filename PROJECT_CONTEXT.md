@@ -270,10 +270,19 @@ functions spread across three repos' `scripts/sql/` folders.
 | Phase | Scope | State |
 |---|---|---|
 | **1. Foundation & Auth Walking Skeleton** | Portable server, full schema + triggers, signup/login/me/logout, admin seed script | ✅ **Complete** (2026-08-08) |
-| **1.5 Prove the Wire** | Rewire `oficina` **auth only** onto the existing Phase 1 endpoints; global error handler; CORS; `seed:dev`; root CI; first new e2e spec | ⬜ Not started (**current phase**) — see [`SPEC-phase-1.5-prove-the-wire.md`](SPEC-phase-1.5-prove-the-wire.md) |
-| **2. Booking & Appointment Lifecycle** | Role middleware, book/cancel/complete, status auto-transitions, **timeslot overlap (D-J)**, **notification fan-out (D-K)** | ⬜ Not started |
-| **3. Admin Management** | create/delete mechanic, dashboard, lists, details, financial report | ⬜ Not started |
+| **1.5 Prove the Wire** | Rewire `oficina` **auth only** onto the existing Phase 1 endpoints; global error handler; CORS; `seed:dev`; root CI; first new e2e spec | ✅ **Complete** (2026-08-12) — see [`SPEC-phase-1.5-prove-the-wire.md`](SPEC-phase-1.5-prove-the-wire.md). Carries one debt: hand-verification on an Android emulator and a physical device was deferred to pre-production (ticket 06) |
+| **2. Booking & Appointments — `oficina` vertical** | Role guard, `public_mechanics` reads, server-side availability, book, client-cancel, appointment list/detail, notifications + fan-out for those two writes, `profiles.role` triggers (D-R). **Ends with `@supabase/supabase-js` deleted from `oficina`** | ✅ **Complete** (2026-08-12) |
+| **2b. Mechanic vertical** | Timeslot CRUD + **overlap (D-J)**, completion + service report, mechanic-cancel branch, complete fan-out, `mechanic` app rewired, shared-package extraction | ⬜ Not started (**current phase**) |
+| **3. Admin Management** | create/delete mechanic, dashboard, lists, details, financial report, `admin` app rewired | ⬜ Not started |
 | ~~**4. Notifications**~~ | **Dissolved into Phases 2–3 by D-K.** The client UI already exists; fan-out belongs inside the transactions that cause it | — |
+
+**Phases 2–3 were re-cut on 2026-08-12 (D-Q).** The roadmap previously sliced by *capability*
+("Booking & Appointment Lifecycle"), which would have built the whole booking surface server-side
+before any client called it. It now slices by **app vertical**: each phase builds only the
+endpoints one app consumes, rewires that app, and ends with that app fully off Supabase. This
+carries Phase 1.5's thesis forward — every endpoint gets a real client in the same phase it ships.
+The accepted cost is that an appointment is bookable in Phase 2 but not *completable* until
+Phase 2b, because completion is a mechanic action.
 
 **Phase 1.5 was inserted on 2026-08-11.** §16's original ordering (finish Phase 2, *then* rewire) is not wrong, only riskier: it defers every unproven cross-cutting assumption — `fetch` wrapper, token storage, CORS, `EXPO_PUBLIC_API_URL`, the CI secret swap, the `_layout.tsx` bootstrap — to a single late change landing on top of brand-new booking endpoints. Phase 1.5 proves all of them against endpoints that already work, with one screen of blast radius.
 
@@ -323,12 +332,10 @@ RPC and both edge functions; notification fan-out; portable Node process.
 
 Three roles live in one column: `profiles.role ∈ {'admin','mechanic','client'}`.
 
-⚠️ **`profiles.role` has NO database CHECK constraint.** It is enforced **only** by the TypeScript
-union `Role` (`schema.ts` `text('role', { enum: ROLES })`, which emits no SQL). Verified: migration
-`0000` creates only the `profiles` table and its `role` column carries no CHECK; the schema's other
-16 CHECK constraints all live in migration `0001`. The database will accept `role = 'superadmin'`. Every write
-path must therefore validate the role in application code, and any raw-SQL insert bypasses the
-check entirely. See §17.2.
+`profiles.role` has no database `CHECK` constraint: migration `0004` instead enforces the value set
+with the two D-R `BEFORE INSERT` and `BEFORE UPDATE OF role` triggers using `RAISE(ABORT)`. This
+avoids the destructive parent-table rebuild described in §7.2 and §17.2. TypeScript's `Role` union
+remains compile-time support, not database enforcement.
 
 | Actor | App | How the account is created | Can do |
 |---|---|---|---|
@@ -606,17 +613,18 @@ record every deliberate divergence from the Postgres original with file:line cit
 - Money: **integer cents** everywhere (`*_cents`). Never floats.
 - Dates: `date` is `'YYYY-MM-DD'`; `start_time`/`end_time` are `'HH:mm'` (string comparison is
   chronological — this is relied upon by both SQL and TS code).
-- Drizzle's `text(..., { enum: [...] })` is **TypeScript-only** and emits no SQL. Most value sets
-  that must be enforced have an explicit `CHECK` — **but `profiles.role` does not** (§5). Verify
-  before assuming a constraint exists; grep the emitted migration SQL, not `schema.ts`.
+- Drizzle's `text(..., { enum: [...] })` is **TypeScript-only** and emits no SQL. Value sets that
+  must be enforced use explicit `CHECK` constraints or triggers; `profiles.role` uses the two D-R
+  triggers, not a `CHECK` (§5). Verify the emitted migration SQL, not `schema.ts`.
 - `foreign_keys = ON` is set per connection in `db/client.ts`. SQLite defaults it **off** — without
   that pragma every FK in the project is inert.
 
 ### 7.2 Tables
 
 **`profiles`** — every user, all roles.
-`id` PK · `name` NOT NULL · `email` NOT NULL **UNIQUE** · `role` NOT NULL (**no CHECK — TS-only,
-see §5**) · `phone` · `avatar_url` · `password_hash` NOT NULL · `created_at`.
+`id` PK · `name` NOT NULL · `email` NOT NULL **UNIQUE** · `role` NOT NULL (**enforced by the two
+D-R `BEFORE` triggers using `RAISE(ABORT)`, not by a `CHECK`; the database has eight triggers total**,
+see §5 and §10.3) · `phone` · `avatar_url` · `password_hash` NOT NULL · `created_at`.
 Divergences from Postgres: `email` is NOT NULL again (Postgres relaxed it for phone-only auth,
 which this project drops); `password_hash` is **new** (Supabase Auth used to own credentials).
 
@@ -673,20 +681,19 @@ Index `(appointment_id, sort_order)`.
 `before_state`/`after_state` hold **JSON as text** (SQLite has no `jsonb`) — serialize/parse in
 the application layer.
 
-**`notifications`** — ⚠️ **INFERRED, UNVERIFIED.**
-`id` PK · `recipient_id` → `profiles.id` CASCADE · `actor_id` → `profiles.id` SET NULL ·
-`appointment_id` → `appointments.id` CASCADE · `type` · `title` · `body` · `data` TEXT DEFAULT
-`'{}'` · `read_at` (NULL = unread) · `created_at` · `updated_at`.
+**`notifications`** — shape closed at eight columns by D-P.
+`id` PK · `recipient_id` → `profiles.id` CASCADE · `appointment_id` → `appointments.id` CASCADE ·
+`type` · `title` · `body` · `read_at` (NULL = unread) · `created_at`.
 Indexes `(recipient_id, created_at DESC)` and `(recipient_id, read_at)`.
-Reverse-engineered **solely** from `mapNotificationRow()` in `notification-service.ts`. No
-`CREATE TABLE notifications` exists in the *legacy* repos; the feature was apparently never
-shipped; the Supabase project is no longer reachable.
-**Important:** this table **already exists** in the new server — migration `0001` created it, so
-every developer's SQLite file has it. What is uncertain is its *shape*, not its existence. If
-Phase 4 changes it, that is a **new Drizzle migration**. SQLite (3.53.x here) *does* support
-`ADD COLUMN`, `DROP COLUMN` and `RENAME COLUMN`, but it **cannot change a column's type or
-constraints and cannot add a CHECK to an existing table** — those need a table-rebuild migration
-(create new → copy → drop → rename).
+Migration `0005` applied D-P by dropping `actor_id`, `data`, and `updated_at`; this shape is no
+longer inferred or open. SQLite (3.53.x here) supports `ADD COLUMN`, `DROP COLUMN`, and `RENAME
+COLUMN`, but cannot change a column's type or constraints or add a `CHECK` to an existing table.
+For any parent table, a table-rebuild migration (create new → copy → drop → rename) is forbidden
+without an out-of-transaction `PRAGMA foreign_keys = OFF`, which a Drizzle-migrator `.sql` file
+cannot provide: `DROP TABLE` fires `ON DELETE CASCADE` on every referencing row; `PRAGMA
+defer_foreign_keys` defers violation checking, not cascade actions, so it does not prevent those
+deletions; and `PRAGMA foreign_key_check` afterwards reports clean precisely because the cascade
+already removed the orphans it would have flagged.
 TS `NotificationType` = `appointment_confirmed | appointment_canceled | appointment_completed |
 system`.
 
@@ -1029,15 +1036,61 @@ Handwritten migrations (triggers, data backfills) are legitimate — separate st
 | Method | Path | Auth | Body | Success | Errors |
 |---|---|---|---|---|---|
 | GET | `/health` | none | — | `200 {status:'ok',db:'ok'}` | — |
-| POST | `/auth/signup` | none | `{name(1–120), email, password(8–200)}` | `201 {token, user{id,name,email,role:'client'}}` | 400 invalid body · 409 email already registered |
-| POST | `/auth/login` | none | `{email, password}` | `200 {token, user}` | 400 · 401 invalid email or password |
-| GET | `/auth/me` | Bearer | — | `200 {id,name,email,role}` | 401 |
-| POST | `/auth/logout` | Bearer | — | `204` | 401 |
+| POST | `/auth/signup` | none | `{name(1–120), email, password(8–200)}` | `201 {token, user: ProfileUser}`; role forced to `client` | 400 `VALIDATION_FAILED` · 409 `EMAIL_TAKEN` |
+| POST | `/auth/login` | none | `{email, password}` | `200 {token, user: ProfileUser}` | 400 `VALIDATION_FAILED` · 401 `INVALID_CREDENTIALS` |
+| GET | `/auth/me` | Bearer | — | `200 ProfileUser` | 401 `UNAUTHENTICATED` |
+| POST | `/auth/logout` | Bearer | — | `204` | 401 `UNAUTHENTICATED` |
+| GET | `/mechanics` | Bearer | — | `200 PublicMechanic[]` ordered by name | 401 `UNAUTHENTICATED` |
+| GET | `/mechanics/:id` | Bearer | — | `200 PublicMechanic` | 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
+| GET | `/mechanics/:id/timeslots` | Bearer | query `date?: YYYY-MM-DD` | `200 TimeSlot[]`; available, unbooked, active-mechanic future slots only; no date means next seven calendar days | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
+| PATCH | `/profiles/me` | Bearer | strict `{name(1–120)}` | `200 ProfileUser` | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` |
+| GET | `/notifications` | Bearer | — | `200 Notification[]`; newest first, limit 50 | 401 `UNAUTHENTICATED` |
+| GET | `/notifications/unread-count` | Bearer | — | `200 {count}` | 401 `UNAUTHENTICATED` |
+| POST | `/notifications/:id/read` | Bearer | — | `204`; idempotent | 401 `UNAUTHENTICATED` · 404 `NOTIFICATION_NOT_FOUND` |
+| POST | `/notifications/read-all` | Bearer | — | `204`; idempotent | 401 `UNAUTHENTICATED` |
+| POST | `/appointments` | client Bearer | strict `{timeslotId, vehicleInfo? (≤120), notes? (≤1000)}` | `201 Appointment` | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` · 404 `TIMESLOT_NOT_FOUND` · 409 `MECHANIC_UNAVAILABLE`/`TIMESLOT_UNAVAILABLE`/`TIMESLOT_EXPIRED` · 503 `DATABASE_BUSY` |
+| GET | `/appointments` | Bearer | — | `200 Appointment[]` for client; newest appointment date/time first | 401 `UNAUTHENTICATED` · 501 `NOT_IMPLEMENTED` for other roles |
+| GET | `/appointments/:id` | Bearer | — | `200 Appointment` for owning client | 401 `UNAUTHENTICATED` · 404 `APPOINTMENT_NOT_FOUND` |
+| POST | `/appointments/:id/cancel` | Bearer | — | `200 Appointment`; idempotent when already cancelled; frees its timeslot | 401 `UNAUTHENTICATED` · 404 `APPOINTMENT_NOT_FOUND` · 409 `APPOINTMENT_NOT_CANCELLABLE` · 503 `DATABASE_BUSY` |
 
-**Standard error envelope:** every failure returns `{ error: '<lowercase message>' }`. Auth
-failures are deliberately indistinguishable from one another (§9.5). There is no global error
-handler registered, so an unhandled throw currently yields Fastify's default 500 body — add one
-when the first non-auth route ships.
+`ProfileUser` = `{id, name, email, role, phone, avatarUrl}`. This is the exact shared shape returned
+by signup, login, `/auth/me`, and `/profiles/me`; `createdAt` is not serialized.
+`PublicMechanic` = `{id, name, specialty, avatarUrl, updatedAt}`.
+`TimeSlot` = `{id, mechanicId, date, startTime, endTime, isAvailable}`.
+`Notification` = `{id, recipientId, appointmentId, type, title, body, readAt, createdAt}`.
+`Appointment` = `{id, clientId, mechanicId, timeslotId, date, startTime, endTime, status,
+vehicleInfo, notes, createdAt, mechanicName, mechanicPhone, serviceSummary, serviceDiagnosis,
+workPerformed, partsUsed, recommendations, totalAmountCents, closedAt, serviceItems}`; Phase 2
+always serializes `serviceItems: []` because completion belongs to Phase 2b.
+
+**Standard error envelope:** application failures return
+`{ error: '<lowercase message>', code: '<machine-readable code>' }`; Fastify-generated 4xx errors
+retain `{ error }`, unknown routes return `404 { error: 'not found' }`, and unhandled failures return
+`500 { error: 'internal error', code: 'INTERNAL_ERROR' }`. Auth failures remain deliberately
+indistinguishable where §9.5 requires it.
+
+Client error messages, transcribed from `oficina/services/error-messages.ts`:
+
+| Code | Brazilian Portuguese string |
+|---|---|
+| `VALIDATION_FAILED` | Verifique os dados informados e tente novamente. |
+| `UNAUTHENTICATED` | Sua sessão expirou. Entre novamente. |
+| `INVALID_CREDENTIALS` | E-mail ou senha inválidos. |
+| `FORBIDDEN` | Você não tem permissão para esta ação. |
+| `MECHANIC_NOT_FOUND` | Mecânico não encontrado. |
+| `TIMESLOT_NOT_FOUND` | Horário não encontrado. |
+| `APPOINTMENT_NOT_FOUND` | Agendamento não encontrado. |
+| `NOTIFICATION_NOT_FOUND` | Notificação não encontrada. |
+| `EMAIL_TAKEN` | Este e-mail já está cadastrado. |
+| `TIMESLOT_UNAVAILABLE` | Horário indisponível. Escolha outro. |
+| `TIMESLOT_EXPIRED` | Este horário já passou. Escolha outro. |
+| `MECHANIC_UNAVAILABLE` | Este mecânico não está disponível no momento. |
+| `APPOINTMENT_NOT_CANCELLABLE` | Este agendamento não pode mais ser cancelado. |
+| `NOT_IMPLEMENTED` | Recurso indisponível nesta versão. |
+| `DATABASE_BUSY` | Servidor ocupado. Tente novamente. |
+| `INTERNAL_ERROR` | Algo deu errado. Tente novamente. |
+| `NETWORK_UNAVAILABLE` | Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente. |
+| `REQUEST_TIMEOUT` | A solicitação demorou demais. Tente novamente. |
 
 ### 10.2 To build — proposed contracts
 
@@ -1099,6 +1152,11 @@ may override.
 | **D-K** | `notifications` table shape and phasing | **The built client UI is the specification.** Read `notifications.tsx` / `notification-service.ts` / `notification-store.ts` in `oficina` and `mechanic`, reshape the table to match, and land fan-out inside the Phase 2 book/cancel/complete transactions | The notification UI **already exists** in both apps (committed 2026-08-11) — it is a more reliable statement of intent than the reverse-engineered mapper §17.1 was inferred from. Nothing is in production, so reshaping is a free `DROP`/recreate, not the table-rebuild dance §7.2 warns about. Deferring fan-out to a separate phase means reopening all three handlers later. **Phase 4 is therefore dissolved into Phases 2–3** |
 | **D-L** | Framing | **This is a rebuild, not a migration** | Confirmed 2026-08-11: no production data, no live users, project not yet in production. There is no cutover, no dual-run and no rollback to Supabase. Calling it a migration invites planning a cutover that cannot exist. "Migration" in this repo means a Drizzle SQL migration file and nothing else |
 | **D-M** | The four legacy Playwright suites | **Dead. Deleted, not repointed.** Replaced by one fresh spec at the monorepo root, grown per phase | Decided 2026-08-11. They are Supabase-bound and assert against screens that are being rewired. ⚠️ Consequence: `mechanic/tests/e2e/availability.spec.ts` was the only automated guard on the 756-line availability screen (UC-M2) — that screen is now unguarded until the new suite reaches it |
+| **D-N** | Error envelope gains a machine-readable code | **Additive `code` field: `{ error: '<lowercase message>', code: 'TIMESLOT_UNAVAILABLE' }`.** Screens branch on `code`; the message stays verbatim for display | Ratified 2026-08-12. **Amends D-C additively — D-C's envelope and the Phase 1.5 verbatim-message rule both survive intact.** Today `browse/[mechanicId].tsx` branches by substring-matching the message (`unavailable`, `expired`, `too long`), so a copy edit, a lowercasing or a translation on the server silently breaks a client branch with no compile error and no test failure. Booking has three failure branches HTTP status cannot separate (`unavailable` and `expired` are both 409). Introduced now, while there are three branches in one screen, rather than after the pattern is copy-pasted into `mechanic` and `admin` |
+| **D-O** | `syncUnfinalized` write pressure | **Guard the bulk `UPDATE` behind a cheap `SELECT EXISTS(...)`;** issue the write only when a row actually needs transitioning | Ratified 2026-08-12. **Amends D-F; observable behavior is identical.** D-F makes `GET /appointments` a write path, and SQLite has a single writer — so every appointment-list read would take a write lock that can contend with an in-flight `BEGIN IMMEDIATE` booking. The transition is a once-per-day boundary, so on nearly every read the guard keeps it a pure read. D-F's own warning stands: it must run **before** any read transaction opens, never nested inside one. Scope: `GET /appointments` and `GET /appointments/:id` only — timeslot reads have no status to sync |
+| **D-P** | `notifications` table shape | **Narrowed to `id, recipientId, appointmentId, type, title, body, readAt, createdAt`.** `actorId`, `data` and `updatedAt` are dropped | Ratified 2026-08-12. **Amends D-K by applying it.** D-K made the built UI the specification; reading it shows the UI consumes only `id`, `type`, `title`, `body`, `readAt` and `createdAt` (the screen renders a relative timestamp) — so the specification points at a *narrower* table than §7.2's reverse-engineered eleven columns, not a wider one. `appointmentId` is kept as the one unused column with an obvious near-term consumer (tapping a notification to open its appointment) and because it is the FK that makes a notification meaningful. Nothing is in production (D-L), so this is a free `DROP`/recreate, not the table-rebuild dance §7.2 warns about |
+| **D-R** | Enforcing the `profiles.role` value set | **Two `BEFORE INSERT`/`BEFORE UPDATE OF role` triggers using `RAISE(ABORT)` — NOT the `CHECK` constraint §17.2 proposes.** | Ratified 2026-08-12. ⚠️ **§17.2's suggestion is dangerous and must not be followed.** SQLite cannot add a `CHECK` to an existing table, so it implies a create-copy-drop-rename rebuild. That rebuild was written out and **executed against a seeded database: it deleted every mechanic, timeslot, appointment and notification row while reporting success.** `DROP TABLE profiles` performs an implicit delete which fires `ON DELETE CASCADE` on `mechanics.id` and cascades transitively; `PRAGMA defer_foreign_keys` does **not** stop it (it defers violation *checking*, not cascade *actions*); and `PRAGMA foreign_key_check` then reports clean precisely because the cascade left no orphans. `PRAGMA foreign_keys = OFF` would work but must be set **before** `BEGIN`, which a Drizzle-migrator `.sql` file cannot do. Triggers need no rebuild, no trigger teardown, no index recreation, and never expose the cascade. Two consequences worth carrying forward: `ON DELETE CASCADE` fires on `DROP TABLE`, and a check that detects only *orphans* cannot detect an operation that removed the children as well |
+| **D-Q** | Phase slicing | **Slice by app vertical, not by capability.** Each phase builds only the endpoints one app consumes, rewires that app, and ends with that app fully off Supabase | Ratified 2026-08-12; §4.2 re-cut accordingly. Carries Phase 1.5's thesis forward — no endpoint ships without a real client calling it in the same phase, which is the failure mode ("no client has ever called it") 1.5 was created to break. Accepted cost: the booking lifecycle is split across phases, so an appointment is bookable in Phase 2 but not completable until Phase 2b |
 
 **Cross-cutting reminder:** §13.2's status codes (403/404/409) follow from these defaults and
 should be treated as the intended contract, not as competing proposals.
@@ -1573,19 +1631,15 @@ Do not rewire an app before the endpoints it needs exist and are tested.
 
 ### 17.1 Data
 
-- **`notifications` exists, but its shape is a guess.** ✅ **Resolved by D-K (§10.3):** the
-  notification UI already exists in `oficina` and `mechanic` (screen + service + store, committed
-  2026-08-11) and *it* is now the specification — reshape the table to match what those files
-  render. Because nothing is in production (D-L), reshaping is a free `DROP`/recreate, so the
-  SQLite table-rebuild warning below no longer applies. Original finding, kept for context:
-  The table **is** created — migration
-  `0001` — so every developer's SQLite file has it, and Phase 4 must **not** write a
-  `CREATE TABLE` for it. What is unverifiable is the *shape*: it was reverse-engineered from
-  `mapNotificationRow()`, no `CREATE TABLE notifications` exists in any legacy repo, the feature
-  seems never to have shipped, and the Supabase project is unreachable. Nullability, key type and
-  the "`read_at IS NULL` = unread" convention are assumptions. **Before Phase 4:** validate the
-  shape against the desired behavior and `supabase/docs/specs/easy-first-notifications.md`; any
-  change is a new migration, and SQLite's limited `ALTER TABLE` means a table-rebuild (§7.2).
+- **`notifications` shape is closed at eight columns by D-P (§10.3): `id, recipientId,
+  appointmentId, type, title, body, readAt, createdAt`.** Migration `0005` dropped `actorId`, `data`,
+  and `updatedAt`; the built UI was the specification under D-K, and this is no longer an open
+  shape question. Any future constraint or type change that requires a table rebuild inherits the
+  §7.2 prohibition for parent tables: without an out-of-transaction `PRAGMA foreign_keys = OFF`,
+  which a Drizzle-migrator `.sql` file cannot provide, `DROP TABLE` fires `ON DELETE CASCADE` on
+  every referencing row; `PRAGMA defer_foreign_keys` defers violation checking rather than cascade
+  actions and does not prevent deletion; and `PRAGMA foreign_key_check` afterwards reports clean
+  because the cascade already removed the orphans it would have flagged.
 - **No production data migration.** The new DB starts empty. There is no seed script for the
   server yet beyond `seed-admin` — mechanics and timeslots must be created through the app or a
   new seed script.
@@ -1605,13 +1659,18 @@ Do not rewire an app before the endpoints it needs exist and are tested.
 - Legacy `admin_delete_mechanics` granted `DELETE` on `profiles`/`mechanics` to all authenticated
   users and relied on the function's own admin check — a pattern that must **not** be reproduced;
   the new server should gate deletion in the handler alone.
-- **`profiles.role` has no DB constraint** (§5). Until a CHECK is added in a migration, the value
-  set is enforced only by TypeScript. Adding
-  `CHECK (role IN ('admin','mechanic','client'))` is a small, high-value migration —
-  SQLite cannot add a CHECK to an existing table, so it needs a table-rebuild migration.
-- `oficina` reads full `profiles` rows when browsing mechanics, exposing email/phone to the client
+- **`profiles.role` is enforced by the two D-R `BEFORE INSERT` and `BEFORE UPDATE OF role` triggers
+  using `RAISE(ABORT)`, not by a `CHECK` (§5, §7.2, §10.3).** A `CHECK` would require a
+  create-copy-drop-rename rebuild of parent table `profiles`; that path is forbidden because the
+  tested rebuild deleted every mechanic, timeslot, appointment, and notification row while
+  reporting success. `DROP TABLE profiles` fires `ON DELETE CASCADE`; `PRAGMA defer_foreign_keys`
+  does not defer cascade actions; `PRAGMA foreign_key_check` then sees no orphans because the child
+  rows are already gone; and the required `PRAGMA foreign_keys = OFF` must run before `BEGIN`, which
+  a Drizzle-migrator `.sql` file cannot provide.
+- ~~`oficina` reads full `profiles` rows when browsing mechanics, exposing email/phone to the client
   app (UC-C1). The `public_mechanics` projection exists precisely to prevent this and is currently
-  used only by the `mechanic` app.
+  used only by the `mechanic` app.~~ ✅ Resolved by ticket 03's `PublicMechanic` projection and
+  ticket 09's browse-screen rewire (`57c81f3`, `5bb8126`).
 - `admin/package.json`'s `seed`, `seed:mechanics:auth` and `seed:mechanics:data` scripts point at
   files that do not exist in `admin/scripts/` — they are already broken.
 
@@ -1700,7 +1759,7 @@ gate on `server/` any more. If you find that instruction quoted anywhere else, i
 |---|---|---|
 | oficina | workshop / garage | app name, brand |
 | mecânico | mechanic | role, table |
-| agendamento | appointment / booking | `appointments` |
+| agendamento | **appointment** (noun) / **book** (verb) — see the rule below | `appointments` |
 | horário | timeslot | `timeslots` |
 | confirmado | confirmed | `AppointmentStatus` |
 | nao_finalizado | not finalized (past date, not closed out) | `AppointmentStatus` |
@@ -1721,6 +1780,19 @@ gate on `server/` any more. If you find that instruction quoted anywhere else, i
 | notificações | notifications | tab |
 | disponibilidade | availability | mechanic screen |
 | agenda | schedule / agenda | mechanic screen |
+
+**⚠️ "appointment" vs "booking" — one concept, one noun.** *Agendamento* was previously glossed as
+both, and the code uses both: an `appointments` table and `appointment-service.ts`, but
+`appointment-store.book()` and a *reservas* tab labelled "bookings". The rule, ratified 2026-08-12:
+
+- **"appointment" is the noun** — the record, the table, the type, the endpoint (`POST /appointments`).
+- **"booking" is only the verb-form of creating one** — `book()`, "the booking flow", "booked".
+- **Never use "booking" as a noun in new code.** No `Booking` type, no `bookings` array, no
+  `getBookings()`. Rename existing occurrences opportunistically when the file is already being
+  touched; do not open a file solely to rename.
+
+This glossary is the project's **only** vocabulary source. Do not create a root `CONTEXT.md` — it
+would split the language across two files and invite exactly the drift this rule exists to fix.
 
 ---
 
