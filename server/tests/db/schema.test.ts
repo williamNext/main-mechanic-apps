@@ -217,41 +217,68 @@ describe('DATA-01: full nine-table schema', () => {
   });
 
   describe('notifications column set (DATA-02)', () => {
-    it('has exactly the eleven client-evidenced columns', () => {
+    it('has exactly the eight notification read-model columns', () => {
       const cols = testDb.connection.prepare('PRAGMA table_info(notifications)').all() as { name: string }[];
       const names = new Set(cols.map((c) => c.name));
       const want = new Set([
         'id',
         'recipient_id',
-        'actor_id',
         'appointment_id',
         'type',
         'title',
         'body',
-        'data',
         'read_at',
         'created_at',
-        'updated_at',
       ]);
       expect(names).toEqual(want);
     });
 
-    it('defaults data to the empty-object literal and read_at to null when omitted', () => {
-      const recipientId = insertProfile(testDb, { role: 'client' });
-      const notificationId = randomUUID();
-      testDb.connection
-        .prepare(
-          `INSERT INTO notifications (id, recipient_id, type, title, body, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(notificationId, recipientId, 'booking_confirmed', 'Booking confirmed', 'Your booking is set', nowIso(), nowIso());
+    it('keeps both recipient lookup indexes with their column order', () => {
+      const createdIndex = testDb.connection
+        .prepare("PRAGMA index_xinfo('notifications_recipient_created_idx')")
+        .all() as { name: string | null; desc: number; key: number }[];
+      const unreadIndex = testDb.connection
+        .prepare("PRAGMA index_xinfo('notifications_recipient_unread_idx')")
+        .all() as { name: string | null; desc: number; key: number }[];
 
-      const row = testDb.connection.prepare('SELECT * FROM notifications WHERE id = ?').get(notificationId) as {
-        data: string;
-        read_at: string | null;
-      };
-      expect(row.data).toBe('{}');
-      expect(row.read_at).toBeNull();
+      expect(createdIndex.filter((column) => column.key).map(({ name, desc }) => ({ name, desc }))).toEqual([
+        { name: 'recipient_id', desc: 0 },
+        { name: 'created_at', desc: 1 },
+      ]);
+      expect(unreadIndex.filter((column) => column.key).map(({ name, desc }) => ({ name, desc }))).toEqual([
+        { name: 'recipient_id', desc: 0 },
+        { name: 'read_at', desc: 0 },
+      ]);
+    });
+
+    it('keeps appointment_id ON DELETE CASCADE', () => {
+      const foreignKeys = testDb.connection.prepare('PRAGMA foreign_key_list(notifications)').all() as {
+        from: string;
+        table: string;
+        to: string;
+        on_delete: string;
+      }[];
+
+      expect(foreignKeys).toContainEqual(
+        expect.objectContaining({
+          from: 'appointment_id',
+          table: 'appointments',
+          to: 'id',
+          on_delete: 'CASCADE',
+        }),
+      );
+    });
+
+    it('is not referenced by any other database object', () => {
+      const references = testDb.connection
+        .prepare(
+          `SELECT type, name FROM sqlite_schema
+           WHERE name <> 'notifications'
+             AND lower(coalesce(sql, '')) LIKE '%references%notifications%'`,
+        )
+        .all();
+
+      expect(references).toEqual([]);
     });
   });
 

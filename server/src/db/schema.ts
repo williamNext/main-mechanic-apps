@@ -292,18 +292,7 @@ export const adminActionLog = sqliteTable(
   ],
 );
 
-/**
- * INFERRED TABLE — UNVERIFIED (D-01/D-02, DATA-02). No `CREATE TABLE notifications` statement
- * exists in any repository; the feature was apparently never shipped to production and the
- * source Supabase project's access is gone entirely. This column list was reverse-engineered
- * solely from `mapNotificationRow()` in mechanic/services/notification-service.ts (byte-identical
- * in oficina/services/notification-service.ts), which shows column *usage* via a Supabase
- * `.select('*')` result, not a schema definition. Nullability, `id`'s key type (assumed TEXT
- * primary key), and the meaning of `read_at IS NULL` as "unread" (implied by
- * `getUnreadNotificationCount`'s `.is('read_at', null)` filter, never stated) are ASSUMPTIONS,
- * not observations. Phase 4, the first real consumer, must re-derive this schema rather than
- * trust it as-is.
- */
+/** Eight-column notification read model consumed by authenticated notification endpoints. */
 export const notifications = sqliteTable(
   'notifications',
   {
@@ -311,25 +300,17 @@ export const notifications = sqliteTable(
     recipientId: text('recipient_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
-    actorId: text('actor_id').references(() => profiles.id, { onDelete: 'set null' }),
     appointmentId: text('appointment_id').references(() => appointments.id, { onDelete: 'cascade' }),
     type: text('type').notNull(),
     title: text('title').notNull(),
     body: text('body').notNull(),
-    data: text('data').notNull().default('{}'),
     readAt: text('read_at'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
-    updatedAt: text('updated_at')
-      .notNull()
-      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   },
   (t) => [
-    // Recipient's newest-first notification list (mechanic/services/notification-service.ts
-    // getNotifications: .eq('recipient_id', ...).order('created_at', { ascending: false })).
     index('notifications_recipient_created_idx').on(t.recipientId, desc(t.createdAt)),
-    // Recipient's unread count (getUnreadNotificationCount: .eq('recipient_id', ...).is('read_at', null)).
     index('notifications_recipient_unread_idx').on(t.recipientId, t.readAt),
   ],
 );

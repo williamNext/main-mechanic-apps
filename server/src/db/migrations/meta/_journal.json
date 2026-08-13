@@ -36,6 +36,13 @@
       "when": 1786556995322,
       "tag": "0004_profiles_role_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786580902379,
+      "tag": "0005_massive_demogoblin",
+      "breakpoints": true
     }
   ]
 }

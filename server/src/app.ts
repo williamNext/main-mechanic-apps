@@ -4,6 +4,7 @@ import type { Db, Connection } from './db/client.js';
 import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { mechanicsRoutes } from './routes/mechanics.js';
+import { notificationRoutes } from './routes/notifications.js';
 import { profileRoutes } from './routes/profiles.js';
 import { HttpError } from './errors.js';
 
@@ -52,6 +53,7 @@ export function buildApp(db: Db, connection: Connection) {
   healthRoutes(app, connection);
   authRoutes(app, db);
   mechanicsRoutes(app, db);
+  notificationRoutes(app, db);
   profileRoutes(app, db);
 
   return app;
