@@ -35,6 +35,7 @@ export default function AppointmentDetailsScreen() {
     cancelByClient,
   } = useAppointmentStore();
   const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   const appointment = selectedAppointment?.id === id ? selectedAppointment : null;
@@ -70,6 +71,7 @@ export default function AppointmentDetailsScreen() {
   const confirmCancel = async () => {
     if (!appointment || isCancelling) return;
 
+    setCancelError(null);
     setIsCancelling(true);
     try {
       await cancelByClient(appointment.id);
@@ -80,8 +82,10 @@ export default function AppointmentDetailsScreen() {
 
       if (code === 'APPOINTMENT_NOT_FOUND' || code === 'APPOINTMENT_NOT_CANCELLABLE') {
         Alert.alert('Erro', getApiErrorMessage(code));
+        setCancelError(getApiErrorMessage(code));
       } else {
         Alert.alert('Erro', getApiErrorMessage(code));
+        setCancelError(getApiErrorMessage(code));
       }
     } finally {
       setIsCancelling(false);
@@ -197,6 +201,13 @@ export default function AppointmentDetailsScreen() {
             <Text style={styles.modalDescription}>
               Esta ação libera o horário para novos agendamentos. Deseja continuar?
             </Text>
+
+            {cancelError ? (
+              <View testID="cancel-error" style={styles.cancelError}>
+                <MaterialIcons name="error-outline" size={20} color={colors.error} />
+                <Text style={styles.cancelErrorText}>{cancelError}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.modalActions}>
               <PrimaryButton
@@ -354,6 +365,19 @@ const styles = StyleSheet.create({
   modalDescription: {
     ...typography.bodyMd,
     color: colors.onSurfaceVariant,
+  },
+  cancelError: {
+    borderRadius: radius.md,
+    backgroundColor: colors.errorContainer,
+    padding: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+  },
+  cancelErrorText: {
+    ...typography.bodyMd,
+    color: colors.error,
+    flex: 1,
   },
   modalActions: {
     marginTop: spacing.xs,
