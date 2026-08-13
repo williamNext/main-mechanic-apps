@@ -9,6 +9,7 @@ import { requireAuth } from '../auth/middleware.js';
 import type { Db } from '../db/client.js';
 import { profiles } from '../db/schema.js';
 import { HttpError } from '../errors.js';
+import { profileUserColumns, serializeProfileUser } from './user.js';
 
 // Unknown keys (including a client-supplied `role`) are stripped by zod's
 // default "strip" behavior — they never reach the insert (D-07, T-01-03).
@@ -87,7 +88,14 @@ export function authRoutes(app: FastifyInstance, db: Db) {
 
     return reply.code(201).send({
       token,
-      user: { id, name, email: normalizedEmail, role: 'client' },
+      user: serializeProfileUser({
+        id,
+        name,
+        email: normalizedEmail,
+        role: 'client',
+        phone: null,
+        avatarUrl: null,
+      }),
     });
   });
 
@@ -118,7 +126,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
 
     return reply.code(200).send({
       token,
-      user: { id: row.id, name: row.name, email: row.email, role: row.role },
+      user: serializeProfileUser(row),
     });
   });
 
@@ -130,13 +138,13 @@ export function authRoutes(app: FastifyInstance, db: Db) {
       // the token payload, so a profile that has changed since the token
       // was issued reports its current state (T-03-08).
       const userId = request.user!.sub;
-      const row = db.select().from(profiles).where(eq(profiles.id, userId)).get();
+      const row = db.select(profileUserColumns).from(profiles).where(eq(profiles.id, userId)).get();
 
       if (!row) {
         throw new HttpError(401, 'unauthorized', 'UNAUTHENTICATED');
       }
 
-      return reply.send({ id: row.id, name: row.name, email: row.email, role: row.role });
+      return reply.send(serializeProfileUser(row));
     },
   );
 

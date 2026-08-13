@@ -52,7 +52,14 @@ describe('POST /auth/signup', () => {
     const body = res.json();
     expect(typeof body.token).toBe('string');
     expect(body.token.length).toBeGreaterThan(0);
-    expect(body.user.role).toBe('client');
+    expect(body.user).toEqual({
+      id: expect.any(String),
+      name: 'Ana',
+      email: 'ana@example.com',
+      role: 'client',
+      phone: null,
+      avatarUrl: null,
+    });
   });
 
   it('decoded JWT carries sub, role, and a non-empty jti', async () => {
@@ -199,6 +206,11 @@ describe('POST /auth/login', () => {
 
   it('logs in with the signup email and password, returning the same user id and role client', async () => {
     const signupBody = await signup('login-happy@example.com');
+    testDb.db
+      .update(profiles)
+      .set({ phone: '+5511988887777', avatarUrl: 'https://cdn.example.com/login-avatar.png' })
+      .where(eq(profiles.id, signupBody.user.id))
+      .run();
 
     const res = await app.inject({
       method: 'POST',
@@ -210,8 +222,14 @@ describe('POST /auth/login', () => {
     const body = res.json();
     expect(typeof body.token).toBe('string');
     expect(body.token.length).toBeGreaterThan(0);
-    expect(body.user.id).toBe(signupBody.user.id);
-    expect(body.user.role).toBe('client');
+    expect(body.user).toEqual({
+      id: signupBody.user.id,
+      name: 'Ana',
+      email: 'login-happy@example.com',
+      role: 'client',
+      phone: '+5511988887777',
+      avatarUrl: 'https://cdn.example.com/login-avatar.png',
+    });
   });
 
   it('mints a token whose jti differs from the signup token, each login is a distinct session', async () => {
@@ -341,6 +359,11 @@ describe('GET /auth/me', () => {
 
   it('returns the caller profile for a valid token', async () => {
     const signupBody = await signupAndGetBody('me@example.com');
+    testDb.db
+      .update(profiles)
+      .set({ phone: '+5511977776666', avatarUrl: 'https://cdn.example.com/me-avatar.png' })
+      .where(eq(profiles.id, signupBody.user.id))
+      .run();
 
     const res = await app.inject({
       method: 'GET',
@@ -349,11 +372,13 @@ describe('GET /auth/me', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({
+    expect(res.json()).toEqual({
       id: signupBody.user.id,
       name: 'Ana',
       email: 'me@example.com',
       role: 'client',
+      phone: '+5511977776666',
+      avatarUrl: 'https://cdn.example.com/me-avatar.png',
     });
   });
 
