@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Linking, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useEffect, useRef } from 'react';
+import { ActivityIndicator, Animated, Linking, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -10,14 +10,24 @@ import { formatDate } from '@/utils/date';
 import { getInitials, toBrazilWhatsAppPhone } from '@/utils/format';
 
 export default function BookingSuccessScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { appointments } = useAppointmentStore();
+  const {
+    selectedAppointment,
+    loadedAppointmentId,
+    isDetailLoading,
+    error,
+    fetchById,
+  } = useAppointmentStore();
   const scale = useRef(new Animated.Value(0.85)).current;
 
-  const latestAppointment = useMemo(
-    () => appointments[appointments.length - 1],
-    [appointments],
-  );
+  const appointment = selectedAppointment?.id === id ? selectedAppointment : null;
+
+  useEffect(() => {
+    if (id) {
+      void fetchById(id);
+    }
+  }, [fetchById, id]);
 
   useEffect(() => {
     Animated.spring(scale, {
@@ -29,16 +39,36 @@ export default function BookingSuccessScreen() {
   }, [scale]);
 
   const handleWhatsApp = () => {
-    if (!latestAppointment?.mechanicPhone) {
+    if (!appointment?.mechanicPhone) {
       return;
     }
-    const phone = toBrazilWhatsAppPhone(latestAppointment.mechanicPhone);
+    const phone = toBrazilWhatsAppPhone(appointment.mechanicPhone);
     if (!phone) {
       return;
     }
-    const message = `Olá ${latestAppointment.mechanicName || 'mecânico'}, confirmando meu agendamento.`;
+    const message = `Olá ${appointment.mechanicName || 'mecânico'}, confirmando meu agendamento.`;
     Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`).catch(() => null);
   };
+
+  if (isDetailLoading || loadedAppointmentId !== id) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.content}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!appointment) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.content}>
+          <Text style={styles.subtitle}>{error ?? 'Agendamento não encontrado.'}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -53,10 +83,10 @@ export default function BookingSuccessScreen() {
         <View style={styles.summaryCard}>
           <View style={styles.summaryTopRow}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(latestAppointment?.mechanicName || 'Mecânico')}</Text>
+              <Text style={styles.avatarText}>{getInitials(appointment.mechanicName || 'Mecânico')}</Text>
             </View>
             <View style={styles.summaryNameWrap}>
-              <Text style={styles.mechanicName}>{latestAppointment?.mechanicName || 'Mecânico'}</Text>
+              <Text style={styles.mechanicName}>{appointment.mechanicName || 'Mecânico'}</Text>
             </View>
           </View>
 
@@ -66,24 +96,24 @@ export default function BookingSuccessScreen() {
             <View style={styles.summaryCell}>
               <Text style={styles.summaryLabel}>Data e Hora</Text>
               <Text style={styles.summaryValue}>
-                {latestAppointment ? `${formatDate(latestAppointment.date)} ${latestAppointment.startTime}` : 'A confirmar'}
+                {`${formatDate(appointment.date)} ${appointment.startTime}`}
               </Text>
             </View>
             <View style={styles.summaryCell}>
               <Text style={styles.summaryLabel}>Serviço</Text>
-              <Text style={styles.summaryValue}>{latestAppointment?.vehicleInfo || 'Diagnóstico geral'}</Text>
+              <Text style={styles.summaryValue}>{appointment.vehicleInfo || 'Diagnóstico geral'}</Text>
             </View>
           </View>
 
           <View style={styles.notesRow}>
             <Text style={styles.summaryLabel}>Observações</Text>
-            <Text style={styles.summaryValue}>{latestAppointment?.notes || 'Sem observações adicionais.'}</Text>
+            <Text style={styles.summaryValue}>{appointment.notes || 'Sem observações adicionais.'}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.actions}>
-        {latestAppointment?.mechanicPhone ? (
+        {appointment.mechanicPhone ? (
           <PrimaryButton
             title="Falar com Mecânico"
             variant="whatsapp"

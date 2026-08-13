@@ -79,29 +79,23 @@ export default function BookMechanicScreen() {
 
     setBooking(true);
     try {
-      await book({
-        timeSlotId: selectedSlot.id,
+      const appointment = await book({
+        timeslotId: selectedSlot.id,
         vehicleInfo: vehicleModel.trim(),
         notes: problemDescription.trim(),
       });
-      router.replace('/(client)/booking-success');
-    } catch (error: any) {
-      const rawMessage = String(error?.message || '').toLowerCase();
+      router.replace({ pathname: '/(client)/booking-success', params: { id: appointment.id } });
+    } catch (error: unknown) {
+      const code = isApiError(error) ? error.code : null;
 
-      if (rawMessage.includes('unavailable')) {
-        Alert.alert('Horário indisponível', 'Este horário acabou de ser reservado. Escolha outro horário.');
+      if (code === 'TIMESLOT_UNAVAILABLE' || code === 'TIMESLOT_EXPIRED') {
+        Alert.alert('Erro', getApiErrorMessage(code));
         await fetchAvailable(mechanicId, selectedDate, { force: true });
         setSelectedSlot(null);
-      } else if (rawMessage.includes('expired')) {
-        Alert.alert('Horário expirado', 'Este horário já passou. Escolha outro horário.');
-        await fetchAvailable(mechanicId, selectedDate, { force: true });
-        setSelectedSlot(null);
-      } else if (rawMessage.includes('too long')) {
-        Alert.alert('Erro', 'Revise os textos do veículo e da descrição.');
-      } else if (rawMessage.includes('booking rpc missing')) {
-        Alert.alert('Configuracao pendente', 'Funcao de agendamento ausente no Supabase. Aplique o SQL de correcao e tente novamente.');
+      } else if (code === 'VALIDATION_FAILED') {
+        Alert.alert('Erro', getApiErrorMessage(code));
       } else {
-        Alert.alert('Erro', 'Falha ao realizar agendamento');
+        Alert.alert('Erro', getApiErrorMessage(code));
       }
     } finally {
       setBooking(false);

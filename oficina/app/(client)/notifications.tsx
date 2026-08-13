@@ -2,6 +2,8 @@ import React, { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { TopAppBar } from '@/components/ui/TopAppBar';
@@ -11,12 +13,7 @@ import { useNotificationStore } from '@/stores/notification-store';
 import { AppNotification } from '@/types/models';
 
 function formatCreatedAt(value: string) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
+  return formatDistanceToNow(parseISO(value), { addSuffix: true, locale: ptBR });
 }
 
 export default function ClientNotificationsScreen() {

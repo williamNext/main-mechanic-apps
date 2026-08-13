@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Linking,
   Modal,
@@ -16,7 +17,8 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { StatusBanner } from '@/components/ui/StatusBanner';
 import { TopAppBar } from '@/components/ui/TopAppBar';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
-import { useAuth } from '@/hooks/use-auth';
+import { isApiError } from '@/services/api';
+import { getApiErrorMessage } from '@/services/error-messages';
 import { useAppointmentStore } from '@/stores/appointment-store';
 import { formatDate, formatTimeRange } from '@/utils/date';
 import { formatPhone, getInitials, toBrazilWhatsAppPhone } from '@/utils/format';
@@ -24,21 +26,24 @@ import { formatPhone, getInitials, toBrazilWhatsAppPhone } from '@/utils/format'
 export default function AppointmentDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
-  const { appointments, fetchByClient, cancelByClient } = useAppointmentStore();
+  const {
+    selectedAppointment,
+    loadedAppointmentId,
+    isDetailLoading,
+    error,
+    fetchById,
+    cancelByClient,
+  } = useAppointmentStore();
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  const appointment = useMemo(
-    () => appointments.find((item) => item.id === id),
-    [appointments, id],
-  );
+  const appointment = selectedAppointment?.id === id ? selectedAppointment : null;
 
   useEffect(() => {
-    if (user?.id) {
-      fetchByClient(user.id);
+    if (id) {
+      void fetchById(id);
     }
-  }, [user?.id, fetchByClient]);
+  }, [id, fetchById]);
 
   const handleWhatsApp = () => {
     if (isCancelling) {
@@ -68,22 +73,15 @@ export default function AppointmentDetailsScreen() {
     setIsCancelling(true);
     try {
       await cancelByClient(appointment.id);
-      if (user?.id) {
-        await fetchByClient(user.id);
-      }
       setShowCancelModal(false);
       router.replace('/(client)/bookings');
-    } catch (error: any) {
-      const rawMessage = String(error?.message || '').toLowerCase();
+    } catch (error: unknown) {
+      const code = isApiError(error) ? error.code : null;
 
-      if (rawMessage.includes('not found')) {
-        Alert.alert('Erro', 'Agendamento não encontrado.');
-      } else if (rawMessage.includes('not authorized')) {
-        Alert.alert('Erro', 'Você não tem permissão para cancelar este agendamento.');
-      } else if (rawMessage.includes('cannot cancel')) {
-        Alert.alert('Erro', 'Somente agendamentos confirmados podem ser cancelados.');
+      if (code === 'APPOINTMENT_NOT_FOUND' || code === 'APPOINTMENT_NOT_CANCELLABLE') {
+        Alert.alert('Erro', getApiErrorMessage(code));
       } else {
-        Alert.alert('Erro', 'Não foi possível cancelar o agendamento.');
+        Alert.alert('Erro', getApiErrorMessage(code));
       }
     } finally {
       setIsCancelling(false);
@@ -104,12 +102,23 @@ export default function AppointmentDetailsScreen() {
     setShowCancelModal(false);
   };
 
+  if (isDetailLoading || loadedAppointmentId !== id) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <TopAppBar title="Detalhes" showBackButton />
+        <View style={styles.notFoundWrap}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!appointment) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <TopAppBar title="Detalhes" showBackButton />
         <View style={styles.notFoundWrap}>
-          <Text style={styles.notFoundText}>Agendamento não encontrado.</Text>
+          <Text style={styles.notFoundText}>{error ?? getApiErrorMessage('APPOINTMENT_NOT_FOUND')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -138,6 +147,7 @@ export default function AppointmentDetailsScreen() {
             <DetailTile icon="directions-car" title="Veículo" value={appointment.vehicleInfo || 'Não informado'} />
             <DetailTile icon="build" title="Serviço" value={appointment.notes || 'Sem descrição'} />
             <DetailTile icon="fact-check" title="Fechamento" value={appointment.serviceSummary || 'Nao finalizado'} />
+            <DetailTile icon="troubleshoot" title="Diagnóstico" value={appointment.serviceDiagnosis || 'Nao informado'} />
             <DetailTile icon="payments" title="Valor" value={appointment.totalAmountCents ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(appointment.totalAmountCents / 100) : 'Nao informado'} />
             <DetailTile
               icon="call"

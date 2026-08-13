@@ -19,7 +19,7 @@ export default function ClientBookingsScreen() {
 
   useEffect(() => {
     if (user?.id) {
-      fetchByClient(user.id);
+      fetchByClient();
     }
   }, [user?.id, fetchByClient]);
 
@@ -54,7 +54,7 @@ export default function ClientBookingsScreen() {
           data={filteredAppointments}
           keyExtractor={(item) => item.id}
           refreshing={isLoading}
-          onRefresh={() => user?.id && fetchByClient(user.id)}
+          onRefresh={() => user?.id && fetchByClient()}
           contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
           renderItem={({ item }) => (
             <AppointmentCard
