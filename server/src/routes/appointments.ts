@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { appointmentViewColumns, serializeAppointment, type AppointmentViewRow } from '../appointments/serializer.js';
@@ -44,6 +44,57 @@ function notificationBody(action: 'confirmado' | 'cancelado', mechanicName: stri
 
 export function appointmentRoutes(app: FastifyInstance, db: Db) {
   const authenticate = requireAuth(db);
+
+  app.get('/appointments', { preHandler: authenticate }, async (request) => {
+    syncUnfinalized(db);
+
+    const caller = db
+      .select({ role: profiles.role })
+      .from(profiles)
+      .where(eq(profiles.id, request.user!.sub))
+      .get();
+    if (caller?.role !== 'client') {
+      throw new HttpError(501, 'not implemented', 'NOT_IMPLEMENTED');
+    }
+
+    const rows = db
+      .select(appointmentViewColumns)
+      .from(appointments)
+      .innerJoin(profiles, eq(profiles.id, appointments.mechanicId))
+      .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+      .where(eq(appointments.clientId, request.user!.sub))
+      .orderBy(desc(appointments.date), desc(appointments.startTime))
+      .all();
+
+    return rows.map(serializeAppointment);
+  });
+
+  app.get<{ Params: { id: string } }>('/appointments/:id', { preHandler: authenticate }, async (request) => {
+    syncUnfinalized(db);
+
+    const caller = db
+      .select({ role: profiles.role })
+      .from(profiles)
+      .where(eq(profiles.id, request.user!.sub))
+      .get();
+    if (caller?.role !== 'client') {
+      throw appointmentNotFound();
+    }
+
+    const row = db
+      .select(appointmentViewColumns)
+      .from(appointments)
+      .innerJoin(profiles, eq(profiles.id, appointments.mechanicId))
+      .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+      .where(and(eq(appointments.id, request.params.id), eq(appointments.clientId, request.user!.sub)))
+      .get();
+
+    if (!row) {
+      throw appointmentNotFound();
+    }
+
+    return serializeAppointment(row);
+  });
 
   app.post(
     '/appointments',

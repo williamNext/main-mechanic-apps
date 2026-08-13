@@ -10,6 +10,7 @@ import {
   insertTimeslot,
   makeUserToken,
 } from '../helpers/appointments.js';
+import { insertProfile, makeMechanicToken } from '../helpers/profile.js';
 
 type TestDb = ReturnType<typeof makeTestDb>;
 
@@ -22,6 +23,246 @@ function notificationRows(testDb: TestDb) {
     .prepare('SELECT recipient_id, appointment_id, type, title, body FROM notifications ORDER BY created_at')
     .all();
 }
+
+function makeAdminToken(testDb: TestDb) {
+  const id = insertProfile(testDb, { role: 'admin' });
+  const token = signAccessToken({ userId: id, role: 'admin' }).token;
+  return { id, token };
+}
+
+describe('GET /appointments', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let clientId: string;
+  let clientToken: string;
+  let mechanicId: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-12T15:00:00.000Z'));
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    ({ id: clientId, token: clientToken } = makeUserToken(testDb, 'client'));
+    mechanicId = insertMechanic(testDb, { name: 'Carlos Lima', phone: '+5511777777777' });
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await app.close();
+    testDb.cleanup();
+  });
+
+  it('returns only the caller appointments in date-descending and startTime-descending order', async () => {
+    const earlierDate = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      date: '2026-08-13',
+      startTime: '16:00:00',
+      endTime: '17:00:00',
+    });
+    const earlierTime = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      date: '2026-08-14',
+      startTime: '09:00:00',
+      endTime: '10:00:00',
+    });
+    const laterTime = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      date: '2026-08-14',
+      startTime: '14:00:00',
+      endTime: '15:00:00',
+      vehicleInfo: 'Honda Civic',
+      notes: 'Ruido nos freios',
+    });
+    const otherClient = makeUserToken(testDb, 'client');
+    const hidden = insertAppointment(testDb, {
+      clientId: otherClient.id,
+      mechanicId,
+      date: '2026-08-15',
+      startTime: '18:00:00',
+      endTime: '19:00:00',
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/appointments?scope=admin',
+      headers: auth(clientToken),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().map((appointment: { id: string }) => appointment.id)).toEqual([
+      laterTime,
+      earlierTime,
+      earlierDate,
+    ]);
+    expect(response.body).not.toContain(hidden);
+    expect(response.json()[0]).toEqual({
+      id: laterTime,
+      clientId,
+      mechanicId,
+      timeslotId: null,
+      date: '2026-08-14',
+      startTime: '14:00:00',
+      endTime: '15:00:00',
+      status: 'confirmado',
+      vehicleInfo: 'Honda Civic',
+      notes: 'Ruido nos freios',
+      createdAt: expect.any(String),
+      mechanicName: 'Carlos Lima',
+      mechanicPhone: '+5511777777777',
+      serviceSummary: null,
+      serviceDiagnosis: null,
+      workPerformed: null,
+      partsUsed: null,
+      recommendations: null,
+      totalAmountCents: null,
+      closedAt: null,
+      serviceItems: [],
+    });
+  });
+
+  it.each([
+    ['mechanic', (database: TestDb) => makeMechanicToken(database)],
+    ['admin', (database: TestDb) => makeAdminToken(database)],
+  ] as const)('returns NOT_IMPLEMENTED for a stored %s role', async (_role, makeCaller) => {
+    const caller = makeCaller(testDb);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/appointments',
+      headers: auth(caller.token),
+    });
+
+    expect(response.statusCode).toBe(501);
+    expect(response.json()).toEqual({ error: 'not implemented', code: 'NOT_IMPLEMENTED' });
+  });
+
+  it('transitions a past confirmed appointment before returning the list', async () => {
+    const appointmentId = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      date: '2026-08-11',
+      status: 'confirmado',
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/appointments', headers: auth(clientToken) });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()[0].status).toBe('nao_finalizado');
+    const stored = testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get(appointmentId);
+    expect(stored).toEqual({ status: 'nao_finalizado' });
+  });
+});
+
+describe('GET /appointments/:id', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let clientId: string;
+  let clientToken: string;
+  let mechanicId: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-12T15:00:00.000Z'));
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    ({ id: clientId, token: clientToken } = makeUserToken(testDb, 'client'));
+    mechanicId = insertMechanic(testDb, { name: 'Marina Costa', phone: '+5511666666666' });
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await app.close();
+    testDb.cleanup();
+  });
+
+  it('returns the owning client appointment with a byte-identical list shape', async () => {
+    const appointmentId = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      date: '2026-08-14',
+      startTime: '11:00:00',
+      endTime: '12:00:00',
+    });
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/appointments/${appointmentId}`,
+      headers: auth(clientToken),
+    });
+    const list = await app.inject({ method: 'GET', url: '/appointments', headers: auth(clientToken) });
+
+    expect(detail.statusCode).toBe(200);
+    expect(detail.body).toBe(JSON.stringify(list.json()[0]));
+    expect(detail.json()).toEqual(expect.objectContaining({
+      id: appointmentId,
+      clientId,
+      mechanicId,
+      mechanicName: 'Marina Costa',
+      mechanicPhone: '+5511666666666',
+      serviceItems: [],
+    }));
+  });
+
+  it('makes wrong owner, mechanic, admin, and unknown id byte-identical 404 responses', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId });
+    const otherClient = makeUserToken(testDb, 'client');
+    const mechanic = makeMechanicToken(testDb);
+    const admin = makeAdminToken(testDb);
+
+    const wrongOwner = await app.inject({
+      method: 'GET',
+      url: `/appointments/${appointmentId}`,
+      headers: auth(otherClient.token),
+    });
+    const wrongRole = await app.inject({
+      method: 'GET',
+      url: `/appointments/${appointmentId}`,
+      headers: auth(mechanic.token),
+    });
+    const adminRole = await app.inject({
+      method: 'GET',
+      url: `/appointments/${appointmentId}`,
+      headers: auth(admin.token),
+    });
+    const unknown = await app.inject({
+      method: 'GET',
+      url: `/appointments/${randomUUID()}`,
+      headers: auth(clientToken),
+    });
+
+    expect(wrongOwner.statusCode).toBe(404);
+    expect(wrongRole.statusCode).toBe(404);
+    expect(adminRole.statusCode).toBe(404);
+    expect(unknown.statusCode).toBe(404);
+    expect(wrongOwner.body).toBe(unknown.body);
+    expect(wrongRole.body).toBe(unknown.body);
+    expect(adminRole.body).toBe(unknown.body);
+    expect(unknown.json()).toEqual({ error: 'appointment not found', code: 'APPOINTMENT_NOT_FOUND' });
+  });
+
+  it('transitions a past confirmed appointment before returning detail', async () => {
+    const appointmentId = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      date: '2026-08-11',
+      status: 'confirmado',
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/appointments/${appointmentId}`,
+      headers: auth(clientToken),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().status).toBe('nao_finalizado');
+    const stored = testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get(appointmentId);
+    expect(stored).toEqual({ status: 'nao_finalizado' });
+  });
+});
 
 describe('POST /appointments', () => {
   let testDb: TestDb;
