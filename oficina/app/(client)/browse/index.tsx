@@ -102,6 +102,7 @@ function MechanicListCard({ mechanic, onPress }: { mechanic: PublicMechanic; onP
   return (
     <Animated.View style={[styles.cardAnimated, { transform: [{ scale }] }]}> 
       <Pressable
+        testID={`mechanic-card-${mechanic.id}`}
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}

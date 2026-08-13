@@ -7,6 +7,7 @@ interface TimeSlotButtonProps {
   selected?: boolean;
   unavailable?: boolean;
   onPress?: () => void;
+  testID?: string;
 }
 
 export function TimeSlotButton({
@@ -14,9 +15,11 @@ export function TimeSlotButton({
   selected = false,
   unavailable = false,
   onPress,
+  testID,
 }: TimeSlotButtonProps) {
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       disabled={unavailable}
       android_ripple={{ color: colors.surfaceContainerHigh }}

@@ -7,11 +7,13 @@ interface DateChipProps {
   dayNumber: string;
   active?: boolean;
   onPress?: () => void;
+  testID?: string;
 }
 
-export function DateChip({ dayLabel, dayNumber, active = false, onPress }: DateChipProps) {
+export function DateChip({ dayLabel, dayNumber, active = false, onPress, testID }: DateChipProps) {
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       style={({ pressed }) => [styles.base, active ? styles.active : styles.inactive, pressed && styles.pressed]}
       android_ripple={{ color: colors.surfaceContainerHigh }}

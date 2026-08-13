@@ -127,7 +127,7 @@ export default function AppointmentDetailsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <TopAppBar title="Detalhes" showBackButton />
-      <StatusBanner status={appointment.status} />
+      <StatusBanner testID="appointment-status" status={appointment.status} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.detailCard}>
@@ -171,6 +171,7 @@ export default function AppointmentDetailsScreen() {
           {appointment.status === 'confirmado' ? (
             <View style={styles.cancelWrap}>
               <PrimaryButton
+                testID="cancel-appointment-button"
                 title="Cancelar Agendamento"
                 variant="outlined"
                 onPress={handleCancel}
@@ -205,6 +206,7 @@ export default function AppointmentDetailsScreen() {
                 disabled={isCancelling}
               />
               <PrimaryButton
+                testID="confirm-cancel-button"
                 title="Sim, cancelar"
                 variant="filled"
                 onPress={() => {

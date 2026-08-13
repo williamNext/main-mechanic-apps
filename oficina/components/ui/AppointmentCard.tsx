@@ -11,6 +11,7 @@ interface AppointmentCardProps {
   onPress?: () => void;
   actionLabel?: string;
   onActionPress?: () => void;
+  testID?: string;
 }
 
 export function AppointmentCard({
@@ -18,6 +19,7 @@ export function AppointmentCard({
   onPress,
   actionLabel = 'Ver detalhes',
   onActionPress,
+  testID,
 }: AppointmentCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const theme = (statusTheme as Record<string, (typeof statusTheme)[keyof typeof statusTheme]>)[appointment.status] || statusTheme.confirmado;
@@ -45,6 +47,7 @@ export function AppointmentCard({
   return (
     <Animated.View style={[styles.outer, { transform: [{ scale }] }]}>
       <Pressable
+        testID={testID}
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}

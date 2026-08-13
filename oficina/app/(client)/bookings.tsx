@@ -58,6 +58,7 @@ export default function ClientBookingsScreen() {
           contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
           renderItem={({ item }) => (
             <AppointmentCard
+              testID={`appointment-card-${item.id}`}
               appointment={item}
               onPress={() => router.push(`/(client)/appointment/${item.id}`)}
             />

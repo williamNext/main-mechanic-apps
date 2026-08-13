@@ -44,6 +44,7 @@ export default function BookMechanicScreen() {
   const [vehicleModel, setVehicleModel] = useState('');
   const [problemDescription, setProblemDescription] = useState('');
   const [booking, setBooking] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   const days = useMemo(() => getNextDays(7), []);
 
@@ -77,6 +78,7 @@ export default function BookMechanicScreen() {
       return;
     }
 
+    setBookingError(null);
     setBooking(true);
     try {
       const appointment = await book({
@@ -90,12 +92,15 @@ export default function BookMechanicScreen() {
 
       if (code === 'TIMESLOT_UNAVAILABLE' || code === 'TIMESLOT_EXPIRED') {
         Alert.alert('Erro', getApiErrorMessage(code));
+        setBookingError(getApiErrorMessage(code));
         await fetchAvailable(mechanicId, selectedDate, { force: true });
         setSelectedSlot(null);
       } else if (code === 'VALIDATION_FAILED') {
         Alert.alert('Erro', getApiErrorMessage(code));
+        setBookingError(getApiErrorMessage(code));
       } else {
         Alert.alert('Erro', getApiErrorMessage(code));
+        setBookingError(getApiErrorMessage(code));
       }
     } finally {
       setBooking(false);
@@ -108,7 +113,7 @@ export default function BookMechanicScreen() {
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {mechanicError ? (
-            <View style={styles.mechanicError}>
+            <View testID="mechanic-error" style={styles.mechanicError}>
               <MaterialIcons name="error-outline" size={20} color={colors.error} />
               <Text style={styles.mechanicErrorText}>{mechanicError}</Text>
             </View>
@@ -129,9 +134,10 @@ export default function BookMechanicScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Selecione a Data</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
-              {days.map((day) => (
+              {days.map((day, index) => (
                 <DateChip
                   key={day}
+                  testID={`date-chip-${index}`}
                   dayLabel={format(parseISO(day), 'EEE', { locale: ptBR })}
                   dayNumber={format(parseISO(day), 'dd')}
                   active={selectedDate === day}
@@ -148,6 +154,7 @@ export default function BookMechanicScreen() {
                 slots.map((slot) => (
                   <View key={slot.id} style={styles.slotCell}>
                     <TimeSlotButton
+                      testID={`slot-button-${slot.id}`}
                       label={slot.startTime.slice(0, 5)}
                       selected={selectedSlot?.id === slot.id}
                       onPress={() => setSelectedSlot(slot)}
@@ -165,6 +172,7 @@ export default function BookMechanicScreen() {
 
           <View style={styles.section}>
             <InputField
+              testID="vehicle-model-input"
               label="Modelo do Veículo"
               value={vehicleModel}
               onChangeText={setVehicleModel}
@@ -173,6 +181,7 @@ export default function BookMechanicScreen() {
             />
             <View style={styles.spacer} />
             <InputField
+              testID="problem-description-input"
               label="Descrição do Problema"
               value={problemDescription}
               onChangeText={setProblemDescription}
@@ -186,7 +195,16 @@ export default function BookMechanicScreen() {
         </ScrollView>
 
         <SafeAreaView edges={['bottom']} style={styles.fixedCtaWrap}>
+          {bookingError ? (
+            <View style={styles.mechanicError}>
+              <MaterialIcons name="error-outline" size={20} color={colors.error} />
+              <Text testID="booking-error" style={styles.mechanicErrorText}>
+                {bookingError}
+              </Text>
+            </View>
+          ) : null}
           <PrimaryButton
+            testID="confirm-booking-button"
             title="Confirmar Agendamento"
             variant="secondary"
             leftIcon={<MaterialIcons name="event-available" size={18} color={colors.onPrimary} />}

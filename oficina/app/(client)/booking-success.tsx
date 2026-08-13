@@ -77,7 +77,7 @@ export default function BookingSuccessScreen() {
           <MaterialIcons name="check-circle" size={48} color={colors.onPrimary} />
         </Animated.View>
 
-        <Text style={styles.title}>Agendamento Confirmado!</Text>
+        <Text testID="booking-success-title" style={styles.title}>Agendamento Confirmado!</Text>
         <Text style={styles.subtitle}>Seu veículo está em boas mãos.</Text>
 
         <View style={styles.summaryCard}>
