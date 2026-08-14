@@ -207,7 +207,7 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
             closedAt: null,
           };
         },
-        true,
+        { appointmentsTimeslotUnique: true },
       );
 
       return reply.code(201).send(serializeAppointment(appointment));

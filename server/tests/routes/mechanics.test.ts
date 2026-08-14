@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
 import { signAccessToken } from '../../src/auth/jwt.js';
 import { makeTestDb } from '../helpers/db.js';
-import { insertProfile } from '../helpers/profile.js';
+import { insertProfile, makeMechanicToken } from '../helpers/profile.js';
 import { insertAppointment, insertMechanic, insertTimeslot } from '../helpers/appointments.js';
 
 type TestDb = ReturnType<typeof makeTestDb>;
@@ -487,5 +487,328 @@ describe('mechanics auth', () => {
     expect(res.statusCode).toBe(401);
     expect(res.json()).toEqual({ error: 'unauthorized', code: 'UNAUTHENTICATED' });
     expect(selectSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /timeslots', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let mechanic: ReturnType<typeof makeMechanicToken>;
+
+  beforeEach(() => {
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    mechanic = makeMechanicToken(testDb);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-14T15:00:00.000Z'));
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await app.close();
+    testDb.cleanup();
+  });
+
+  it('creates one slot from an object and returns an array of one', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: { date: '2026-08-15', startTime: '09:00', endTime: '10:00' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual([
+      {
+        id: expect.any(String),
+        mechanicId: mechanic.id,
+        date: '2026-08-15',
+        startTime: '09:00',
+        endTime: '10:00',
+        isAvailable: true,
+      },
+    ]);
+  });
+
+  it('creates every slot in a batch', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: [
+        { date: '2026-08-15', startTime: '09:00', endTime: '10:00' },
+        { date: '2026-08-15', startTime: '14:00', endTime: '15:00' },
+      ],
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toHaveLength(2);
+    expect(testDb.connection.prepare('SELECT COUNT(*) AS count FROM timeslots').get()).toEqual({ count: 2 });
+  });
+
+  it('accepts slots that share only an endpoint', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: [
+        { date: '2026-08-15', startTime: '09:00', endTime: '10:00' },
+        { date: '2026-08-15', startTime: '10:00', endTime: '11:00' },
+      ],
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toHaveLength(2);
+  });
+
+  it('refuses a slot that overlaps a stored slot', async () => {
+    insertTimeslot(testDb, {
+      mechanicId: mechanic.id,
+      date: '2026-08-15',
+      startTime: '09:00',
+      endTime: '10:00',
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: { date: '2026-08-15', startTime: '09:30', endTime: '10:30' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'timeslot overlap', code: 'TIMESLOT_OVERLAP' });
+  });
+
+  it('refuses a slot that overlaps an unavailable stored slot', async () => {
+    insertTimeslot(testDb, {
+      mechanicId: mechanic.id,
+      date: '2026-08-15',
+      startTime: '09:00',
+      endTime: '10:00',
+      isAvailable: 0,
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: { date: '2026-08-15', startTime: '08:30', endTime: '09:30' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'timeslot overlap', code: 'TIMESLOT_OVERLAP' });
+  });
+
+  it('rejects an internally overlapping batch without inserting any rows', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: [
+        { date: '2026-08-15', startTime: '09:00', endTime: '10:00' },
+        { date: '2026-08-15', startTime: '09:30', endTime: '10:30' },
+      ],
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'timeslot overlap', code: 'TIMESLOT_OVERLAP' });
+    expect(testDb.connection.prepare('SELECT COUNT(*) AS count FROM timeslots').get()).toEqual({ count: 0 });
+  });
+
+  it('rejects a mixed-date batch with VALIDATION_FAILED', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: [
+        { date: '2026-08-15', startTime: '09:00', endTime: '10:00' },
+        { date: '2026-08-16', startTime: '10:00', endTime: '11:00' },
+      ],
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'invalid request body', code: 'VALIDATION_FAILED' });
+    expect(testDb.connection.prepare('SELECT COUNT(*) AS count FROM timeslots').get()).toEqual({ count: 0 });
+  });
+
+  it('refuses a slot starting earlier today in Sao Paulo time under a frozen clock', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: { date: '2026-08-14', startTime: '11:00', endTime: '12:00' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'timeslot expired', code: 'TIMESLOT_EXPIRED' });
+  });
+
+  it('refuses client callers with FORBIDDEN', async () => {
+    const token = makeClientToken(testDb);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/timeslots',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { date: '2026-08-15', startTime: '09:00', endTime: '10:00' },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });
+  });
+});
+
+describe('PATCH /timeslots/:id', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let mechanic: ReturnType<typeof makeMechanicToken>;
+
+  beforeEach(() => {
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    mechanic = makeMechanicToken(testDb);
+  });
+
+  afterEach(async () => {
+    await app.close();
+    testDb.cleanup();
+  });
+
+  it('blocks an owned available slot', async () => {
+    const id = insertTimeslot(testDb, { mechanicId: mechanic.id });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/timeslots/${id}`,
+      headers: { authorization: `Bearer ${mechanic.token}` },
+      payload: { isAvailable: false },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ id, mechanicId: mechanic.id, isAvailable: false });
+  });
+
+  it.each(['confirmado', 'nao_finalizado', 'acabado'] as const)(
+    'refuses unblocking a slot referenced by a %s appointment',
+    async (status) => {
+      const id = insertTimeslot(testDb, { mechanicId: mechanic.id, isAvailable: 0 });
+      const clientId = insertProfile(testDb, { role: 'client' });
+      insertAppointment(testDb, { clientId, mechanicId: mechanic.id, timeslotId: id, status });
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/timeslots/${id}`,
+        headers: { authorization: `Bearer ${mechanic.token}` },
+        payload: { isAvailable: true },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: 'timeslot has appointment', code: 'TIMESLOT_HAS_APPOINTMENT' });
+    },
+  );
+
+  it('returns TIMESLOT_NOT_FOUND to non-owning mechanics and clients', async () => {
+    const id = insertTimeslot(testDb, { mechanicId: mechanic.id });
+    const otherMechanic = makeMechanicToken(testDb);
+    const clientToken = makeClientToken(testDb);
+
+    for (const token of [otherMechanic.token, clientToken]) {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/timeslots/${id}`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { isAvailable: false },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual({ error: 'timeslot not found', code: 'TIMESLOT_NOT_FOUND' });
+    }
+  });
+});
+
+describe('DELETE /timeslots/:id', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let mechanic: ReturnType<typeof makeMechanicToken>;
+
+  beforeEach(() => {
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    mechanic = makeMechanicToken(testDb);
+  });
+
+  afterEach(async () => {
+    await app.close();
+    testDb.cleanup();
+  });
+
+  it.each(['confirmado', 'nao_finalizado'] as const)(
+    'refuses deleting a slot referenced by a %s appointment',
+    async (status) => {
+      const id = insertTimeslot(testDb, { mechanicId: mechanic.id, isAvailable: 0 });
+      const clientId = insertProfile(testDb, { role: 'client' });
+      insertAppointment(testDb, { clientId, mechanicId: mechanic.id, timeslotId: id, status });
+
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/timeslots/${id}`,
+        headers: { authorization: `Bearer ${mechanic.token}` },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: 'timeslot has appointment', code: 'TIMESLOT_HAS_APPOINTMENT' });
+    },
+  );
+
+  it('deletes a merely blocked slot', async () => {
+    const id = insertTimeslot(testDb, { mechanicId: mechanic.id, isAvailable: 0 });
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/timeslots/${id}`,
+      headers: { authorization: `Bearer ${mechanic.token}` },
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect(res.body).toBe('');
+    expect(testDb.connection.prepare('SELECT id FROM timeslots WHERE id = ?').get(id)).toBeUndefined();
+  });
+
+  it('deletes a slot referenced only by an acabado appointment and nulls its reference', async () => {
+    const id = insertTimeslot(testDb, { mechanicId: mechanic.id, isAvailable: 0 });
+    const clientId = insertProfile(testDb, { role: 'client' });
+    const appointmentId = insertAppointment(testDb, {
+      clientId,
+      mechanicId: mechanic.id,
+      timeslotId: id,
+      status: 'acabado',
+    });
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/timeslots/${id}`,
+      headers: { authorization: `Bearer ${mechanic.token}` },
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect(
+      testDb.connection.prepare('SELECT timeslot_id AS timeslotId FROM appointments WHERE id = ?').get(appointmentId),
+    ).toEqual({ timeslotId: null });
+  });
+
+  it('returns TIMESLOT_NOT_FOUND to non-owning mechanics and clients', async () => {
+    const id = insertTimeslot(testDb, { mechanicId: mechanic.id });
+    const otherMechanic = makeMechanicToken(testDb);
+    const clientToken = makeClientToken(testDb);
+
+    for (const token of [otherMechanic.token, clientToken]) {
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/timeslots/${id}`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual({ error: 'timeslot not found', code: 'TIMESLOT_NOT_FOUND' });
+    }
   });
 });
