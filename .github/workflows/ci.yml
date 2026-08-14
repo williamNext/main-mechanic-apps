@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       server: ${{ steps.filter.outputs.server }}
+      mechanic: ${{ steps.filter.outputs.mechanic }}
+      oficina: ${{ steps.filter.outputs.oficina }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -29,6 +31,10 @@ jobs:
           filters: |
             server:
               - 'server/**'
+            mechanic:
+              - 'mechanic/**'
+            oficina:
+              - 'oficina/**'
 
   server-typecheck:
     needs: changes
@@ -67,3 +73,45 @@ jobs:
         run: npm ci
       - name: Test
         run: npm test
+
+  mechanic-checks:
+    needs: changes
+    if: needs.changes.outputs.mechanic == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mechanic
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mechanic/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+
+  oficina-checks:
+    needs: changes
+    if: needs.changes.outputs.oficina == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: oficina
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: oficina/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint

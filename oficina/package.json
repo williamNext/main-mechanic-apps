@@ -11,6 +11,7 @@
     "build:web": "node scripts/export-web.js",
     "vercel-build": "node scripts/export-web.js",
     "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
     "env:check": "node scripts/check-env.js",
     "hooks:setup": "node scripts/setup-git-hooks.js"
   },

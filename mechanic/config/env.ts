@@ -1,6 +1,7 @@
 type ClientEnv = {
   EXPO_PUBLIC_SUPABASE_URL: string;
   EXPO_PUBLIC_SUPABASE_ANON_KEY: string;
+  EXPO_PUBLIC_API_URL: string;
 };
 
 export const env: ClientEnv = {
@@ -8,4 +9,5 @@ export const env: ClientEnv = {
   // Build scripts run env:check to fail early if values are missing.
   EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL as string,
   EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string,
+  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL as string,
 };
