@@ -531,6 +531,13 @@ describe('POST /appointments', () => {
         title: 'Agendamento confirmado',
         body: 'Seu agendamento com João Silva em 03/09 às 08:05 foi confirmado.',
       },
+      {
+        recipient_id: mechanicId,
+        appointment_id: booked.json().id,
+        type: 'appointment_confirmed',
+        title: 'Novo agendamento',
+        body: 'Test Person agendou com você em 03/09 às 08:05.',
+      },
     ]);
     expect(listed.json()[0].body).toBe('Seu agendamento com João Silva em 03/09 às 08:05 foi confirmado.');
   });
@@ -601,6 +608,13 @@ describe('POST /appointments/:id/cancel', () => {
         type: 'appointment_canceled',
         title: 'Agendamento cancelado',
         body: 'Seu agendamento com Maria Souza em 13/08 às 14:20 foi cancelado.',
+      },
+      {
+        recipient_id: mechanicId,
+        appointment_id: appointmentId,
+        type: 'appointment_canceled',
+        title: 'Agendamento cancelado',
+        body: 'Test Person cancelou o agendamento de 13/08 às 14:20.',
       },
     ]);
 

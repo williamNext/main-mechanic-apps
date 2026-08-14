@@ -42,6 +42,14 @@ function notificationBody(action: 'confirmado' | 'cancelado', mechanicName: stri
   return `Seu agendamento com ${mechanicName} em ${day}/${month} às ${startTime.slice(0, 5)} foi ${action}.`;
 }
 
+function mechanicNotificationBody(action: 'agendou' | 'cancelou', clientName: string, date: string, startTime: string) {
+  const [, month, day] = date.split('-');
+  const dateTime = `${day}/${month} às ${startTime.slice(0, 5)}`;
+  return action === 'agendou'
+    ? `${clientName} agendou com você em ${dateTime}.`
+    : `${clientName} cancelou o agendamento de ${dateTime}.`;
+}
+
 export function appointmentRoutes(app: FastifyInstance, db: Db) {
   const authenticate = requireAuth(db);
 
@@ -141,6 +149,12 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
             throw new HttpError(409, 'timeslot expired', 'TIMESLOT_EXPIRED');
           }
 
+          const client = tx
+            .select({ name: profiles.name })
+            .from(profiles)
+            .where(eq(profiles.id, request.user!.sub))
+            .get()!;
+
           const inserted = tx
             .insert(appointments)
             .values({
@@ -167,6 +181,16 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
               type: 'appointment_confirmed',
               title: 'Agendamento confirmado',
               body: notificationBody('confirmado', slot.mechanicName, inserted.date, inserted.startTime),
+            })
+            .run();
+          tx.insert(notifications)
+            .values({
+              id: randomUUID(),
+              recipientId: slot.mechanicId,
+              appointmentId: inserted.id,
+              type: 'appointment_confirmed',
+              title: 'Novo agendamento',
+              body: mechanicNotificationBody('agendou', client.name, inserted.date, inserted.startTime),
             })
             .run();
 
@@ -228,6 +252,12 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
           );
         }
 
+        const client = tx
+          .select({ name: profiles.name })
+          .from(profiles)
+          .where(eq(profiles.id, row.clientId))
+          .get()!;
+
         tx.update(appointments).set({ status: 'cancelado' }).where(eq(appointments.id, row.id)).run();
         if (row.timeslotId !== null) {
           tx.update(timeslots).set({ isAvailable: true }).where(eq(timeslots.id, row.timeslotId)).run();
@@ -240,6 +270,16 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
             type: 'appointment_canceled',
             title: 'Agendamento cancelado',
             body: notificationBody('cancelado', row.mechanicName, row.date, row.startTime),
+          })
+          .run();
+        tx.insert(notifications)
+          .values({
+            id: randomUUID(),
+            recipientId: row.mechanicId,
+            appointmentId: row.id,
+            type: 'appointment_canceled',
+            title: 'Agendamento cancelado',
+            body: mechanicNotificationBody('cancelou', client.name, row.date, row.startTime),
           })
           .run();
 
