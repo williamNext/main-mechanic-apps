@@ -6,6 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
 const SERVER_PORT = 3010;
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
 const OFICINA_PORT = 19007;
+const MECHANIC_PORT = 19008;
 
 const SERVER_ENV = [
   `$env:DB_PATH='./data/dev-e2e.sqlite'`,
@@ -49,11 +50,29 @@ export default defineConfig({
       reuseExistingServer: true,
       timeout: 240000,
     },
+    {
+      command: `powershell -NoProfile -Command "cd ../mechanic; $env:CI=1; $env:EXPO_NO_DOCTOR=1; $env:EXPO_PUBLIC_API_URL='${SERVER_URL}'; npx expo start --web --port ${MECHANIC_PORT}"`,
+      url: `http://127.0.0.1:${MECHANIC_PORT}`,
+      reuseExistingServer: true,
+      timeout: 240000,
+    },
   ],
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'client-chromium',
+      testDir: './src/flows/client',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: `http://127.0.0.1:${OFICINA_PORT}`,
+      },
+    },
+    {
+      name: 'mechanic-chromium',
+      testDir: './src/flows/mechanic',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: `http://127.0.0.1:${MECHANIC_PORT}`,
+      },
     },
   ],
 });

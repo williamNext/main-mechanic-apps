@@ -227,11 +227,11 @@ export default function MechanicAppointmentDetailScreen() {
           <Text style={styles.sectionTitle}>Cliente</Text>
           <View style={styles.infoRow}>
             <UserRound size={18} color={colors.safetyOrange} />
-            <Text style={styles.infoText}>{appointment.clientName ?? 'Nome nao informado'}</Text>
+            <Text testID="appointment-client-name" style={styles.infoText}>{appointment.clientName ?? 'Nome nao informado'}</Text>
           </View>
           <View style={styles.infoRow}>
             <Phone size={18} color={colors.safetyOrange} />
-            <Text style={styles.infoText}>{appointment.clientPhone ?? 'Telefone oculto ou indisponivel'}</Text>
+            <Text testID="appointment-client-phone" style={styles.infoText}>{appointment.clientPhone ?? 'Telefone oculto ou indisponivel'}</Text>
           </View>
         </View>
 
@@ -342,6 +342,7 @@ export default function MechanicAppointmentDetailScreen() {
             <ScreenErrorBanner message={finishError} testID="appointment-finish-error-banner" />
 
             <PrimaryButton
+              testID="appointment-finish-button"
               title="Finalizar servico"
               onPress={handleFinish}
               loading={finishing}

@@ -53,7 +53,11 @@ function AppointmentRow({ appointment, onPress }: { appointment: Appointment; on
   const theme = statusTheme[appointment.status] ?? statusTheme.confirmado;
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <Pressable
+      testID={`appointment-card-${appointment.id}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+    >
       <View style={styles.cardHeader}>
         <View style={[styles.statusPill, { backgroundColor: theme.background }]}>
           <Text style={[styles.statusText, { color: theme.text }]}>{appointment.status}</Text>
