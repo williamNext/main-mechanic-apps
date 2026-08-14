@@ -7,36 +7,38 @@ import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
-import { formatPhone } from '@/utils/format';
+import { getApiErrorMessage } from '@/services/error-messages';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { loginByPhone, logout, isAuthActionLoading } = useAuthStore();
-  const [phone, setPhone] = useState('');
+  const { loginByEmail, logout, isAuthActionLoading } = useAuthStore();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const canSubmit = !!phone.replace(/\D/g, '') && !!password;
+  const canSubmit = !!email.trim() && !!password;
 
   async function handleLogin() {
     if (isSubmitting) return;
 
     setErrorMsg(null);
-    const digits = phone.replace(/\D/g, '');
+    const trimmedEmail = email.trim();
 
-    if (!digits || !password) {
-      setErrorMsg('Telefone e senha obrigatorios.');
+    if (!trimmedEmail || !password) {
+      setErrorMsg('Preencha e-mail e senha.');
       return;
     }
 
-    if (digits.length < 10 || digits.length > 13) {
-      setErrorMsg('Telefone invalido.');
+    if (!EMAIL_REGEX.test(trimmedEmail)) {
+      setErrorMsg('E-mail inválido.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const success = await loginByPhone(phone, password);
+      const success = await loginByEmail(trimmedEmail, password);
       const loggedUser = useAuthStore.getState().user;
       const isMechanic = loggedUser?.role === 'mechanic';
 
@@ -51,7 +53,8 @@ export default function LoginScreen() {
         return;
       }
 
-      setErrorMsg('Credenciais invalidas ou erro de conexao.');
+      const storeErrorCode = useAuthStore.getState().errorCode;
+      setErrorMsg(getApiErrorMessage(storeErrorCode));
     } finally {
       setIsSubmitting(false);
     }
@@ -70,20 +73,24 @@ export default function LoginScreen() {
               <Text style={styles.subtitle}>Agenda e disponibilidade para mecanicos.</Text>
             </View>
 
-            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+            {errorMsg ? <Text testID="login-error" style={styles.errorText}>{errorMsg}</Text> : null}
 
             <View style={styles.form}>
               <InputField
-                label="Telefone"
-                value={phone}
-                onChangeText={(text) => setPhone(formatPhone(text))}
-                placeholder="(51) 99999-9999"
-                keyboardType="phone-pad"
+                testID="login-email"
+                label="E-mail"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="voce@email.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
                 returnKeyType="next"
-                leftIcon={<MaterialIcons name="call" size={18} color={colors.outline} />}
+                leftIcon={<MaterialIcons name="mail" size={18} color={colors.outline} />}
               />
 
               <InputField
+                testID="login-password"
                 label="Senha"
                 value={password}
                 onChangeText={setPassword}
@@ -144,7 +151,6 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.headlineLgMobile, color: colors.primary },
   subtitle: { ...typography.bodyMd, color: colors.onSurfaceVariant, textAlign: 'center' },
-
   form: { gap: spacing.sm, marginTop: spacing.base },
   errorText: { ...typography.labelSm, color: colors.error, marginTop: spacing.xs },
 });

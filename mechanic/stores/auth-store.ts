@@ -2,8 +2,7 @@ import { create } from 'zustand';
 import { User, Mechanic, Role } from '@/types/models';
 import * as authService from '@/services/auth-service';
 import * as mechanicService from '@/services/mechanic-service';
-
-const LOGIN_TIMEOUT_MS = 15000;
+import { isApiError } from '@/services/wire-client';
 
 interface AuthState {
   user: User | Mechanic | null;
@@ -13,8 +12,8 @@ interface AuthState {
   isAuthenticated: boolean;
   role: Role | null;
   error: string | null;
+  errorCode: string | null;
 
-  loginByPhone: (phone: string, password: string) => Promise<boolean>;
   loginByEmail: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<Mechanic>) => Promise<void>;
@@ -24,7 +23,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => {
   const setLoadingState = (
-    patch: Partial<Pick<AuthState, 'isBootstrappingSession' | 'isAuthActionLoading' | 'error'>>,
+    patch: Partial<Pick<AuthState, 'isBootstrappingSession' | 'isAuthActionLoading' | 'error' | 'errorCode'>>,
   ) => {
     set((state) => {
       const isBootstrappingSession = patch.isBootstrappingSession ?? state.isBootstrappingSession;
@@ -45,44 +44,21 @@ export const useAuthStore = create<AuthState>((set, get) => {
     isAuthenticated: false,
     role: null,
     error: null,
-
-    loginByPhone: async (phone, password) => {
-      setLoadingState({ isAuthActionLoading: true, error: null });
-      try {
-        const user = await authService.withTimeout(
-          authService.loginByPhone(phone, password),
-          LOGIN_TIMEOUT_MS,
-          'Tempo limite excedido ao entrar',
-        );
-        if (user) {
-          set({ user, isAuthenticated: true, role: user.role, error: null });
-          return true;
-        }
-      } catch (e) {
-        console.error('Erro ao entrar:', e);
-        set({ error: e instanceof Error ? e.message : 'Falha ao entrar' });
-      } finally {
-        setLoadingState({ isAuthActionLoading: false });
-      }
-
-      return false;
-    },
+    errorCode: null,
 
     loginByEmail: async (email, password) => {
-      setLoadingState({ isAuthActionLoading: true, error: null });
+      setLoadingState({ isAuthActionLoading: true, error: null, errorCode: null });
       try {
-        const user = await authService.withTimeout(
-          authService.login(email, password),
-          LOGIN_TIMEOUT_MS,
-          'Tempo limite excedido ao entrar',
-        );
+        const user = await authService.login(email, password);
         if (user) {
-          set({ user, isAuthenticated: true, role: user.role, error: null });
+          set({ user, isAuthenticated: true, role: user.role, error: null, errorCode: null });
           return true;
         }
       } catch (e) {
-        console.error('Erro ao entrar:', e);
-        set({ error: e instanceof Error ? e.message : 'Falha ao entrar' });
+        set({
+          error: e instanceof Error ? e.message : 'Login failed',
+          errorCode: isApiError(e) ? e.code ?? null : null,
+        });
       } finally {
         setLoadingState({ isAuthActionLoading: false });
       }
@@ -91,12 +67,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     logout: async () => {
-      setLoadingState({ isAuthActionLoading: true, error: null });
-      set({ user: null, isAuthenticated: false, role: null, error: null });
+      setLoadingState({ isAuthActionLoading: true, error: null, errorCode: null });
+      set({ user: null, isAuthenticated: false, role: null, error: null, errorCode: null });
       try {
         await authService.logout();
-      } catch (e) {
-        console.error('Erro ao sair:', e);
+      } catch {
       } finally {
         setLoadingState({ isAuthActionLoading: false });
       }
@@ -110,6 +85,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         isBootstrappingSession: false,
         isLoading: state.isAuthActionLoading,
         error: null,
+        errorCode: null,
       }));
     },
 
@@ -121,7 +97,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const { user } = get();
       if (!user) return;
 
-      setLoadingState({ isAuthActionLoading: true, error: null });
+      setLoadingState({ isAuthActionLoading: true, error: null, errorCode: null });
       try {
         await mechanicService.updateMechanicProfile(user.id, data);
         set({ user: { ...user, ...data } as User | Mechanic, error: null });

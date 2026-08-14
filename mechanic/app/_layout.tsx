@@ -11,7 +11,6 @@ import {
   Inter_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { supabase } from '@/services/api';
 import { useAuthStore } from '@/stores/auth-store';
 import * as authService from '@/services/auth-service';
 import { useAppTheme } from '@/hooks/use-theme';
@@ -32,7 +31,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     let active = true;
-    const timers: ReturnType<typeof setTimeout>[] = [];
 
     const loadInitialSession = async () => {
       const requestId = ++profileRequestId.current;
@@ -47,43 +45,10 @@ export default function RootLayout() {
       }
     };
 
-    const scheduleProfileLoad = (userId: string, source: string) => {
-      const requestId = ++profileRequestId.current;
-
-      if (typeof __DEV__ !== 'undefined' && __DEV__) {
-        console.log(`[auth] ${source} event received; profile load deferred`);
-      }
-
-      const timer = setTimeout(() => {
-        void authService
-          .getUserById(userId)
-          .then((user) => {
-            if (active && requestId === profileRequestId.current) setUser(user);
-          })
-          .catch((error) => {
-            console.error('Erro ao carregar perfil após evento de autenticação:', error);
-            if (active && requestId === profileRequestId.current) setUser(null);
-          });
-      }, 0);
-
-      timers.push(timer);
-    };
-
     void loadInitialSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        scheduleProfileLoad(session.user.id, event);
-      } else if (event === 'SIGNED_OUT') {
-        profileRequestId.current += 1;
-        setUser(null);
-      }
-    });
 
     return () => {
       active = false;
-      timers.forEach(clearTimeout);
-      subscription.unsubscribe();
     };
   }, [setBootstrappingSession, setUser]);
 
