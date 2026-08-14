@@ -152,6 +152,25 @@ export default function AppointmentDetailsScreen() {
             <DetailTile icon="build" title="Serviço" value={appointment.notes || 'Sem descrição'} />
             <DetailTile icon="fact-check" title="Fechamento" value={appointment.serviceSummary || 'Nao finalizado'} />
             <DetailTile icon="troubleshoot" title="Diagnóstico" value={appointment.serviceDiagnosis || 'Nao informado'} />
+            {appointment.workPerformed ? (
+              <DetailTile icon="handyman" title="Serviço executado" value={appointment.workPerformed} />
+            ) : null}
+            {appointment.partsUsed ? (
+              <DetailTile icon="construction" title="Peças utilizadas" value={appointment.partsUsed} />
+            ) : null}
+            {appointment.recommendations ? (
+              <DetailTile icon="recommend" title="Recomendações" value={appointment.recommendations} />
+            ) : null}
+            {appointment.closedAt ? (
+              <DetailTile
+                icon="event-available"
+                title="Finalizado em"
+                value={new Intl.DateTimeFormat('pt-BR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                }).format(new Date(appointment.closedAt))}
+              />
+            ) : null}
             <DetailTile icon="payments" title="Valor" value={appointment.totalAmountCents ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(appointment.totalAmountCents / 100) : 'Nao informado'} />
             <DetailTile
               icon="call"
@@ -159,6 +178,35 @@ export default function AppointmentDetailsScreen() {
               value={appointment.mechanicPhone ? formatPhone(appointment.mechanicPhone) : 'Não informado'}
             />
           </View>
+
+          {appointment.serviceItems && appointment.serviceItems.length > 0 ? (
+            <View style={styles.itemsSection}>
+              <View style={styles.divider} />
+              <Text style={styles.itemsTitle}>Itens do serviço</Text>
+              {appointment.serviceItems.map((item, index) => (
+                <View key={item.id ?? `${index}-${item.description}`} style={styles.itemRow}>
+                  <Text style={styles.itemDescription}>{item.description}</Text>
+                  <Text style={styles.itemAmount}>
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(item.amountCents / 100)}
+                  </Text>
+                </View>
+              ))}
+              {appointment.totalAmountCents != null ? (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total</Text>
+                  <Text style={styles.totalAmount}>
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(appointment.totalAmountCents / 100)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.actions}>
@@ -326,6 +374,46 @@ const styles = StyleSheet.create({
   tileValue: {
     ...typography.bodyMd,
     color: colors.onSurface,
+  },
+  itemsSection: {
+    gap: spacing.sm,
+  },
+  itemsTitle: {
+    ...typography.labelSm,
+    color: colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  itemDescription: {
+    ...typography.bodyMd,
+    color: colors.onSurface,
+    flex: 1,
+  },
+  itemAmount: {
+    ...typography.bodyMd,
+    color: colors.onSurface,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.outlineVariant,
+    paddingTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  totalLabel: {
+    ...typography.labelMd,
+    color: colors.onSurface,
+  },
+  totalAmount: {
+    ...typography.labelMd,
+    color: colors.primary,
   },
   actions: {
     gap: spacing.sm,
