@@ -281,39 +281,49 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
     async (request) => {
       syncUnfinalized(db);
 
-      const appointment = runImmediateTransaction<AppointmentViewRow>(db, (tx) => {
+      const result = runImmediateTransaction<{
+        appointment: AppointmentViewRow;
+        viewer: 'client' | 'mechanic';
+      }>(db, (tx) => {
         const caller = tx
-          .select({ role: profiles.role })
+          .select({ role: profiles.role, name: profiles.name })
           .from(profiles)
           .where(eq(profiles.id, request.user!.sub))
           .get();
-        if (caller?.role !== 'client') {
+        if (caller?.role !== 'client' && caller?.role !== 'mechanic') {
           throw appointmentNotFound();
         }
 
+        const viewer = caller.role;
+
         const row = tx
-          .select(appointmentViewColumnsFor('client'))
+          .select(appointmentViewColumnsFor(viewer))
           .from(appointments)
-          .innerJoin(profiles, eq(profiles.id, appointments.mechanicId))
+          .innerJoin(
+            profiles,
+            eq(profiles.id, viewer === 'client' ? appointments.mechanicId : appointments.clientId),
+          )
           .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
-          .where(and(eq(appointments.id, request.params.id), eq(appointments.clientId, request.user!.sub)))
+          .where(
+            and(
+              eq(appointments.id, request.params.id),
+              eq(viewer === 'client' ? appointments.clientId : appointments.mechanicId, request.user!.sub),
+            ),
+          )
           .get();
 
         if (!row) {
           throw appointmentNotFound();
         }
 
-        const client = tx
-          .select({ name: profiles.name })
-          .from(profiles)
-          .where(eq(profiles.id, row.clientId))
-          .get()!;
-        const scopedRow: AppointmentViewRow = { ...row, clientName: client.name, clientPhone: null };
+        const scopedRow: AppointmentViewRow =
+          viewer === 'client' ? { ...row, clientName: caller.name } : { ...row, mechanicName: caller.name };
 
         if (row.status === 'cancelado') {
-          return scopedRow;
+          return { appointment: scopedRow, viewer };
         }
-        if (row.status !== 'confirmado') {
+        const canCancel = row.status === 'confirmado' || (viewer === 'mechanic' && row.status === 'nao_finalizado');
+        if (!canCancel) {
           throw new HttpError(
             409,
             `cannot cancel appointment with status ${row.status}`,
@@ -332,25 +342,27 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
             appointmentId: row.id,
             type: 'appointment_canceled',
             title: 'Agendamento cancelado',
-            body: notificationBody('cancelado', row.mechanicName, row.date, row.startTime),
+            body: notificationBody('cancelado', scopedRow.mechanicName, row.date, row.startTime),
           })
           .run();
-        tx.insert(notifications)
-          .values({
-            id: randomUUID(),
-            recipientId: row.mechanicId,
-            appointmentId: row.id,
-            type: 'appointment_canceled',
-            title: 'Agendamento cancelado',
-            body: mechanicNotificationBody('cancelou', client.name, row.date, row.startTime),
-          })
-          .run();
+        if (viewer === 'client') {
+          tx.insert(notifications)
+            .values({
+              id: randomUUID(),
+              recipientId: row.mechanicId,
+              appointmentId: row.id,
+              type: 'appointment_canceled',
+              title: 'Agendamento cancelado',
+              body: mechanicNotificationBody('cancelou', scopedRow.clientName, row.date, row.startTime),
+            })
+            .run();
+        }
 
-        return { ...scopedRow, status: 'cancelado' };
+        return { appointment: { ...scopedRow, status: 'cancelado' }, viewer };
       });
 
-      const items = loadServiceItems(db, [appointment.id]).get(appointment.id) ?? [];
-      return serializeAppointment(appointment, 'client', items);
+      const items = loadServiceItems(db, [result.appointment.id]).get(result.appointment.id) ?? [];
+      return serializeAppointment(result.appointment, result.viewer, items);
     },
   );
 }

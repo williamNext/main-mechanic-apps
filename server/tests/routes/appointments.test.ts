@@ -687,6 +687,7 @@ describe('POST /appointments/:id/cancel', () => {
   let clientId: string;
   let clientToken: string;
   let mechanicId: string;
+  let mechanicToken: string;
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -695,6 +696,7 @@ describe('POST /appointments/:id/cancel', () => {
     app = buildApp(testDb.db, testDb.connection);
     ({ id: clientId, token: clientToken } = makeUserToken(testDb));
     mechanicId = insertMechanic(testDb, { name: 'Maria Souza', phone: '+5511888888888' });
+    mechanicToken = signAccessToken({ userId: mechanicId, role: 'mechanic' }).token;
   });
 
   afterEach(async () => {
@@ -767,6 +769,76 @@ describe('POST /appointments/:id/cancel', () => {
     expect(rebooked.statusCode).toBe(201);
   });
 
+  it('lets the assigned mechanic cancel a confirmed appointment and frees its slot', async () => {
+    testDb.connection.prepare('UPDATE profiles SET phone = ? WHERE id = ?').run('+5511999999999', clientId);
+    const timeslotId = insertTimeslot(testDb, {
+      mechanicId,
+      date: '2026-08-13',
+      startTime: '14:20:30',
+      endTime: '15:20:30',
+      isAvailable: 0,
+    });
+    const appointmentId = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      timeslotId,
+      date: '2026-08-13',
+      startTime: '14:20:30',
+      endTime: '15:20:30',
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/cancel`,
+      headers: auth(mechanicToken),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({
+      id: appointmentId,
+      timeslotId,
+      status: 'cancelado',
+      mechanicName: 'Maria Souza',
+      mechanicPhone: null,
+      clientName: 'Test Person',
+      clientPhone: '+5511999999999',
+    }));
+    expect(testDb.connection.prepare('SELECT is_available FROM timeslots WHERE id = ?').get(timeslotId)).toEqual({
+      is_available: 1,
+    });
+    expect(notificationRows(testDb)).toEqual([
+      {
+        recipient_id: clientId,
+        appointment_id: appointmentId,
+        type: 'appointment_canceled',
+        title: 'Agendamento cancelado',
+        body: 'Seu agendamento com Maria Souza em 13/08 às 14:20 foi cancelado.',
+      },
+    ]);
+  });
+
+  it('lets the assigned mechanic cancel an unfinalized appointment without a timeslot', async () => {
+    const appointmentId = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      timeslotId: null,
+      status: 'nao_finalizado',
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/cancel`,
+      headers: auth(mechanicToken),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({
+      id: appointmentId,
+      timeslotId: null,
+      status: 'cancelado',
+    }));
+  });
+
   it('silently succeeds for an already canceled appointment without duplicate fan-out', async () => {
     const appointmentId = insertAppointment(testDb, { clientId, mechanicId, status: 'cancelado' });
 
@@ -774,6 +846,20 @@ describe('POST /appointments/:id/cancel', () => {
       method: 'POST',
       url: `/appointments/${appointmentId}/cancel`,
       headers: auth(clientToken),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().status).toBe('cancelado');
+    expect(notificationRows(testDb)).toEqual([]);
+  });
+
+  it('silently succeeds when the assigned mechanic cancels an already canceled appointment', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId, status: 'cancelado' });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/cancel`,
+      headers: auth(mechanicToken),
     });
 
     expect(response.statusCode).toBe(200);
@@ -797,21 +883,42 @@ describe('POST /appointments/:id/cancel', () => {
     });
   });
 
-  it('makes wrong owner, wrong role, and unknown id byte-identical 404 responses', async () => {
+  it('refuses mechanic cancellation from acabado with the exact existing message', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId, status: 'acabado' });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/cancel`,
+      headers: auth(mechanicToken),
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: 'cannot cancel appointment with status acabado',
+      code: 'APPOINTMENT_NOT_CANCELLABLE',
+    });
+  });
+
+  it('makes wrong owner, wrong mechanic, admin, and unknown id byte-identical 404 responses', async () => {
     const appointmentId = insertAppointment(testDb, { clientId, mechanicId });
     const other = makeUserToken(testDb);
-    const wrongRoleAppointmentId = insertAppointment(testDb, { clientId: mechanicId, mechanicId });
-    const mechanicToken = signAccessToken({ userId: mechanicId, role: 'client' }).token;
+    const otherMechanic = makeMechanicToken(testDb);
+    const admin = makeAdminToken(testDb);
 
     const wrongOwner = await app.inject({
       method: 'POST',
       url: `/appointments/${appointmentId}/cancel`,
       headers: auth(other.token),
     });
-    const wrongRole = await app.inject({
+    const adminResponse = await app.inject({
       method: 'POST',
-      url: `/appointments/${wrongRoleAppointmentId}/cancel`,
-      headers: auth(mechanicToken),
+      url: `/appointments/${appointmentId}/cancel`,
+      headers: auth(admin.token),
+    });
+    const wrongMechanic = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/cancel`,
+      headers: auth(otherMechanic.token),
     });
     const unknown = await app.inject({
       method: 'POST',
@@ -820,10 +927,12 @@ describe('POST /appointments/:id/cancel', () => {
     });
 
     expect(wrongOwner.statusCode).toBe(404);
-    expect(wrongRole.statusCode).toBe(404);
+    expect(adminResponse.statusCode).toBe(404);
+    expect(wrongMechanic.statusCode).toBe(404);
     expect(unknown.statusCode).toBe(404);
     expect(wrongOwner.body).toBe(unknown.body);
-    expect(wrongRole.body).toBe(unknown.body);
+    expect(adminResponse.body).toBe(unknown.body);
+    expect(wrongMechanic.body).toBe(unknown.body);
     expect(unknown.json()).toEqual({ error: 'appointment not found', code: 'APPOINTMENT_NOT_FOUND' });
   });
 
