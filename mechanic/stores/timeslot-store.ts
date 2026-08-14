@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { TimeSlot } from '@/types/models';
 import * as timeslotService from '@/services/timeslot-service';
+import type { CreateTimeSlotInput } from '@/services/timeslot-service';
 
 const TIMESLOTS_CACHE_TTL_MS = 60 * 1000;
 
@@ -11,11 +12,11 @@ interface TimeSlotState {
   fetchedAt: number | null;
   fetchKey: string | null;
 
-  fetchByMechanic: (mechanicId: string, options?: { force?: boolean }) => Promise<void>;
+  fetchByMechanic: (mechanicId: string, date: string, options?: { force?: boolean }) => Promise<void>;
   fetchAvailable: (mechanicId: string, date?: string, options?: { force?: boolean }) => Promise<void>;
-  addSlot: (data: Omit<TimeSlot, 'id'>) => Promise<TimeSlot>;
+  addSlot: (data: CreateTimeSlotInput | CreateTimeSlotInput[]) => Promise<TimeSlot[]>;
   toggleAvailability: (slotId: string, isAvailable: boolean) => Promise<void>;
-  removeSlot: (slotId: string, mechanicId: string) => Promise<void>;
+  removeSlot: (slotId: string) => Promise<void>;
   invalidateCache: () => void;
 }
 
@@ -26,8 +27,8 @@ export const useTimeSlotStore = create<TimeSlotState>((set, get) => ({
   fetchedAt: null,
   fetchKey: null,
 
-  fetchByMechanic: async (mechanicId, options) => {
-    const fetchKey = `all:${mechanicId}`;
+  fetchByMechanic: async (mechanicId, date, options) => {
+    const fetchKey = `all:${mechanicId}:${date}`;
     const { fetchedAt, fetchKey: currentFetchKey } = get();
     const cacheFresh = fetchedAt !== null && Date.now() - fetchedAt < TIMESLOTS_CACHE_TTL_MS;
 
@@ -35,7 +36,7 @@ export const useTimeSlotStore = create<TimeSlotState>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const slots = await timeslotService.getSlotsByMechanic(mechanicId);
+      const slots = await timeslotService.getSlotsByMechanic(mechanicId, date, true);
       set({ slots, fetchKey, fetchedAt: Date.now(), isLoading: false });
     } catch {
       set({ error: 'Falha ao carregar horários', isLoading: false });
@@ -59,24 +60,24 @@ export const useTimeSlotStore = create<TimeSlotState>((set, get) => ({
   },
 
   addSlot: async (data) => {
-    const slot = await timeslotService.createSlot(data);
-    set((state) => ({ slots: [...state.slots, slot], fetchedAt: null, fetchKey: null }));
-    return slot;
+    const createdSlots = await timeslotService.createSlot(data);
+    set((state) => ({ slots: [...state.slots, ...createdSlots], fetchedAt: null, fetchKey: null }));
+    return createdSlots;
   },
 
   toggleAvailability: async (slotId, isAvailable) => {
-    await timeslotService.updateSlotAvailability(slotId, isAvailable);
+    const updatedSlot = await timeslotService.updateSlotAvailability(slotId, isAvailable);
     set((state) => ({
-      slots: state.slots.map((s) => (s.id === slotId ? { ...s, isAvailable } : s)),
+      slots: state.slots.map((slot) => (slot.id === slotId ? updatedSlot : slot)),
       fetchedAt: null,
       fetchKey: null,
     }));
   },
 
-  removeSlot: async (slotId, mechanicId) => {
-    const deletedSlotId = await timeslotService.deleteSlot(slotId, mechanicId);
+  removeSlot: async (slotId) => {
+    await timeslotService.deleteSlot(slotId);
     set((state) => ({
-      slots: state.slots.filter((s) => s.id !== deletedSlotId),
+      slots: state.slots.filter((slot) => slot.id !== slotId),
       fetchedAt: null,
       fetchKey: null,
     }));

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { Clock3, Lock, Plus, Trash2 } from 'lucide-react-native';
+import { Clock3, Plus, Trash2 } from 'lucide-react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -9,6 +9,8 @@ import { useTimeSlotStore } from '@/stores/timeslot-store';
 import { TimeSlot } from '@/types/models';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { formatDateFull, formatTimeRange, toISODate } from '@/utils/date';
+import { getApiErrorMessage } from '@/services/error-messages';
+import { ApiError, isApiError } from '@/services/wire-client';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -25,12 +27,6 @@ function compareTime(start: string, end: string) {
 
 function toDateAtMidnight(date: string) {
   return new Date(`${date}T00:00:00`);
-}
-
-function isPastDate(date: string) {
-  if (!DATE_PATTERN.test(date)) return true;
-  const today = toISODate(new Date());
-  return date < today;
 }
 
 function maskTimeInput(raw: string) {
@@ -58,19 +54,10 @@ function addMinutesToTime(time: string, minutesToAdd: number) {
   return minutesToTime(result);
 }
 
-function hasOverlap(slots: TimeSlot[], date: string, startTime: string, endTime: string) {
-  return slots.some((slot) => {
-    if (slot.date !== date) return false;
-    return compareTime(startTime, slot.endTime) < 0 && compareTime(endTime, slot.startTime) > 0;
-  });
-}
-
-function validateSlot(date: string, startTime: string, endTime: string, slots: TimeSlot[]) {
+function validateSlot(date: string, startTime: string, endTime: string) {
   if (!DATE_PATTERN.test(date)) return 'Use data no formato AAAA-MM-DD.';
-  if (isPastDate(date)) return 'Nao pode usar data no passado.';
   if (!TIME_PATTERN.test(startTime) || !TIME_PATTERN.test(endTime)) return 'Use horario no formato HH:mm.';
   if (compareTime(startTime, endTime) >= 0) return 'Horario final deve ser maior que o inicial.';
-  if (hasOverlap(slots, date, startTime, endTime)) return 'Horario conflita com outro existente.';
   return null;
 }
 
@@ -89,6 +76,21 @@ function getSlotTestId(slot: TimeSlot) {
   return `availability-slot-${slot.date}-${slot.startTime.replace(':', '')}-${slot.endTime.replace(':', '')}`;
 }
 
+function getRequestErrorMessage(error: unknown) {
+  const apiError: ApiError | null = isApiError(error) ? error : null;
+  return getApiErrorMessage(apiError?.code);
+}
+
+function ScreenErrorBanner({ message, testID }: { message: string | null; testID: string }) {
+  if (!message) return null;
+
+  return (
+    <View style={styles.errorBanner} testID={testID}>
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
+
 function SlotRow({
   slot,
   isDeleting,
@@ -100,7 +102,10 @@ function SlotRow({
   onToggle: (slot: TimeSlot) => void;
   onDelete: (slot: TimeSlot) => void;
 }) {
-  const deleteDisabled = !slot.isAvailable || isDeleting;
+  const hasActiveAppointment = slot.hasActiveAppointment === true;
+  const stateLabel = hasActiveAppointment ? 'Reservado' : slot.isAvailable ? 'Disponível' : 'Bloqueado';
+  const stateColor = slot.isAvailable && !hasActiveAppointment ? colors.secondary : colors.onSurfaceVariant;
+  const deleteDisabled = isDeleting;
 
   return (
     <View style={styles.slotCard} testID={getSlotTestId(slot)}>
@@ -110,15 +115,13 @@ function SlotRow({
           <Clock3 size={16} color={colors.onSurfaceVariant} />
           <Text style={styles.slotTime}>{formatTimeRange(slot.startTime, slot.endTime)}</Text>
         </View>
-        <Text style={[styles.slotState, { color: slot.isAvailable ? colors.secondary : colors.onSurfaceVariant }]}>
-          {slot.isAvailable ? 'Disponivel' : 'Bloqueado ou reservado'}
-        </Text>
+        <Text style={[styles.slotState, { color: stateColor }]}>{stateLabel}</Text>
       </View>
       <View style={styles.slotActions}>
         <Switch
           value={slot.isAvailable}
           onValueChange={() => onToggle(slot)}
-          disabled={isDeleting}
+          disabled={hasActiveAppointment || isDeleting}
           trackColor={{ false: colors.surfaceContainerHigh, true: colors.secondaryContainer }}
           thumbColor={slot.isAvailable ? colors.secondary : colors.outline}
         />
@@ -128,11 +131,7 @@ function SlotRow({
           style={[styles.iconButton, deleteDisabled ? styles.iconButtonDisabled : null]}
           testID="availability-delete-slot-button"
         >
-          {slot.isAvailable ? (
-            <Trash2 size={18} color={isDeleting ? colors.onSurfaceVariant : colors.error} />
-          ) : (
-            <Lock size={18} color={colors.onSurfaceVariant} />
-          )}
+          <Trash2 size={18} color={isDeleting ? colors.onSurfaceVariant : colors.error} />
         </Pressable>
       </View>
     </View>
@@ -147,6 +146,7 @@ export default function AvailabilityScreen() {
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('09:00');
   const [formError, setFormError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [batchDuration, setBatchDuration] = useState<60 | 90 | 120>(60);
@@ -158,24 +158,19 @@ export default function AvailabilityScreen() {
   const [deletingSlotId, setDeletingSlotId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.role === 'mechanic') {
-      void fetchByMechanic(user.id, { force: true });
+    if (user?.role === 'mechanic' && DATE_PATTERN.test(date)) {
+      void fetchByMechanic(user.id, date, { force: true });
     }
-  }, [fetchByMechanic, user]);
+  }, [date, fetchByMechanic, user]);
 
   const orderedSlots = useMemo(
     () => [...slots].sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)),
     [slots],
   );
 
-  const todaySlotsCount = useMemo(
-    () => orderedSlots.filter((slot) => slot.date === today).length,
-    [orderedSlots, today],
-  );
-
   const refresh = () => {
-    if (user?.role === 'mechanic') {
-      void fetchByMechanic(user.id, { force: true });
+    if (user?.role === 'mechanic' && DATE_PATTERN.test(date)) {
+      void fetchByMechanic(user.id, date, { force: true });
     }
   };
 
@@ -189,7 +184,7 @@ export default function AvailabilityScreen() {
 
     const normalizedStart = maskTimeInput(startTime.trim());
     const normalizedEnd = maskTimeInput(endTime.trim());
-    const validation = validateSlot(date.trim(), normalizedStart, normalizedEnd, orderedSlots);
+    const validation = validateSlot(date.trim(), normalizedStart, normalizedEnd);
     if (validation) {
       setFormError(validation);
       return;
@@ -197,18 +192,17 @@ export default function AvailabilityScreen() {
 
     setSaving(true);
     setFormError(null);
+    setActionError(null);
     try {
       await addSlot({
-        mechanicId: user.id,
         date: date.trim(),
         startTime: normalizedStart,
         endTime: normalizedEnd,
-        isAvailable: true,
       });
       setStartTime(normalizedStart);
       setEndTime(normalizedEnd);
-    } catch (slotError: any) {
-      setFormError(slotError.message || 'Falha ao criar horario.');
+    } catch (slotError: unknown) {
+      setFormError(getRequestErrorMessage(slotError));
     } finally {
       setSaving(false);
     }
@@ -247,42 +241,40 @@ export default function AvailabilityScreen() {
     let currentStart = batchStartDirty || !currentDateHasSlots
       ? normalizedBatchStart
       : findLastEndTimeForDate(batchDate, orderedSlots, normalizedBatchStart);
-    const stagedSlots: TimeSlot[] = [];
-    setSaving(true);
-    setFormError(null);
+    const candidates: { date: string; startTime: string; endTime: string }[] = [];
 
-    try {
-      for (let index = 0; index < count; index++) {
-        const nextEnd = addMinutesToTime(currentStart, batchDuration);
-        if (!nextEnd) {
-          throw new Error(`Parou no item ${index + 1}: intervalo passou de 23:59.`);
-        }
-
-        const combined = [...orderedSlots, ...stagedSlots];
-        const validation = validateSlot(batchDate, currentStart, nextEnd, combined);
-        if (validation) {
-          throw new Error(`Parou no item ${index + 1}: ${validation}`);
-        }
-
-        const created = await addSlot({
-          mechanicId: user.id,
-          date: batchDate,
-          startTime: currentStart,
-          endTime: nextEnd,
-          isAvailable: true,
-        });
-        stagedSlots.push(created);
-        currentStart = nextEnd;
+    for (let index = 0; index < count; index++) {
+      const nextEnd = addMinutesToTime(currentStart, batchDuration);
+      if (!nextEnd) {
+        setFormError(`Parou no item ${index + 1}: intervalo passou de 23:59.`);
+        return;
       }
 
-      if (stagedSlots.length > 0) {
-        const lastSlot = stagedSlots[stagedSlots.length - 1];
+      const validation = validateSlot(batchDate, currentStart, nextEnd);
+      if (validation) {
+        setFormError(`Parou no item ${index + 1}: ${validation}`);
+        return;
+      }
+
+      candidates.push({ date: batchDate, startTime: currentStart, endTime: nextEnd });
+      currentStart = nextEnd;
+    }
+
+    setSaving(true);
+    setFormError(null);
+    setActionError(null);
+
+    try {
+      const createdSlots = await addSlot(candidates);
+
+      if (createdSlots.length > 0) {
+        const lastSlot = createdSlots[createdSlots.length - 1];
         setStartTime(lastSlot.startTime);
         setEndTime(lastSlot.endTime);
         setBatchStartTime(normalizedBatchStart);
       }
-    } catch (slotError: any) {
-      setFormError(slotError.message || 'Falha ao criar intervalos em lote.');
+    } catch (slotError: unknown) {
+      setFormError(getRequestErrorMessage(slotError));
     } finally {
       setSaving(false);
     }
@@ -295,10 +287,6 @@ export default function AvailabilityScreen() {
 
     if (event.type === 'dismissed' || !selectedDate) return;
     const nextDate = toISODate(selectedDate);
-    if (isPastDate(nextDate)) {
-      setFormError('Nao pode usar data no passado.');
-      return;
-    }
     setDate(nextDate);
     resetBatchStart();
     setFormError(null);
@@ -308,23 +296,22 @@ export default function AvailabilityScreen() {
     const nextDate = value.replace(/[^\d-]/g, '').slice(0, 10);
     setDate(nextDate);
     resetBatchStart();
-    if (DATE_PATTERN.test(nextDate) && isPastDate(nextDate)) {
-      setFormError('Nao pode usar data no passado.');
-      return;
-    }
     setFormError(null);
   };
 
   const handleToggle = async (slot: TimeSlot) => {
+    setActionError(null);
     try {
       await toggleAvailability(slot.id, !slot.isAvailable);
-    } catch (toggleError: any) {
-      Alert.alert('Falha ao atualizar horario', toggleError.message || 'Tente novamente.');
+    } catch (toggleError: unknown) {
+      const message = getRequestErrorMessage(toggleError);
+      setActionError(message);
+      Alert.alert('Falha ao atualizar horário', message);
     }
   };
 
   const handleDelete = (slot: TimeSlot) => {
-    if (!slot.isAvailable) return;
+    setActionError(null);
     setSlotPendingDelete(slot);
   };
 
@@ -337,11 +324,14 @@ export default function AvailabilityScreen() {
     if (!slotPendingDelete || user?.role !== 'mechanic') return;
 
     setDeletingSlotId(slotPendingDelete.id);
+    setActionError(null);
     try {
-      await removeSlot(slotPendingDelete.id, user.id);
+      await removeSlot(slotPendingDelete.id);
       setSlotPendingDelete(null);
-    } catch (deleteError: any) {
-      Alert.alert('Falha ao excluir', deleteError.message || 'Tente novamente.');
+    } catch (deleteError: unknown) {
+      const message = getRequestErrorMessage(deleteError);
+      setActionError(message);
+      Alert.alert('Falha ao excluir', message);
     } finally {
       setDeletingSlotId(null);
     }
@@ -496,7 +486,7 @@ export default function AvailabilityScreen() {
             </View>
           )}
 
-          {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+          <ScreenErrorBanner message={formError} testID="availability-form-error-banner" />
 
           <PrimaryButton
             title="Criar horarios"
@@ -508,11 +498,12 @@ export default function AvailabilityScreen() {
           />
         </View>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <ScreenErrorBanner message={actionError} testID="availability-action-error-banner" />
+        <ScreenErrorBanner message={error} testID="availability-load-error-banner" />
 
         <View style={styles.listHeader}>
           <Text style={styles.sectionTitle}>Horarios atuais</Text>
-          <Text style={styles.count}>{todaySlotsCount} slots hoje</Text>
+          <Text style={styles.count}>{orderedSlots.length} slots em {formatDateFull(date)}</Text>
         </View>
 
         {orderedSlots.length === 0 ? (
@@ -547,6 +538,7 @@ export default function AvailabilityScreen() {
                 {formatDateFull(slotPendingDelete.date)} - {formatTimeRange(slotPendingDelete.startTime, slotPendingDelete.endTime)}
               </Text>
             ) : null}
+            <ScreenErrorBanner message={actionError} testID="availability-delete-error-banner" />
             <View style={styles.confirmActions}>
               <Pressable
                 disabled={!!deletingSlotId}
@@ -671,6 +663,14 @@ const styles = StyleSheet.create({
   durationChipText: { ...typography.labelSm, color: colors.onSurfaceVariant },
   durationChipTextActive: { color: colors.safetyOrange },
   errorText: { ...typography.labelSm, color: colors.error },
+  errorBanner: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: radius.md,
+    backgroundColor: colors.errorContainer,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   listHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
   sectionTitle: { ...typography.headlineMd, color: colors.onSurface },
   count: { ...typography.labelMd, color: colors.onSurfaceVariant },
