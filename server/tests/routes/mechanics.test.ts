@@ -154,8 +154,256 @@ describe('GET /mechanics/:id/timeslots', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual([
-      { id: earlier, mechanicId, date: '2026-08-13', startTime: '09:00', endTime: '10:00', isAvailable: true },
-      { id: later, mechanicId, date: '2026-08-13', startTime: '10:00', endTime: '11:00', isAvailable: true },
+      {
+        id: earlier,
+        mechanicId,
+        date: '2026-08-13',
+        startTime: '09:00',
+        endTime: '10:00',
+        isAvailable: true,
+        hasActiveAppointment: false,
+      },
+      {
+        id: later,
+        mechanicId,
+        date: '2026-08-13',
+        startTime: '10:00',
+        endTime: '11:00',
+        isAvailable: true,
+        hasActiveAppointment: false,
+      },
+    ]);
+  });
+
+  it('returns the owning mechanic whole day with appointment state', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-12T15:00:00.000Z'));
+    const owner = makeMechanicToken(testDb);
+    const clientId = insertProfile(testDb, { role: 'client' });
+    const blocked = insertTimeslot(testDb, {
+      mechanicId: owner.id,
+      date: '2026-08-12',
+      startTime: '08:00',
+      endTime: '09:00',
+      isAvailable: 0,
+    });
+    const confirmed = insertTimeslot(testDb, {
+      mechanicId: owner.id,
+      date: '2026-08-12',
+      startTime: '09:00',
+      endTime: '10:00',
+      isAvailable: 0,
+    });
+    const unfinished = insertTimeslot(testDb, {
+      mechanicId: owner.id,
+      date: '2026-08-12',
+      startTime: '10:00',
+      endTime: '11:00',
+      isAvailable: 0,
+    });
+    const finished = insertTimeslot(testDb, {
+      mechanicId: owner.id,
+      date: '2026-08-12',
+      startTime: '11:00',
+      endTime: '12:00',
+      isAvailable: 0,
+    });
+    const canceled = insertTimeslot(testDb, {
+      mechanicId: owner.id,
+      date: '2026-08-12',
+      startTime: '12:00',
+      endTime: '13:00',
+    });
+    insertAppointment(testDb, {
+      clientId,
+      mechanicId: owner.id,
+      timeslotId: confirmed,
+      date: '2026-08-12',
+      startTime: '09:00',
+      endTime: '10:00',
+      status: 'confirmado',
+    });
+    insertAppointment(testDb, {
+      clientId,
+      mechanicId: owner.id,
+      timeslotId: unfinished,
+      date: '2026-08-12',
+      startTime: '10:00',
+      endTime: '11:00',
+      status: 'nao_finalizado',
+    });
+    insertAppointment(testDb, {
+      clientId,
+      mechanicId: owner.id,
+      timeslotId: finished,
+      date: '2026-08-12',
+      startTime: '11:00',
+      endTime: '12:00',
+      status: 'acabado',
+    });
+    insertAppointment(testDb, {
+      clientId,
+      mechanicId: owner.id,
+      timeslotId: canceled,
+      date: '2026-08-12',
+      startTime: '12:00',
+      endTime: '13:00',
+      status: 'cancelado',
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/mechanics/${owner.id}/timeslots?date=2026-08-12&includeUnavailable=true`,
+      headers: { authorization: `Bearer ${owner.token}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual([
+      {
+        id: blocked,
+        mechanicId: owner.id,
+        date: '2026-08-12',
+        startTime: '08:00',
+        endTime: '09:00',
+        isAvailable: false,
+        hasActiveAppointment: false,
+      },
+      {
+        id: confirmed,
+        mechanicId: owner.id,
+        date: '2026-08-12',
+        startTime: '09:00',
+        endTime: '10:00',
+        isAvailable: false,
+        hasActiveAppointment: true,
+      },
+      {
+        id: unfinished,
+        mechanicId: owner.id,
+        date: '2026-08-12',
+        startTime: '10:00',
+        endTime: '11:00',
+        isAvailable: false,
+        hasActiveAppointment: true,
+      },
+      {
+        id: finished,
+        mechanicId: owner.id,
+        date: '2026-08-12',
+        startTime: '11:00',
+        endTime: '12:00',
+        isAvailable: false,
+        hasActiveAppointment: true,
+      },
+      {
+        id: canceled,
+        mechanicId: owner.id,
+        date: '2026-08-12',
+        startTime: '12:00',
+        endTime: '13:00',
+        isAvailable: true,
+        hasActiveAppointment: false,
+      },
+    ]);
+  });
+
+  it('lets a deactivated mechanic read their own whole day', async () => {
+    const owner = makeMechanicToken(testDb);
+    testDb.connection.prepare('UPDATE mechanics SET is_active = 0 WHERE id = ?').run(owner.id);
+    const blocked = insertTimeslot(testDb, {
+      mechanicId: owner.id,
+      date: '2026-08-13',
+      startTime: '09:00',
+      endTime: '10:00',
+      isAvailable: 0,
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/mechanics/${owner.id}/timeslots?date=2026-08-13&includeUnavailable=true`,
+      headers: { authorization: `Bearer ${owner.token}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual([
+      {
+        id: blocked,
+        mechanicId: owner.id,
+        date: '2026-08-13',
+        startTime: '09:00',
+        endTime: '10:00',
+        isAvailable: false,
+        hasActiveAppointment: false,
+      },
+    ]);
+  });
+
+  it('requires date when the owner includes unavailable slots', async () => {
+    const owner = makeMechanicToken(testDb);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/mechanics/${owner.id}/timeslots?includeUnavailable=true`,
+      headers: { authorization: `Bearer ${owner.token}` },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'invalid request query', code: 'VALIDATION_FAILED' });
+  });
+
+  it('ignores includeUnavailable from a different mechanic when date is present', async () => {
+    const caller = makeMechanicToken(testDb);
+    const mechanicId = insertMechanic(testDb);
+    insertTimeslot(testDb, {
+      mechanicId,
+      date: '2026-08-13',
+      startTime: '09:00',
+      endTime: '10:00',
+      isAvailable: 0,
+    });
+    insertTimeslot(testDb, { mechanicId, date: '2026-08-13', startTime: '10:00', endTime: '11:00' });
+    const request = {
+      method: 'GET' as const,
+      headers: { authorization: `Bearer ${caller.token}` },
+    };
+
+    const plain = await app.inject({
+      ...request,
+      url: `/mechanics/${mechanicId}/timeslots?date=2026-08-13`,
+    });
+    const withParameter = await app.inject({
+      ...request,
+      url: `/mechanics/${mechanicId}/timeslots?date=2026-08-13&includeUnavailable=true`,
+    });
+
+    expect(withParameter.statusCode).toBe(200);
+    expect(withParameter.body).toBe(plain.body);
+  });
+
+  it('ignores includeUnavailable from a different mechanic without changing the seven-day default', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-12T15:00:00.000Z'));
+    const caller = makeMechanicToken(testDb);
+    const mechanicId = insertMechanic(testDb);
+    insertTimeslot(testDb, { mechanicId, date: '2026-08-12', startTime: '13:00', endTime: '14:00' });
+    insertTimeslot(testDb, { mechanicId, date: '2026-08-18', startTime: '09:00', endTime: '10:00' });
+    insertTimeslot(testDb, { mechanicId, date: '2026-08-19', startTime: '09:00', endTime: '10:00' });
+    const request = {
+      method: 'GET' as const,
+      headers: { authorization: `Bearer ${caller.token}` },
+    };
+
+    const plain = await app.inject({ ...request, url: `/mechanics/${mechanicId}/timeslots` });
+    const withParameter = await app.inject({
+      ...request,
+      url: `/mechanics/${mechanicId}/timeslots?includeUnavailable=true`,
+    });
+
+    expect(withParameter.statusCode).toBe(200);
+    expect(withParameter.body).toBe(plain.body);
+    expect(withParameter.json().map((slot: { date: string }) => slot.date)).toEqual([
+      '2026-08-12',
+      '2026-08-18',
     ]);
   });
 

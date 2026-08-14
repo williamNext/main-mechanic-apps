@@ -237,23 +237,64 @@ export function mechanicsRoutes(app: FastifyInstance, db: Db) {
     return row;
   });
 
-  app.get<{ Params: { id: string }; Querystring: { date?: string } }>(
+  app.get<{ Params: { id: string }; Querystring: { date?: string; includeUnavailable?: string } }>(
     '/mechanics/:id/timeslots',
     { preHandler: authenticate },
     async (request) => {
       const requestedDate = request.query.date;
-      const mechanic = db
-        .select({ id: publicMechanics.id })
-        .from(publicMechanics)
-        .where(eq(publicMechanics.id, request.params.id))
-        .get();
+      const isOwner = request.user!.sub === request.params.id;
+      const includeUnavailable = isOwner && request.query.includeUnavailable === 'true';
+      const mechanic = includeUnavailable
+        ? db
+            .select({ id: mechanics.id })
+            .from(mechanics)
+            .where(eq(mechanics.id, request.params.id))
+            .get()
+        : db
+            .select({ id: publicMechanics.id })
+            .from(publicMechanics)
+            .where(eq(publicMechanics.id, request.params.id))
+            .get();
 
       if (!mechanic) {
         throw mechanicNotFound();
       }
 
+      if (
+        isOwner &&
+        request.query.includeUnavailable !== undefined &&
+        request.query.includeUnavailable !== 'true'
+      ) {
+        throw new HttpError(400, 'invalid request query', 'VALIDATION_FAILED');
+      }
+
       if (requestedDate !== undefined && !isDateString(requestedDate)) {
         throw new HttpError(400, 'invalid request query', 'VALIDATION_FAILED');
+      }
+
+      if (includeUnavailable && requestedDate === undefined) {
+        throw new HttpError(400, 'invalid request query', 'VALIDATION_FAILED');
+      }
+
+      if (includeUnavailable) {
+        const ownerQuery = db
+          .select({
+            ...timeslotColumns,
+            hasActiveAppointment: sql<number>`EXISTS (
+              SELECT 1
+              FROM appointments
+              WHERE appointments.timeslot_id = timeslots.id
+                AND appointments.status IN ('confirmado', 'nao_finalizado', 'acabado')
+            )`,
+          })
+          .from(timeslots)
+          .where(
+            and(eq(timeslots.mechanicId, request.params.id), eq(timeslots.date, requestedDate!)),
+          )
+          .orderBy(asc(timeslots.date), asc(timeslots.startTime));
+        return ownerQuery
+          .all()
+          .map((slot) => ({ ...slot, hasActiveAppointment: Boolean(slot.hasActiveAppointment) }));
       }
 
       const now = getSaoPauloDateTimeParts();
@@ -294,7 +335,8 @@ export function mechanicsRoutes(app: FastifyInstance, db: Db) {
           ),
         )
         .orderBy(asc(timeslots.date), asc(timeslots.startTime))
-        .all();
+        .all()
+        .map((slot) => ({ ...slot, hasActiveAppointment: false }));
     },
   );
 }

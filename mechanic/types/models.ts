@@ -29,6 +29,7 @@ export interface TimeSlot {
   startTime: string;  // "HH:mm"
   endTime: string;    // "HH:mm"
   isAvailable: boolean;
+  hasActiveAppointment?: boolean;
 }
 
 export interface Appointment {
