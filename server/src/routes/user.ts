@@ -1,4 +1,4 @@
-import { profiles, type Role } from '../db/schema.js';
+import { mechanics, profiles, type Role } from '../db/schema.js';
 
 export const profileUserColumns = {
   id: profiles.id,
@@ -7,6 +7,7 @@ export const profileUserColumns = {
   role: profiles.role,
   phone: profiles.phone,
   avatarUrl: profiles.avatarUrl,
+  specialty: mechanics.specialty,
 };
 
 type ProfileUser = {
@@ -16,6 +17,7 @@ type ProfileUser = {
   role: Role;
   phone: string | null;
   avatarUrl: string | null;
+  specialty: string | null;
 };
 
 export function serializeProfileUser(profile: ProfileUser): ProfileUser {
@@ -26,5 +28,6 @@ export function serializeProfileUser(profile: ProfileUser): ProfileUser {
     role: profile.role,
     phone: profile.phone,
     avatarUrl: profile.avatarUrl,
+    specialty: profile.specialty,
   };
 }

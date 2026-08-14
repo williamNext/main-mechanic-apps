@@ -7,7 +7,7 @@ import { hashPassword, verifyPassword } from '../auth/hash.js';
 import { signAccessToken } from '../auth/jwt.js';
 import { requireAuth } from '../auth/middleware.js';
 import type { Db } from '../db/client.js';
-import { profiles } from '../db/schema.js';
+import { mechanics, profiles } from '../db/schema.js';
 import { HttpError } from '../errors.js';
 import { profileUserColumns, serializeProfileUser } from './user.js';
 
@@ -95,6 +95,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
         role: 'client',
         phone: null,
         avatarUrl: null,
+        specialty: null,
       }),
     });
   });
@@ -108,7 +109,12 @@ export function authRoutes(app: FastifyInstance, db: Db) {
     const { email, password } = parsed.data;
     const normalizedEmail = email.trim().toLowerCase();
 
-    const row = db.select().from(profiles).where(eq(profiles.email, normalizedEmail)).get();
+    const row = db
+      .select({ ...profileUserColumns, passwordHash: profiles.passwordHash })
+      .from(profiles)
+      .leftJoin(mechanics, eq(mechanics.id, profiles.id))
+      .where(eq(profiles.email, normalizedEmail))
+      .get();
 
     // Always verify a password, even when the email lookup misses — against
     // the real hash when the row exists, against the module-level dummy
@@ -138,7 +144,12 @@ export function authRoutes(app: FastifyInstance, db: Db) {
       // the token payload, so a profile that has changed since the token
       // was issued reports its current state (T-03-08).
       const userId = request.user!.sub;
-      const row = db.select(profileUserColumns).from(profiles).where(eq(profiles.id, userId)).get();
+      const row = db
+        .select(profileUserColumns)
+        .from(profiles)
+        .leftJoin(mechanics, eq(mechanics.id, profiles.id))
+        .where(eq(profiles.id, userId))
+        .get();
 
       if (!row) {
         throw new HttpError(401, 'unauthorized', 'UNAUTHENTICATED');

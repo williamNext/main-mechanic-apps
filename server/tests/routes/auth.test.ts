@@ -12,6 +12,8 @@ import { profiles } from '../../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { makeTestDb } from '../helpers/db.js';
 import { seedAdmin } from '../../scripts/seed-admin.js';
+import { hashPassword } from '../../src/auth/hash.js';
+import { makeMechanicToken } from '../helpers/profile.js';
 
 const JWT_SECRET = 'test-secret-at-least-32-characters-long';
 
@@ -59,6 +61,7 @@ describe('POST /auth/signup', () => {
       role: 'client',
       phone: null,
       avatarUrl: null,
+      specialty: null,
     });
   });
 
@@ -229,7 +232,27 @@ describe('POST /auth/login', () => {
       role: 'client',
       phone: '+5511988887777',
       avatarUrl: 'https://cdn.example.com/login-avatar.png',
+      specialty: null,
     });
+  });
+
+  it('returns stored specialty when a mechanic logs in', async () => {
+    const email = 'mechanic-login@example.com';
+    const { id } = makeMechanicToken(testDb, { email, specialty: 'Injecao eletronica' });
+    testDb.db
+      .update(profiles)
+      .set({ passwordHash: await hashPassword('mechanic-password') })
+      .where(eq(profiles.id, id))
+      .run();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email, password: 'mechanic-password' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().user).toMatchObject({ id, role: 'mechanic', specialty: 'Injecao eletronica' });
   });
 
   it('mints a token whose jti differs from the signup token, each login is a distinct session', async () => {
@@ -379,7 +402,21 @@ describe('GET /auth/me', () => {
       role: 'client',
       phone: '+5511977776666',
       avatarUrl: 'https://cdn.example.com/me-avatar.png',
+      specialty: null,
     });
+  });
+
+  it('returns stored specialty for a mechanic caller', async () => {
+    const { id, token } = makeMechanicToken(testDb, { specialty: 'Motor' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ id, role: 'mechanic', specialty: 'Motor' });
   });
 
   it('returns 401 with no Authorization header', async () => {
