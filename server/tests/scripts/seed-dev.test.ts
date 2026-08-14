@@ -3,7 +3,14 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
-import { appointments, mechanics, profiles, timeslots } from '../../src/db/schema.js';
+import {
+  appointmentServiceItems,
+  appointmentServiceReports,
+  appointments,
+  mechanics,
+  profiles,
+  timeslots,
+} from '../../src/db/schema.js';
 import { isDevelopmentDbPath, seedDev } from '../../scripts/seed-dev.js';
 import { makeTestDb } from '../helpers/db.js';
 
@@ -45,7 +52,7 @@ describe('seedDev', () => {
     expect(result.mechanicIds).toHaveLength(3);
     expect(result.clientIds).toEqual(['seed-client-1', 'seed-client-2']);
     expect(result.secondClientId).toBe('seed-client-2');
-    expect(result.timeslotCount).toBe(66);
+    expect(result.timeslotCount).toBe(67);
 
     const mechanicRows = testDb.db.select().from(profiles).where(eq(profiles.role, 'mechanic')).all();
     expect(mechanicRows).toHaveLength(4);
@@ -56,8 +63,11 @@ describe('seedDev', () => {
     const adminRows = testDb.db.select().from(profiles).where(eq(profiles.role, 'admin')).all();
     expect(adminRows).toHaveLength(1);
 
+    expect([...mechanicRows, ...clientRows, ...adminRows].every((profile) => profile.phone !== null)).toBe(true);
+    expect(clientRows.find((profile) => profile.id === 'seed-client-1')?.phone).toBe('+5511988880001');
+
     const timeslotRows = testDb.db.select().from(timeslots).all();
-    expect(timeslotRows).toHaveLength(66);
+    expect(timeslotRows).toHaveLength(67);
 
     const mechanicTableRows = testDb.db.select().from(mechanics).all();
     expect(mechanicTableRows).toHaveLength(4);
@@ -120,11 +130,84 @@ describe('seedDev', () => {
     expect(inactiveRows.map((r) => r.id).sort()).toEqual(['seed-timeslot-inactive-0', 'seed-timeslot-inactive-1']);
   });
 
-  it('seeds one confirmado, one nao_finalizado and one cancelado appointment for the known client', async () => {
+  it('seeds one appointment in every lifecycle status', async () => {
     await seedDev(testDb.db);
 
-    const rows = testDb.db.select().from(appointments).where(eq(appointments.clientId, 'seed-client-1')).all();
-    expect(rows.map((row) => row.status).sort()).toEqual(['cancelado', 'confirmado', 'nao_finalizado']);
+    const rows = testDb.db.select().from(appointments).all();
+    expect(rows.map((row) => row.status).sort()).toEqual(['acabado', 'cancelado', 'confirmado', 'nao_finalizado']);
+  });
+
+  it('seeds a completed appointment with an unavailable dedicated timeslot and full ordered report', async () => {
+    await seedDev(testDb.db);
+
+    const appointment = testDb.db
+      .select()
+      .from(appointments)
+      .where(eq(appointments.id, 'seed-appointment-acabado'))
+      .get();
+    expect(appointment).toMatchObject({
+      clientId: 'seed-client-2',
+      mechanicId: 'seed-mechanic-3',
+      timeslotId: 'seed-timeslot-completed',
+      status: 'acabado',
+      vehicleInfo: 'Volkswagen T-Cross 2021',
+    });
+
+    const completedSlot = testDb.db
+      .select()
+      .from(timeslots)
+      .where(eq(timeslots.id, 'seed-timeslot-completed'))
+      .get();
+    expect(completedSlot).toMatchObject({
+      mechanicId: 'seed-mechanic-3',
+      isAvailable: false,
+      startTime: '14:00',
+      endTime: '15:00',
+    });
+
+    const report = testDb.db
+      .select()
+      .from(appointmentServiceReports)
+      .where(eq(appointmentServiceReports.appointmentId, 'seed-appointment-acabado'))
+      .get();
+    expect(report).toMatchObject({
+      mechanicId: 'seed-mechanic-3',
+      summary: 'Revisão do sistema de freios dianteiros concluída',
+      diagnosis: 'Pastilhas dianteiras desgastadas e discos com leve irregularidade superficial.',
+      workPerformed: 'Substituição das pastilhas dianteiras, limpeza do conjunto e ajuste do sistema de freios.',
+      partsUsed: 'Um jogo de pastilhas de freio dianteiras.',
+      recommendations: 'Revisar discos e fluido de freio após 10.000 km ou seis meses.',
+      totalAmountCents: 70000,
+    });
+
+    const items = testDb.db
+      .select()
+      .from(appointmentServiceItems)
+      .where(eq(appointmentServiceItems.appointmentId, 'seed-appointment-acabado'))
+      .all()
+      .sort((left, right) => left.sortOrder - right.sortOrder);
+    expect(items.map(({ id, description, amountCents, sortOrder }) => ({ id, description, amountCents, sortOrder })))
+      .toEqual([
+        {
+          id: 'seed-service-item-0',
+          description: 'Diagnóstico do sistema de freios',
+          amountCents: 15000,
+          sortOrder: 0,
+        },
+        {
+          id: 'seed-service-item-1',
+          description: 'Jogo de pastilhas de freio dianteiras',
+          amountCents: 32000,
+          sortOrder: 1,
+        },
+        {
+          id: 'seed-service-item-2',
+          description: 'Mão de obra para substituição e ajuste',
+          amountCents: 23000,
+          sortOrder: 2,
+        },
+      ]);
+    expect(items.reduce((total, item) => total + item.amountCents, 0)).toBe(report?.totalAmountCents);
   });
 
   it('documents the second client login and shared password in README', () => {
@@ -160,6 +243,8 @@ describe('seedDev', () => {
       mechanics: testDb.db.select().from(mechanics).all().length,
       timeslots: testDb.db.select().from(timeslots).all().length,
       appointments: testDb.db.select().from(appointments).all().length,
+      appointmentServiceReports: testDb.db.select().from(appointmentServiceReports).all().length,
+      appointmentServiceItems: testDb.db.select().from(appointmentServiceItems).all().length,
     };
 
     await seedDev(testDb.db);
@@ -169,9 +254,13 @@ describe('seedDev', () => {
       mechanics: testDb.db.select().from(mechanics).all().length,
       timeslots: testDb.db.select().from(timeslots).all().length,
       appointments: testDb.db.select().from(appointments).all().length,
+      appointmentServiceReports: testDb.db.select().from(appointmentServiceReports).all().length,
+      appointmentServiceItems: testDb.db.select().from(appointmentServiceItems).all().length,
     };
 
     expect(countsAfter).toEqual(countsBefore);
+    expect(countsAfter.appointmentServiceReports).toBe(1);
+    expect(countsAfter.appointmentServiceItems).toBe(3);
 
     const res = await app.inject({
       method: 'POST',

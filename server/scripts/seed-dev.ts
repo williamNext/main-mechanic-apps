@@ -3,14 +3,40 @@ import { fileURLToPath } from 'node:url';
 import { hashPassword } from '../src/auth/hash.js';
 import { config } from '../src/config/index.js';
 import { createDb, type Db } from '../src/db/client.js';
-import { appointments, mechanics, profiles, timeslots, type Role } from '../src/db/schema.js';
+import {
+  appointmentServiceItems,
+  appointmentServiceReports,
+  appointments,
+  mechanics,
+  profiles,
+  timeslots,
+  type Role,
+} from '../src/db/schema.js';
 
 const SHARED_PASSWORD = 'SenhaDev123!';
 
 const MECHANIC_SEEDS = [
-  { id: 'seed-mechanic-1', name: 'Carlos Silva', specialty: 'Motor e Câmbio', email: 'carlos.silva@oficina.dev' },
-  { id: 'seed-mechanic-2', name: 'Ana Souza', specialty: 'Freios e Suspensão', email: 'ana.souza@oficina.dev' },
-  { id: 'seed-mechanic-3', name: 'João Pereira', specialty: 'Elétrica Automotiva', email: 'joao.pereira@oficina.dev' },
+  {
+    id: 'seed-mechanic-1',
+    name: 'Carlos Silva',
+    specialty: 'Motor e Câmbio',
+    email: 'carlos.silva@oficina.dev',
+    phone: '+5511999990001',
+  },
+  {
+    id: 'seed-mechanic-2',
+    name: 'Ana Souza',
+    specialty: 'Freios e Suspensão',
+    email: 'ana.souza@oficina.dev',
+    phone: '+5511999990002',
+  },
+  {
+    id: 'seed-mechanic-3',
+    name: 'João Pereira',
+    specialty: 'Elétrica Automotiva',
+    email: 'joao.pereira@oficina.dev',
+    phone: '+5511999990003',
+  },
 ] as const;
 
 const INACTIVE_MECHANIC_SEED = {
@@ -18,11 +44,27 @@ const INACTIVE_MECHANIC_SEED = {
   name: 'Paulo Inativo',
   specialty: 'Diagnostico',
   email: 'paulo.inativo@oficina.dev',
+  phone: '+5511999990004',
 } as const;
 
-const CLIENT_SEED = { id: 'seed-client-1', name: 'Mariana Costa', email: 'mariana.costa@oficina.dev' } as const;
-const SECOND_CLIENT_SEED = { id: 'seed-client-2', name: 'Rafael Lima', email: 'rafael.lima@oficina.dev' } as const;
-const ADMIN_SEED = { id: 'seed-admin-1', name: 'Admin Dev', email: 'admin@oficina.dev' } as const;
+const CLIENT_SEED = {
+  id: 'seed-client-1',
+  name: 'Mariana Costa',
+  email: 'mariana.costa@oficina.dev',
+  phone: '+5511988880001',
+} as const;
+const SECOND_CLIENT_SEED = {
+  id: 'seed-client-2',
+  name: 'Rafael Lima',
+  email: 'rafael.lima@oficina.dev',
+  phone: '+5511988880002',
+} as const;
+const ADMIN_SEED = {
+  id: 'seed-admin-1',
+  name: 'Admin Dev',
+  email: 'admin@oficina.dev',
+  phone: '+5511977770001',
+} as const;
 
 const DAYS_AHEAD = 7;
 const SLOTS_PER_DAY = [
@@ -70,11 +112,11 @@ export interface SeedDevResult {
 
 function upsertProfile(
   tx: Parameters<Parameters<Db['transaction']>[0]>[0],
-  seed: { id: string; name: string; email: string },
+  seed: { id: string; name: string; email: string; phone: string },
   role: Role,
   passwordHash: string,
 ) {
-  const values = { id: seed.id, name: seed.name, email: seed.email, role, passwordHash };
+  const values = { id: seed.id, name: seed.name, email: seed.email, phone: seed.phone, role, passwordHash };
   tx.insert(profiles).values(values).onConflictDoUpdate({ target: profiles.id, set: values }).run();
 }
 
@@ -108,7 +150,7 @@ function upsertAppointment(
     date: string;
     startTime: string;
     endTime: string;
-    status: 'confirmado' | 'nao_finalizado' | 'cancelado';
+    status: 'confirmado' | 'nao_finalizado' | 'cancelado' | 'acabado';
     vehicleInfo: string;
     notes: string | null;
   },
@@ -134,6 +176,14 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
     startTime: '09:00',
     endTime: '10:00',
     isAvailable: true,
+  };
+  const completedTimeslot = {
+    id: 'seed-timeslot-completed',
+    mechanicId: MECHANIC_SEEDS[2].id,
+    date: pastDate,
+    startTime: '14:00',
+    endTime: '15:00',
+    isAvailable: false,
   };
   const inactiveTimeslots = [
     {
@@ -191,6 +241,7 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       .run();
 
     upsertTimeslot(tx, activePastTimeslot);
+    upsertTimeslot(tx, completedTimeslot);
     inactiveTimeslots.forEach((slot) => upsertTimeslot(tx, slot));
 
     upsertProfile(tx, CLIENT_SEED, 'client', sharedHash);
@@ -233,10 +284,56 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       vehicleInfo: 'Toyota Corolla 2019',
       notes: null,
     });
+    upsertAppointment(tx, {
+      id: 'seed-appointment-acabado',
+      clientId: SECOND_CLIENT_SEED.id,
+      mechanicId: MECHANIC_SEEDS[2].id,
+      timeslotId: completedTimeslot.id,
+      date: completedTimeslot.date,
+      startTime: completedTimeslot.startTime,
+      endTime: completedTimeslot.endTime,
+      status: 'acabado',
+      vehicleInfo: 'Volkswagen T-Cross 2021',
+      notes: 'Cliente relatou ruído ao frear e vibração no volante.',
+    });
+
+    const serviceItems = [
+      { id: 'seed-service-item-0', description: 'Diagnóstico do sistema de freios', amountCents: 15000, sortOrder: 0 },
+      { id: 'seed-service-item-1', description: 'Jogo de pastilhas de freio dianteiras', amountCents: 32000, sortOrder: 1 },
+      {
+        id: 'seed-service-item-2',
+        description: 'Mão de obra para substituição e ajuste',
+        amountCents: 23000,
+        sortOrder: 2,
+      },
+    ];
+    const totalAmountCents = serviceItems.reduce((total, item) => total + item.amountCents, 0);
+    const reportValues = {
+      appointmentId: 'seed-appointment-acabado',
+      mechanicId: MECHANIC_SEEDS[2].id,
+      summary: 'Revisão do sistema de freios dianteiros concluída',
+      diagnosis: 'Pastilhas dianteiras desgastadas e discos com leve irregularidade superficial.',
+      workPerformed: 'Substituição das pastilhas dianteiras, limpeza do conjunto e ajuste do sistema de freios.',
+      partsUsed: 'Um jogo de pastilhas de freio dianteiras.',
+      recommendations: 'Revisar discos e fluido de freio após 10.000 km ou seis meses.',
+      totalAmountCents,
+    };
+    tx.insert(appointmentServiceReports)
+      .values(reportValues)
+      .onConflictDoUpdate({ target: appointmentServiceReports.appointmentId, set: reportValues })
+      .run();
+
+    serviceItems.forEach((item) => {
+      const values = { ...item, appointmentId: 'seed-appointment-acabado' };
+      tx.insert(appointmentServiceItems)
+        .values(values)
+        .onConflictDoUpdate({ target: appointmentServiceItems.id, set: values })
+        .run();
+    });
   });
 
   const mechanicIds = MECHANIC_SEEDS.map((m) => m.id);
-  const timeslotCount = mechanicIds.length * dates.length * SLOTS_PER_DAY.length + 1 + inactiveTimeslots.length;
+  const timeslotCount = mechanicIds.length * dates.length * SLOTS_PER_DAY.length + 2 + inactiveTimeslots.length;
   console.log(
     `Seeded ${mechanicIds.length} active mechanics, 1 inactive mechanic, 2 clients, 1 admin, ${timeslotCount} timeslots.`,
   );
