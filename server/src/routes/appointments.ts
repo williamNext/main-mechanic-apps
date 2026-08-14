@@ -1,14 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { appointmentViewColumns, serializeAppointment, type AppointmentViewRow } from '../appointments/serializer.js';
+import {
+  appointmentViewColumnsFor,
+  serializeAppointment,
+  type AppointmentViewRow,
+  type ServiceItem,
+} from '../appointments/serializer.js';
 import { syncUnfinalized } from '../appointments/sync-unfinalized.js';
 import { runImmediateTransaction } from '../appointments/transactions.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import type { Db } from '../db/client.js';
 import {
   appointmentServiceReports,
+  appointmentServiceItems,
   appointments,
   mechanics,
   notifications,
@@ -50,6 +56,34 @@ function mechanicNotificationBody(action: 'agendou' | 'cancelou', clientName: st
     : `${clientName} cancelou o agendamento de ${dateTime}.`;
 }
 
+function loadServiceItems(db: Db, appointmentIds: string[]) {
+  const grouped = new Map<string, ServiceItem[]>();
+  if (appointmentIds.length === 0) {
+    return grouped;
+  }
+
+  const rows = db
+    .select({
+      appointmentId: appointmentServiceItems.appointmentId,
+      id: appointmentServiceItems.id,
+      description: appointmentServiceItems.description,
+      amountCents: appointmentServiceItems.amountCents,
+      sortOrder: appointmentServiceItems.sortOrder,
+    })
+    .from(appointmentServiceItems)
+    .where(inArray(appointmentServiceItems.appointmentId, appointmentIds))
+    .orderBy(asc(appointmentServiceItems.sortOrder))
+    .all();
+
+  for (const { appointmentId, ...item } of rows) {
+    const items = grouped.get(appointmentId) ?? [];
+    items.push(item);
+    grouped.set(appointmentId, items);
+  }
+
+  return grouped;
+}
+
 export function appointmentRoutes(app: FastifyInstance, db: Db) {
   const authenticate = requireAuth(db);
 
@@ -57,51 +91,75 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
     syncUnfinalized(db);
 
     const caller = db
-      .select({ role: profiles.role })
+      .select({ role: profiles.role, name: profiles.name })
       .from(profiles)
       .where(eq(profiles.id, request.user!.sub))
       .get();
-    if (caller?.role !== 'client') {
+    if (caller?.role !== 'client' && caller?.role !== 'mechanic') {
       throw new HttpError(501, 'not implemented', 'NOT_IMPLEMENTED');
     }
 
+    const viewer = caller.role;
+
     const rows = db
-      .select(appointmentViewColumns)
+      .select(appointmentViewColumnsFor(viewer))
       .from(appointments)
-      .innerJoin(profiles, eq(profiles.id, appointments.mechanicId))
+      .innerJoin(
+        profiles,
+        eq(profiles.id, viewer === 'client' ? appointments.mechanicId : appointments.clientId),
+      )
       .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
-      .where(eq(appointments.clientId, request.user!.sub))
+      .where(eq(viewer === 'client' ? appointments.clientId : appointments.mechanicId, request.user!.sub))
       .orderBy(desc(appointments.date), desc(appointments.startTime))
       .all();
 
-    return rows.map(serializeAppointment);
+    const scopedRows: AppointmentViewRow[] = rows.map((row) =>
+      viewer === 'client' ? { ...row, clientName: caller.name } : { ...row, mechanicName: caller.name },
+    );
+    const itemsByAppointment = loadServiceItems(db, scopedRows.map((row) => row.id));
+
+    return scopedRows.map((row) => serializeAppointment(row, viewer, itemsByAppointment.get(row.id) ?? []));
   });
 
   app.get<{ Params: { id: string } }>('/appointments/:id', { preHandler: authenticate }, async (request) => {
     syncUnfinalized(db);
 
     const caller = db
-      .select({ role: profiles.role })
+      .select({ role: profiles.role, name: profiles.name })
       .from(profiles)
       .where(eq(profiles.id, request.user!.sub))
       .get();
-    if (caller?.role !== 'client') {
+    if (caller?.role !== 'client' && caller?.role !== 'mechanic') {
       throw appointmentNotFound();
     }
 
+    const viewer = caller.role;
+
     const row = db
-      .select(appointmentViewColumns)
+      .select(appointmentViewColumnsFor(viewer))
       .from(appointments)
-      .innerJoin(profiles, eq(profiles.id, appointments.mechanicId))
+      .innerJoin(
+        profiles,
+        eq(profiles.id, viewer === 'client' ? appointments.mechanicId : appointments.clientId),
+      )
       .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
-      .where(and(eq(appointments.id, request.params.id), eq(appointments.clientId, request.user!.sub)))
+      .where(
+        and(
+          eq(appointments.id, request.params.id),
+          eq(viewer === 'client' ? appointments.clientId : appointments.mechanicId, request.user!.sub),
+        ),
+      )
       .get();
 
     if (!row) {
       throw appointmentNotFound();
     }
 
-    return serializeAppointment(row);
+    const scopedRow: AppointmentViewRow =
+      viewer === 'client' ? { ...row, clientName: caller.name } : { ...row, mechanicName: caller.name };
+    const items = loadServiceItems(db, [scopedRow.id]).get(scopedRow.id) ?? [];
+
+    return serializeAppointment(scopedRow, viewer, items);
   });
 
   app.post(
@@ -198,6 +256,8 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
             ...inserted,
             mechanicName: slot.mechanicName,
             mechanicPhone: slot.mechanicPhone,
+            clientName: client.name,
+            clientPhone: null,
             serviceSummary: null,
             serviceDiagnosis: null,
             workPerformed: null,
@@ -210,7 +270,8 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
         { appointmentsTimeslotUnique: true },
       );
 
-      return reply.code(201).send(serializeAppointment(appointment));
+      const items = loadServiceItems(db, [appointment.id]).get(appointment.id) ?? [];
+      return reply.code(201).send(serializeAppointment(appointment, 'client', items));
     },
   );
 
@@ -231,7 +292,7 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
         }
 
         const row = tx
-          .select(appointmentViewColumns)
+          .select(appointmentViewColumnsFor('client'))
           .from(appointments)
           .innerJoin(profiles, eq(profiles.id, appointments.mechanicId))
           .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
@@ -241,8 +302,16 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
         if (!row) {
           throw appointmentNotFound();
         }
+
+        const client = tx
+          .select({ name: profiles.name })
+          .from(profiles)
+          .where(eq(profiles.id, row.clientId))
+          .get()!;
+        const scopedRow: AppointmentViewRow = { ...row, clientName: client.name, clientPhone: null };
+
         if (row.status === 'cancelado') {
-          return row;
+          return scopedRow;
         }
         if (row.status !== 'confirmado') {
           throw new HttpError(
@@ -251,12 +320,6 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
             'APPOINTMENT_NOT_CANCELLABLE',
           );
         }
-
-        const client = tx
-          .select({ name: profiles.name })
-          .from(profiles)
-          .where(eq(profiles.id, row.clientId))
-          .get()!;
 
         tx.update(appointments).set({ status: 'cancelado' }).where(eq(appointments.id, row.id)).run();
         if (row.timeslotId !== null) {
@@ -283,10 +346,11 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
           })
           .run();
 
-        return { ...row, status: 'cancelado' };
+        return { ...scopedRow, status: 'cancelado' };
       });
 
-      return serializeAppointment(appointment);
+      const items = loadServiceItems(db, [appointment.id]).get(appointment.id) ?? [];
+      return serializeAppointment(appointment, 'client', items);
     },
   );
 }

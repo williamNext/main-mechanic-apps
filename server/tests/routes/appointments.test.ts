@@ -30,6 +30,35 @@ function makeAdminToken(testDb: TestDb) {
   return { id, token };
 }
 
+function insertServiceReportItems(
+  testDb: TestDb,
+  appointmentId: string,
+  mechanicId: string,
+  items: Array<{ id: string; description: string; amountCents: number; sortOrder: number }>,
+) {
+  testDb.connection
+    .prepare(
+      `INSERT INTO appointment_service_reports
+         (appointment_id, mechanic_id, summary, work_performed, total_amount_cents)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(
+      appointmentId,
+      mechanicId,
+      'Revisao concluida',
+      'Servico executado',
+      items.reduce((total, item) => total + item.amountCents, 0),
+    );
+
+  const statement = testDb.connection.prepare(
+    `INSERT INTO appointment_service_items (id, appointment_id, description, amount_cents, sort_order)
+     VALUES (?, ?, ?, ?, ?)`,
+  );
+  for (const item of items) {
+    statement.run(item.id, appointmentId, item.description, item.amountCents, item.sortOrder);
+  }
+}
+
 describe('GET /appointments', () => {
   let testDb: TestDb;
   let app: FastifyInstance;
@@ -112,6 +141,8 @@ describe('GET /appointments', () => {
       createdAt: expect.any(String),
       mechanicName: 'Carlos Lima',
       mechanicPhone: '+5511777777777',
+      clientName: 'Test Person',
+      clientPhone: null,
       serviceSummary: null,
       serviceDiagnosis: null,
       workPerformed: null,
@@ -123,11 +154,69 @@ describe('GET /appointments', () => {
     });
   });
 
-  it.each([
-    ['mechanic', (database: TestDb) => makeMechanicToken(database)],
-    ['admin', (database: TestDb) => makeAdminToken(database)],
-  ] as const)('returns NOT_IMPLEMENTED for a stored %s role', async (_role, makeCaller) => {
-    const caller = makeCaller(testDb);
+  it('returns assigned appointments for a mechanic with all statuses and descending date/time order', async () => {
+    testDb.connection.prepare('UPDATE profiles SET phone = ? WHERE id = ?').run('+5511555555555', clientId);
+    const mechanicToken = signAccessToken({ userId: mechanicId, role: 'mechanic' }).token;
+    const appointmentsByExpectedOrder = [
+      insertAppointment(testDb, {
+        clientId,
+        mechanicId,
+        date: '2026-08-16',
+        startTime: '15:00:00',
+        endTime: '16:00:00',
+        status: 'acabado',
+      }),
+      insertAppointment(testDb, {
+        clientId,
+        mechanicId,
+        date: '2026-08-16',
+        startTime: '10:00:00',
+        endTime: '11:00:00',
+        status: 'cancelado',
+      }),
+      insertAppointment(testDb, {
+        clientId,
+        mechanicId,
+        date: '2026-08-15',
+        status: 'nao_finalizado',
+      }),
+      insertAppointment(testDb, {
+        clientId,
+        mechanicId,
+        date: '2026-08-14',
+        status: 'confirmado',
+      }),
+    ];
+    const otherMechanic = insertMechanic(testDb);
+    const hidden = insertAppointment(testDb, { clientId, mechanicId: otherMechanic, date: '2026-08-17' });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/appointments',
+      headers: auth(mechanicToken),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().map((appointment: { id: string }) => appointment.id)).toEqual(
+      appointmentsByExpectedOrder,
+    );
+    expect(response.body).not.toContain(hidden);
+    expect(response.json().map((appointment: { status: string }) => appointment.status)).toEqual([
+      'acabado',
+      'cancelado',
+      'nao_finalizado',
+      'confirmado',
+    ]);
+    expect(response.json()[0]).toEqual(expect.objectContaining({
+      mechanicName: 'Carlos Lima',
+      mechanicPhone: null,
+      clientName: 'Test Person',
+      clientPhone: '+5511555555555',
+    }));
+  });
+
+  it('returns NOT_IMPLEMENTED for a stored admin role', async () => {
+    const caller = makeAdminToken(testDb);
 
     const response = await app.inject({
       method: 'GET',
@@ -202,7 +291,29 @@ describe('GET /appointments/:id', () => {
       mechanicId,
       mechanicName: 'Marina Costa',
       mechanicPhone: '+5511666666666',
+      clientName: 'Test Person',
+      clientPhone: null,
       serviceItems: [],
+    }));
+  });
+
+  it('returns assigned detail to a mechanic with viewer-scoped contacts', async () => {
+    testDb.connection.prepare('UPDATE profiles SET phone = ? WHERE id = ?').run('+5511444444444', clientId);
+    const mechanicToken = signAccessToken({ userId: mechanicId, role: 'mechanic' }).token;
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/appointments/${appointmentId}`,
+      headers: auth(mechanicToken),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({
+      mechanicName: 'Marina Costa',
+      mechanicPhone: null,
+      clientName: 'Test Person',
+      clientPhone: '+5511444444444',
     }));
   });
 
@@ -241,6 +352,31 @@ describe('GET /appointments/:id', () => {
     expect(wrongRole.body).toBe(unknown.body);
     expect(adminRole.body).toBe(unknown.body);
     expect(unknown.json()).toEqual({ error: 'appointment not found', code: 'APPOINTMENT_NOT_FOUND' });
+  });
+
+  it('returns service items in sort order from detail and list', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId, status: 'acabado' });
+    const firstId = randomUUID();
+    const secondId = randomUUID();
+    insertServiceReportItems(testDb, appointmentId, mechanicId, [
+      { id: secondId, description: 'Mao de obra', amountCents: 20000, sortOrder: 1 },
+      { id: firstId, description: 'Pastilhas', amountCents: 15000, sortOrder: 0 },
+    ]);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/appointments/${appointmentId}`,
+      headers: auth(clientToken),
+    });
+    const list = await app.inject({ method: 'GET', url: '/appointments', headers: auth(clientToken) });
+
+    expect(response.statusCode).toBe(200);
+    const expectedItems = [
+      { id: firstId, description: 'Pastilhas', amountCents: 15000, sortOrder: 0 },
+      { id: secondId, description: 'Mao de obra', amountCents: 20000, sortOrder: 1 },
+    ];
+    expect(response.json().serviceItems).toEqual(expectedItems);
+    expect(list.json()[0].serviceItems).toEqual(expectedItems);
   });
 
   it('transitions a past confirmed appointment before returning detail', async () => {
@@ -318,6 +454,8 @@ describe('POST /appointments', () => {
       createdAt: expect.any(String),
       mechanicName: 'João Silva',
       mechanicPhone: '+5511999999999',
+      clientName: 'Test Person',
+      clientPhone: null,
       serviceSummary: null,
       serviceDiagnosis: null,
       workPerformed: null,
@@ -597,6 +735,8 @@ describe('POST /appointments/:id/cancel', () => {
       status: 'cancelado',
       mechanicName: 'Maria Souza',
       mechanicPhone: '+5511888888888',
+      clientName: 'Test Person',
+      clientPhone: null,
       serviceSummary: null,
       serviceDiagnosis: null,
       serviceItems: [],
