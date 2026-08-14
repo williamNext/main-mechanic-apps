@@ -22,7 +22,7 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   fetch: async (recipientId) => {
     set({ isLoading: true, error: null });
     try {
-      const notifications = await notificationService.getNotifications(recipientId);
+      const notifications = await notificationService.getNotifications();
       set({
         notifications,
         unreadCount: notifications.filter((item) => !item.readAt).length,
@@ -35,7 +35,7 @@ export const useNotificationStore = create<NotificationState>((set) => ({
 
   fetchUnreadCount: async (recipientId) => {
     try {
-      const unreadCount = await notificationService.getUnreadNotificationCount(recipientId);
+      const unreadCount = await notificationService.getUnreadNotificationCount();
       set({ unreadCount });
     } catch {
       set({ error: 'Falha ao carregar notificacoes' });
@@ -55,7 +55,7 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   },
 
   markAllRead: async (recipientId) => {
-    await notificationService.markAllNotificationsRead(recipientId);
+    await notificationService.markAllNotificationsRead();
     const now = new Date().toISOString();
     set((state) => ({
       notifications: state.notifications.map((item) => ({ ...item, readAt: item.readAt ?? now })),

@@ -4,7 +4,7 @@ import { Appointment, CompleteAppointmentInput } from '@/types/models';
 export type { CompleteAppointmentInput };
 
 export interface BookAppointmentInput {
-  timeSlotId: string;
+  timeslotId: string;
   vehicleInfo?: string;
   notes?: string;
 }
@@ -27,7 +27,7 @@ function mapAppointmentRow(a: any): Appointment {
     id: a.id,
     clientId: a.client_id,
     mechanicId: a.mechanic_id,
-    timeSlotId: a.timeslot_id,
+    timeslotId: a.timeslot_id,
     date: a.date,
     startTime: a.start_time,
     endTime: a.end_time,
@@ -164,7 +164,7 @@ export async function getAppointmentsByMechanic(mechanicId: string): Promise<App
 export async function createAppointment(appointment: BookAppointmentInput): Promise<Appointment> {
   const { data, error } = await supabase
     .rpc('book_client_appointment', {
-      p_timeslot_id: appointment.timeSlotId,
+      p_timeslot_id: appointment.timeslotId,
       p_vehicle_info: appointment.vehicleInfo ?? null,
       p_notes: appointment.notes ?? null,
     });

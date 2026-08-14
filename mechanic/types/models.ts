@@ -40,7 +40,7 @@ export interface Appointment {
   mechanicId: string;
   mechanicName?: string;
   mechanicPhone?: string;
-  timeSlotId: string;
+  timeslotId: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -68,15 +68,12 @@ export interface ServiceItem {
 export interface AppNotification {
   id: string;
   recipientId: string;
-  actorId?: string | null;
-  appointmentId?: string | null;
+  appointmentId: string | null;
   type: NotificationType;
   title: string;
   body: string;
-  data: Record<string, unknown>;
-  readAt?: string | null;
+  readAt: string | null;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface CompleteAppointmentInput {
