@@ -1,5 +1,6 @@
 import { supabase } from './api';
 import { Appointment, CompleteAppointmentInput } from '@/types/models';
+import { isApiError, request } from './wire-client';
 
 export type { CompleteAppointmentInput };
 
@@ -131,34 +132,19 @@ export async function getAppointmentsByClient(clientId: string): Promise<Appoint
   }));
 }
 
-export async function getAppointmentsByMechanic(mechanicId: string): Promise<Appointment[]> {
-  await syncUnfinalizedAppointments();
+export async function getAppointmentsByMechanic(): Promise<Appointment[]> {
+  return request<Appointment[]>('/appointments');
+}
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .select(`
-      *,
-      client:profiles!client_id(name, phone),
-      appointment_service_reports (
-        summary,
-        diagnosis,
-        work_performed,
-        parts_used,
-        recommendations,
-        total_amount_cents,
-        closed_at
-      )
-    `)
-    .eq('mechanic_id', mechanicId)
-    .order('date', { ascending: false });
-
-  if (error) throw error;
-
-  return data.map((a: any) => mapAppointmentRow({
-    ...a,
-    clientName: a.client?.name ?? undefined,
-    clientPhone: a.client?.phone ?? undefined,
-  }));
+export async function getAppointmentById(id: string): Promise<Appointment | null> {
+  try {
+    return await request<Appointment>(`/appointments/${encodeURIComponent(id)}`);
+  } catch (error) {
+    if (isApiError(error) && error.code === 'APPOINTMENT_NOT_FOUND') {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function createAppointment(appointment: BookAppointmentInput): Promise<Appointment> {
@@ -203,28 +189,25 @@ export async function cancelClientAppointment(appointmentId: string): Promise<vo
   if (error) throw error;
 }
 
-export async function cancelMechanicAppointment(appointmentId: string): Promise<void> {
-  const { error } = await supabase.rpc('cancel_mechanic_appointment', {
-    p_appointment_id: appointmentId,
+export async function cancelMechanicAppointment(appointmentId: string): Promise<Appointment> {
+  return request<Appointment>(`/appointments/${encodeURIComponent(appointmentId)}/cancel`, {
+    method: 'POST',
   });
-
-  if (error) throw error;
 }
 
-export async function completeMechanicAppointment(input: CompleteAppointmentInput): Promise<void> {
-  const { error } = await supabase.rpc('complete_mechanic_appointment', {
-    p_appointment_id: input.appointmentId,
-    p_summary: input.summary,
-    p_diagnosis: input.diagnosis ?? null,
-    p_work_performed: input.workPerformed,
-    p_parts_used: input.partsUsed ?? null,
-    p_recommendations: input.recommendations ?? null,
-    p_items: input.items.map((item, index) => ({
-      description: item.description,
-      amountCents: item.amountCents,
-      sortOrder: item.sortOrder ?? index,
-    })),
+export async function completeMechanicAppointment(input: CompleteAppointmentInput): Promise<Appointment> {
+  return request<Appointment>(`/appointments/${encodeURIComponent(input.appointmentId)}/complete`, {
+    method: 'POST',
+    body: {
+      summary: input.summary,
+      diagnosis: input.diagnosis,
+      workPerformed: input.workPerformed,
+      partsUsed: input.partsUsed,
+      recommendations: input.recommendations,
+      items: input.items.map((item) => ({
+        description: item.description,
+        amountCents: item.amountCents,
+      })),
+    },
   });
-
-  if (error) throw error;
 }

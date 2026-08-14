@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, CalendarDays, Car, Clock3, Phone, Plus, Trash2, UserRound } from 'lucide-react-native';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { getApiErrorMessage } from '@/services/error-messages';
+import { isApiError } from '@/services/wire-client';
 import { useAppointmentStore } from '@/stores/appointment-store';
 import { colors, radius, shadow, spacing, statusTheme, typography } from '@/constants/theme';
 import { formatDateFull, formatTimeRange } from '@/utils/date';
@@ -32,15 +34,32 @@ function blankItem(): ServiceItemDraft {
   return { id: `${Date.now()}-${Math.random()}`, description: '', amount: '' };
 }
 
+function ScreenErrorBanner({ message, testID }: { message: string | null; testID: string }) {
+  if (!message) return null;
+
+  return (
+    <View style={styles.errorBanner} testID={testID}>
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
+
 export default function MechanicAppointmentDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const appointmentId = safeParam(id);
-  const appointments = useAppointmentStore((state) => state.appointments);
+  const selectedAppointment = useAppointmentStore((state) => state.selectedAppointment);
+  const loadedAppointmentId = useAppointmentStore((state) => state.loadedAppointmentId);
+  const isDetailLoading = useAppointmentStore((state) => state.isDetailLoading);
+  const loadError = useAppointmentStore((state) => state.error);
+  const fetchById = useAppointmentStore((state) => state.fetchById);
   const cancelByMechanic = useAppointmentStore((state) => state.cancelByMechanic);
   const completeByMechanic = useAppointmentStore((state) => state.completeByMechanic);
   const [cancelling, setCancelling] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [finishError, setFinishError] = useState<string | null>(null);
   const [summary, setSummary] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [workPerformed, setWorkPerformed] = useState('');
@@ -48,39 +67,51 @@ export default function MechanicAppointmentDetailScreen() {
   const [recommendations, setRecommendations] = useState('');
   const [items, setItems] = useState<ServiceItemDraft[]>([blankItem()]);
 
-  const appointment = useMemo(
-    () => appointments.find((item) => item.id === appointmentId),
-    [appointments, appointmentId],
-  );
+  const appointment = selectedAppointment?.id === appointmentId ? selectedAppointment : null;
+
+  useEffect(() => {
+    if (appointmentId) {
+      void fetchById(appointmentId);
+    }
+  }, [appointmentId, fetchById]);
 
   const canClose = appointment?.status === 'confirmado' || appointment?.status === 'nao_finalizado';
   const totalCents = items.reduce((sum, item) => sum + (parseMoneyCents(item.amount) ?? 0), 0);
 
   const handleCancel = () => {
     if (!appointment || !canClose) return;
+    setCancelError(null);
+    setShowCancelModal(true);
+  };
 
-    Alert.alert('Cancelar agendamento?', 'Horario sera liberado para clientes.', [
-      { text: 'Manter', style: 'cancel' },
-      {
-        text: 'Cancelar',
-        style: 'destructive',
-        onPress: async () => {
-          setCancelling(true);
-          try {
-            await cancelByMechanic(appointment.id);
-            router.back();
-          } catch (error: any) {
-            Alert.alert('Falha ao cancelar', error.message || 'Tente novamente.');
-          } finally {
-            setCancelling(false);
-          }
-        },
-      },
-    ]);
+  const closeCancelModal = () => {
+    if (cancelling) return;
+    setShowCancelModal(false);
+  };
+
+  const confirmCancel = async () => {
+    if (!appointment || !canClose || cancelling) return;
+
+    setCancelError(null);
+    setCancelling(true);
+    try {
+      await cancelByMechanic(appointment.id);
+      setShowCancelModal(false);
+      router.back();
+    } catch (error: unknown) {
+      const code = isApiError(error) ? error.code : null;
+      const message = getApiErrorMessage(code);
+      setCancelError(message);
+      Alert.alert('Falha ao cancelar', message);
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const handleFinish = async () => {
     if (!appointment || !canClose || finishing) return;
+
+    setFinishError(null);
 
     const preparedItems = items.map((item, index) => ({
       description: item.description.trim(),
@@ -89,12 +120,16 @@ export default function MechanicAppointmentDetailScreen() {
     }));
 
     if (summary.trim().length < 3 || workPerformed.trim().length < 3) {
-      Alert.alert('Revise o fechamento', 'Resumo e servico executado sao obrigatorios.');
+      const message = 'Resumo e servico executado sao obrigatorios.';
+      setFinishError(message);
+      Alert.alert('Revise o fechamento', message);
       return;
     }
 
     if (preparedItems.length === 0 || preparedItems.some((item) => !item.description || item.amountCents === null)) {
-      Alert.alert('Revise os valores', 'Informe descricao e valor valido para cada item.');
+      const message = 'Informe descricao e valor valido para cada item.';
+      setFinishError(message);
+      Alert.alert('Revise os valores', message);
       return;
     }
 
@@ -115,12 +150,31 @@ export default function MechanicAppointmentDetailScreen() {
       });
       Alert.alert('Servico finalizado', 'Fechamento salvo com sucesso.');
       router.back();
-    } catch (error: any) {
-      Alert.alert('Falha ao finalizar', error.message || 'Tente novamente.');
+    } catch (error: unknown) {
+      const code = isApiError(error) ? error.code : null;
+      const message = getApiErrorMessage(code);
+      setFinishError(message);
+      Alert.alert('Falha ao finalizar', message);
     } finally {
       setFinishing(false);
     }
   };
+
+  if (isDetailLoading || loadedAppointmentId !== appointmentId) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={20} color={colors.onSurface} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Agendamento</Text>
+        </View>
+        <View style={styles.empty}>
+          <ActivityIndicator color={colors.safetyOrange} />
+        </View>
+      </View>
+    );
+  }
 
   if (!appointment) {
     return (
@@ -132,8 +186,11 @@ export default function MechanicAppointmentDetailScreen() {
           <Text style={styles.headerTitle}>Agendamento</Text>
         </View>
         <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Agendamento nao carregado</Text>
-          <Text style={styles.emptyText}>Volte para agenda e atualize agendamentos atribuidos.</Text>
+          <Text style={styles.emptyTitle}>Agendamento nao encontrado</Text>
+          <ScreenErrorBanner
+            message={loadError ?? getApiErrorMessage('APPOINTMENT_NOT_FOUND')}
+            testID="appointment-load-error-banner"
+          />
         </View>
       </View>
     );
@@ -191,8 +248,44 @@ export default function MechanicAppointmentDetailScreen() {
           <View style={styles.infoCard}>
             <Text style={styles.sectionTitle}>Servico finalizado</Text>
             <Text style={styles.infoText}>{appointment.serviceSummary ?? 'Resumo nao informado'}</Text>
-            <Text style={styles.notes}>{appointment.workPerformed ?? 'Detalhamento nao informado'}</Text>
+            {appointment.serviceDiagnosis ? (
+              <ReportField label="Diagnostico" value={appointment.serviceDiagnosis} />
+            ) : null}
+            {appointment.workPerformed ? (
+              <ReportField label="Servico executado" value={appointment.workPerformed} />
+            ) : null}
+            {appointment.partsUsed ? (
+              <ReportField label="Pecas utilizadas" value={appointment.partsUsed} />
+            ) : null}
+            {appointment.recommendations ? (
+              <ReportField label="Recomendacoes" value={appointment.recommendations} />
+            ) : null}
+            {appointment.closedAt ? (
+              <ReportField
+                label="Finalizado em"
+                value={new Intl.DateTimeFormat('pt-BR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                }).format(new Date(appointment.closedAt))}
+              />
+            ) : null}
             <Text style={styles.totalText}>{formatMoney(appointment.totalAmountCents)}</Text>
+
+            {appointment.serviceItems && appointment.serviceItems.length > 0 ? (
+              <View style={styles.reportItems}>
+                <Text style={styles.reportLabel}>Itens do servico</Text>
+                {appointment.serviceItems.map((item, index) => (
+                  <View key={item.id ?? `${index}-${item.description}`} style={styles.reportItemRow}>
+                    <Text style={styles.reportItemDescription}>{item.description}</Text>
+                    <Text style={styles.reportItemAmount}>{formatMoney(item.amountCents)}</Text>
+                  </View>
+                ))}
+                <View style={styles.reportTotalRow}>
+                  <Text style={styles.totalLabel}>Total</Text>
+                  <Text style={styles.totalText}>{formatMoney(appointment.totalAmountCents)}</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -246,6 +339,8 @@ export default function MechanicAppointmentDetailScreen() {
               <Text style={styles.totalText}>{formatMoney(totalCents)}</Text>
             </View>
 
+            <ScreenErrorBanner message={finishError} testID="appointment-finish-error-banner" />
+
             <PrimaryButton
               title="Finalizar servico"
               onPress={handleFinish}
@@ -262,6 +357,47 @@ export default function MechanicAppointmentDetailScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <Modal
+        transparent
+        visible={showCancelModal}
+        animationType="fade"
+        onRequestClose={closeCancelModal}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={closeCancelModal}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Cancelar agendamento?</Text>
+            <Text style={styles.modalDescription}>Horario sera liberado para clientes. Deseja continuar?</Text>
+            <ScreenErrorBanner message={cancelError} testID="appointment-cancel-error-banner" />
+            <View style={styles.modalActions}>
+              <PrimaryButton
+                title="Manter"
+                variant="outlined"
+                onPress={closeCancelModal}
+                disabled={cancelling}
+              />
+              <PrimaryButton
+                title="Cancelar"
+                variant="danger"
+                onPress={() => {
+                  void confirmCancel();
+                }}
+                loading={cancelling}
+                disabled={cancelling}
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+function ReportField({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.reportField}>
+      <Text style={styles.reportLabel}>{label}</Text>
+      <Text style={styles.infoText}>{value}</Text>
     </View>
   );
 }
@@ -343,6 +479,20 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
   infoText: { ...typography.bodyMd, color: colors.onSurface, flex: 1 },
   notes: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  reportField: { gap: spacing.xs },
+  reportLabel: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'uppercase' },
+  reportItems: { gap: spacing.sm },
+  reportItemRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  reportItemDescription: { ...typography.bodyMd, color: colors.onSurface, flex: 1 },
+  reportItemAmount: { ...typography.bodyMd, color: colors.onSurface },
+  reportTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.outlineVariant,
+    paddingTop: spacing.sm,
+  },
   field: { gap: 5 },
   fieldLabel: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'uppercase' },
   input: {
@@ -376,6 +526,36 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { ...typography.labelMd, color: colors.onSurfaceVariant },
   totalText: { ...typography.headlineMd, color: colors.onSurface },
+  errorText: { ...typography.labelSm, color: colors.error },
+  errorBanner: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: radius.md,
+    backgroundColor: colors.errorContainer,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.44)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    ...shadow.medium,
+  },
+  modalTitle: { ...typography.headlineMd, color: colors.onSurface },
+  modalDescription: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  modalActions: { gap: spacing.sm, marginTop: spacing.xs },
   empty: {
     margin: spacing.marginMobile,
     minHeight: 180,

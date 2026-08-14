@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CalendarDays, Clock3, UserRound } from 'lucide-react-native';
+import { CalendarDays, Clock3, Phone, UserRound } from 'lucide-react-native';
 import { Appointment } from '@/types/models';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAppointmentStore } from '@/stores/appointment-store';
@@ -39,6 +39,16 @@ function filterAppointments(appointments: Appointment[], mode: AgendaMode) {
     .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
 }
 
+function ScreenErrorBanner({ message, testID }: { message: string | null; testID: string }) {
+  if (!message) return null;
+
+  return (
+    <View style={styles.errorBanner} testID={testID}>
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
+
 function AppointmentRow({ appointment, onPress }: { appointment: Appointment; onPress: () => void }) {
   const theme = statusTheme[appointment.status] ?? statusTheme.confirmado;
 
@@ -52,6 +62,12 @@ function AppointmentRow({ appointment, onPress }: { appointment: Appointment; on
       </View>
 
       <Text style={styles.clientName}>{appointment.clientName ?? 'Cliente'}</Text>
+      {appointment.clientPhone ? (
+        <View style={styles.metaRow}>
+          <Phone size={16} color={colors.onSurfaceVariant} />
+          <Text style={styles.metaText}>{appointment.clientPhone}</Text>
+        </View>
+      ) : null}
       <View style={styles.metaRow}>
         <CalendarDays size={16} color={colors.onSurfaceVariant} />
         <Text style={styles.metaText}>{formatDateFull(appointment.date)}</Text>
@@ -74,7 +90,7 @@ export default function AgendaScreen() {
 
   useEffect(() => {
     if (user?.role === 'mechanic') {
-      void fetchByMechanic(user.id);
+      void fetchByMechanic();
     }
   }, [fetchByMechanic, user]);
 
@@ -90,7 +106,7 @@ export default function AgendaScreen() {
 
   const refresh = () => {
     if (user?.role === 'mechanic') {
-      void fetchByMechanic(user.id);
+      void fetchByMechanic();
     }
   };
 
@@ -125,7 +141,7 @@ export default function AgendaScreen() {
         ))}
       </View>
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      <ScreenErrorBanner message={error} testID="agenda-load-error-banner" />
 
       <ScrollView
         contentContainerStyle={styles.list}
@@ -187,7 +203,17 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: colors.surfaceContainerLowest, ...shadow.light },
   segmentText: { ...typography.labelSm, color: colors.onSurfaceVariant },
   segmentTextActive: { color: colors.onSurface },
-  errorText: { ...typography.labelSm, color: colors.error, marginHorizontal: spacing.marginMobile },
+  errorText: { ...typography.labelSm, color: colors.error },
+  errorBanner: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: radius.md,
+    backgroundColor: colors.errorContainer,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.marginMobile,
+    marginBottom: spacing.sm,
+  },
   list: { paddingHorizontal: spacing.marginMobile, paddingBottom: 120, gap: spacing.sm },
   card: {
     backgroundColor: colors.surfaceContainerLowest,

@@ -1,11 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BadgeCheck, UserRound } from 'lucide-react-native';
 import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { getApiErrorMessage } from '@/services/error-messages';
+import { isApiError } from '@/services/wire-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { Mechanic } from '@/types/models';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+
+function ScreenErrorBanner({ message, testID }: { message: string | null; testID: string }) {
+  if (!message) return null;
+
+  return (
+    <View style={styles.errorBanner} testID={testID}>
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
 
 export default function MechanicProfileScreen() {
   const user = useAuthStore((state) => state.user);
@@ -16,6 +28,7 @@ export default function MechanicProfileScreen() {
   const [name, setName] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     if (mechanic) {
@@ -38,16 +51,27 @@ export default function MechanicProfileScreen() {
         specialty: specialty.trim(),
       });
       Alert.alert('Perfil salvo', 'Perfil publico do mecanico atualizado.');
-    } catch (error: any) {
-      setError(error.message || 'Falha ao atualizar perfil.');
+    } catch (saveError: unknown) {
+      const code = isApiError(saveError) ? saveError.code : null;
+      const message = getApiErrorMessage(code);
+      setError(message);
+      Alert.alert('Falha ao atualizar perfil', message);
     }
   };
 
   const handleLogout = () => {
-    Alert.alert('Sair?', 'A sessao local atual sera encerrada.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => void logout() },
-    ]);
+    setShowLogoutModal(true);
+  };
+
+  const closeLogoutModal = () => {
+    if (isLoading) return;
+    setShowLogoutModal(false);
+  };
+
+  const confirmLogout = async () => {
+    if (isLoading) return;
+    await logout();
+    setShowLogoutModal(false);
   };
 
   return (
@@ -78,12 +102,43 @@ export default function MechanicProfileScreen() {
           <AppInput label="Especialidade" value={specialty} onChangeText={setSpecialty} placeholder="Eletrica, freios, motor" />
           <AppInput label="Telefone" value={mechanic?.phone ?? 'Telefone nao definido'} editable={false} placeholder="Telefone" />
           <Text style={styles.helperText}>Alteracao de telefone vai exigir verificacao por codigo. Funcao fica para proxima etapa.</Text>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <ScreenErrorBanner message={error} testID="profile-save-error-banner" />
           <PrimaryButton title="Salvar perfil" onPress={handleSave} loading={isLoading} disabled={isLoading} variant="filled" />
         </View>
 
         <PrimaryButton title="Sair" onPress={handleLogout} variant="outlined" />
       </ScrollView>
+
+      <Modal
+        transparent
+        visible={showLogoutModal}
+        animationType="fade"
+        onRequestClose={closeLogoutModal}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={closeLogoutModal}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Sair?</Text>
+            <Text style={styles.modalDescription}>A sessao local atual sera encerrada.</Text>
+            <View style={styles.modalActions}>
+              <PrimaryButton
+                title="Cancelar"
+                variant="outlined"
+                onPress={closeLogoutModal}
+                disabled={isLoading}
+              />
+              <PrimaryButton
+                title="Sair"
+                variant="danger"
+                onPress={() => {
+                  void confirmLogout();
+                }}
+                loading={isLoading}
+                disabled={isLoading}
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -142,4 +197,33 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.headlineMd, color: colors.onSurface },
   helperText: { ...typography.bodyMd, color: colors.onSurfaceVariant },
   errorText: { ...typography.labelSm, color: colors.error },
+  errorBanner: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: radius.md,
+    backgroundColor: colors.errorContainer,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.44)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    ...shadow.medium,
+  },
+  modalTitle: { ...typography.headlineMd, color: colors.onSurface },
+  modalDescription: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  modalActions: { gap: spacing.sm, marginTop: spacing.xs },
 });
