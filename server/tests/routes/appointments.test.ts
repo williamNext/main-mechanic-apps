@@ -59,6 +59,30 @@ function insertServiceReportItems(
   }
 }
 
+function completionPayload(
+  overrides: Partial<{
+    summary: string;
+    diagnosis: string;
+    workPerformed: string;
+    partsUsed: string;
+    recommendations: string;
+    items: Array<{ description: string; amountCents: number }>;
+  }> = {},
+) {
+  return {
+    summary: 'Revisão completa',
+    diagnosis: 'Pastilhas desgastadas',
+    workPerformed: 'Troca das pastilhas dianteiras',
+    partsUsed: 'Jogo de pastilhas',
+    recommendations: 'Retornar em 10.000 km',
+    items: [
+      { description: 'Mão de obra', amountCents: 15000 },
+      { description: 'Pastilhas', amountCents: 22500 },
+    ],
+    ...overrides,
+  };
+}
+
 describe('GET /appointments', () => {
   let testDb: TestDb;
   let app: FastifyInstance;
@@ -1030,5 +1054,298 @@ describe('POST /appointments/:id/cancel', () => {
     expect(canceled.json()).toHaveProperty('serviceDiagnosis', null);
     expect(canceled.json()).not.toHaveProperty('summary');
     expect(canceled.json()).not.toHaveProperty('diagnosis');
+  });
+});
+
+describe('POST /appointments/:id/complete', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let clientId: string;
+  let clientToken: string;
+  let mechanicId: string;
+  let mechanicToken: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-12T15:00:00.000Z'));
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    ({ id: clientId, token: clientToken } = makeUserToken(testDb));
+    mechanicId = insertMechanic(testDb, { name: 'Maria Souza', phone: '+5511888888888' });
+    mechanicToken = signAccessToken({ userId: mechanicId, role: 'mechanic' }).token;
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await app.close();
+    testDb.cleanup();
+  });
+
+  it('completes a confirmed appointment with its full report, ordered items, total, notification, and occupied slot', async () => {
+    testDb.connection.prepare('UPDATE profiles SET phone = ? WHERE id = ?').run('+5511999999999', clientId);
+    const timeslotId = insertTimeslot(testDb, {
+      mechanicId,
+      date: '2026-09-03',
+      startTime: '08:05:59',
+      endTime: '09:05:59',
+      isAvailable: 0,
+    });
+    const appointmentId = insertAppointment(testDb, {
+      clientId,
+      mechanicId,
+      timeslotId,
+      date: '2026-09-03',
+      startTime: '08:05:59',
+      endTime: '09:05:59',
+    });
+    const transaction = vi.spyOn(testDb.db, 'transaction');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/complete`,
+      headers: auth(mechanicToken),
+      payload: completionPayload(),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(transaction.mock.calls[0]?.[1]).toEqual({ behavior: 'immediate' });
+    expect(response.json()).toEqual(expect.objectContaining({
+      id: appointmentId,
+      status: 'acabado',
+      mechanicName: 'Maria Souza',
+      mechanicPhone: null,
+      clientName: 'Test Person',
+      clientPhone: '+5511999999999',
+      serviceSummary: 'Revisão completa',
+      serviceDiagnosis: 'Pastilhas desgastadas',
+      workPerformed: 'Troca das pastilhas dianteiras',
+      partsUsed: 'Jogo de pastilhas',
+      recommendations: 'Retornar em 10.000 km',
+      totalAmountCents: 37500,
+      closedAt: expect.any(String),
+      serviceItems: [
+        { id: expect.any(String), description: 'Mão de obra', amountCents: 15000, sortOrder: 0 },
+        { id: expect.any(String), description: 'Pastilhas', amountCents: 22500, sortOrder: 1 },
+      ],
+    }));
+    expect(
+      testDb.connection
+        .prepare(
+          'SELECT description, amount_cents, sort_order FROM appointment_service_items WHERE appointment_id = ? ORDER BY sort_order',
+        )
+        .all(appointmentId),
+    ).toEqual([
+      { description: 'Mão de obra', amount_cents: 15000, sort_order: 0 },
+      { description: 'Pastilhas', amount_cents: 22500, sort_order: 1 },
+    ]);
+    expect(
+      testDb.connection
+        .prepare('SELECT total_amount_cents FROM appointment_service_reports WHERE appointment_id = ?')
+        .get(appointmentId),
+    ).toEqual({ total_amount_cents: 37500 });
+    expect(testDb.connection.prepare('SELECT is_available FROM timeslots WHERE id = ?').get(timeslotId)).toEqual({
+      is_available: 0,
+    });
+    expect(notificationRows(testDb)).toEqual([
+      {
+        recipient_id: clientId,
+        appointment_id: appointmentId,
+        type: 'appointment_completed',
+        title: 'Atendimento finalizado',
+        body: 'Seu atendimento com Maria Souza em 03/09 às 08:05 foi finalizado.',
+      },
+    ]);
+  });
+
+  it.each([
+    ['nao_finalizado', '2026-08-11'],
+    ['confirmado', '2026-08-11'],
+  ] as const)('completes a %s appointment dated %s', async (status, date) => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId, status, date });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/complete`,
+      headers: auth(mechanicToken),
+      payload: completionPayload(),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().status).toBe('acabado');
+  });
+
+  it.each([
+    ['acabado', 'appointment already completed', 'APPOINTMENT_ALREADY_COMPLETED'],
+    ['cancelado', 'cannot complete appointment with status cancelado', 'APPOINTMENT_NOT_COMPLETABLE'],
+  ] as const)('dispatches %s to its dedicated conflict', async (status, error, code) => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId, status });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/complete`,
+      headers: auth(mechanicToken),
+      payload: completionPayload(),
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error, code });
+  });
+
+  it('returns byte-identical 404 responses for client, spoofed role, wrong mechanic, admin, and unknown id', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId });
+    const spoofedMechanicToken = signAccessToken({ userId: clientId, role: 'mechanic' }).token;
+    const otherMechanic = makeMechanicToken(testDb);
+    const admin = makeAdminToken(testDb);
+    const requests = [
+      [appointmentId, clientToken],
+      [appointmentId, spoofedMechanicToken],
+      [appointmentId, otherMechanic.token],
+      [appointmentId, admin.token],
+      [randomUUID(), mechanicToken],
+    ];
+
+    const responses = await Promise.all(
+      requests.map(([id, token]) =>
+        app.inject({
+          method: 'POST',
+          url: `/appointments/${id}/complete`,
+          headers: auth(token),
+          payload: completionPayload(),
+        }),
+      ),
+    );
+
+    expect(responses.map((response) => response.statusCode)).toEqual([404, 404, 404, 404, 404]);
+    expect(new Set(responses.map((response) => response.body)).size).toBe(1);
+    expect(responses[0].json()).toEqual({ error: 'appointment not found', code: 'APPOINTMENT_NOT_FOUND' });
+  });
+
+  it('rolls back report, items, status, and notification when notification insertion fails', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId });
+    testDb.connection.exec(`
+      CREATE TRIGGER fail_completion_notification
+      BEFORE INSERT ON notifications
+      WHEN NEW.type = 'appointment_completed'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced completion notification failure');
+      END
+    `);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/complete`,
+      headers: auth(mechanicToken),
+      payload: completionPayload(),
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(
+      testDb.connection.prepare('SELECT appointment_id FROM appointment_service_reports WHERE appointment_id = ?').all(appointmentId),
+    ).toEqual([]);
+    expect(
+      testDb.connection.prepare('SELECT id FROM appointment_service_items WHERE appointment_id = ?').all(appointmentId),
+    ).toEqual([]);
+    expect(testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get(appointmentId)).toEqual({
+      status: 'confirmado',
+    });
+    expect(notificationRows(testDb)).toEqual([]);
+  });
+
+  it('accepts every minimum boundary after trimming', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/complete`,
+      headers: auth(mechanicToken),
+      payload: completionPayload({
+        summary: '  abc  ',
+        diagnosis: '',
+        workPerformed: '  xyz  ',
+        partsUsed: '',
+        recommendations: '',
+        items: [{ description: '  de  ', amountCents: 0 }],
+      }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({
+      serviceSummary: 'abc',
+      serviceDiagnosis: null,
+      workPerformed: 'xyz',
+      partsUsed: null,
+      recommendations: null,
+      totalAmountCents: 0,
+      serviceItems: [expect.objectContaining({ description: 'de', amountCents: 0, sortOrder: 0 })],
+    }));
+  });
+
+  it('accepts every maximum boundary after trimming', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId });
+    const items = Array.from({ length: 30 }, (_, index) => ({
+      description: index === 0 ? `  ${'d'.repeat(160)}  ` : `Item ${index}`,
+      amountCents: index,
+    }));
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/complete`,
+      headers: auth(mechanicToken),
+      payload: completionPayload({
+        summary: `  ${'s'.repeat(240)}  `,
+        diagnosis: `  ${'d'.repeat(1000)}  `,
+        workPerformed: `  ${'w'.repeat(2000)}  `,
+        partsUsed: `  ${'p'.repeat(1000)}  `,
+        recommendations: `  ${'r'.repeat(1000)}  `,
+        items,
+      }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({
+      serviceSummary: 's'.repeat(240),
+      serviceDiagnosis: 'd'.repeat(1000),
+      workPerformed: 'w'.repeat(2000),
+      partsUsed: 'p'.repeat(1000),
+      recommendations: 'r'.repeat(1000),
+    }));
+    expect(response.json().serviceItems).toHaveLength(30);
+    expect(response.json().serviceItems[0].description).toBe('d'.repeat(160));
+    expect(response.json().serviceItems.map((item: { sortOrder: number }) => item.sortOrder)).toEqual(
+      Array.from({ length: 30 }, (_, index) => index),
+    );
+  });
+
+  it.each([
+    ['summary below minimum', { summary: '  ab  ' }],
+    ['summary above maximum', { summary: `  ${'s'.repeat(241)}  ` }],
+    ['diagnosis above maximum', { diagnosis: `  ${'d'.repeat(1001)}  ` }],
+    ['work performed below minimum', { workPerformed: '  xy  ' }],
+    ['work performed above maximum', { workPerformed: `  ${'w'.repeat(2001)}  ` }],
+    ['parts used above maximum', { partsUsed: `  ${'p'.repeat(1001)}  ` }],
+    ['recommendations above maximum', { recommendations: `  ${'r'.repeat(1001)}  ` }],
+    ['items below minimum', { items: [] }],
+    [
+      'items above maximum',
+      { items: Array.from({ length: 31 }, (_, index) => ({ description: `Item ${index}`, amountCents: 0 })) },
+    ],
+    ['description below minimum', { items: [{ description: '  d  ', amountCents: 0 }] }],
+    ['description above maximum', { items: [{ description: `  ${'d'.repeat(161)}  `, amountCents: 0 }] }],
+    ['amount below minimum', { items: [{ description: 'Item', amountCents: -1 }] }],
+    ['amount not integer', { items: [{ description: 'Item', amountCents: 1.5 }] }],
+  ])('rejects %s before opening a transaction', async (_label, overrides) => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId });
+    const transaction = vi.spyOn(testDb.db, 'transaction');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/appointments/${appointmentId}/complete`,
+      headers: auth(mechanicToken),
+      payload: completionPayload(overrides),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid request body', code: 'VALIDATION_FAILED' });
+    expect(transaction).not.toHaveBeenCalled();
   });
 });

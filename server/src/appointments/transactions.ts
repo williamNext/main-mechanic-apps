@@ -6,6 +6,7 @@ type SqliteError = Error & { code?: string };
 export type WriteErrorMappings = {
   appointmentsTimeslotUnique?: boolean;
   timeslotIntervalUnique?: boolean;
+  appointmentServiceReportsPrimaryKey?: boolean;
 };
 
 export function mapAppointmentWriteError(error: unknown, mappings: WriteErrorMappings = {}): never {
@@ -30,6 +31,13 @@ export function mapAppointmentWriteError(error: unknown, mappings: WriteErrorMap
     sqliteError.message.includes('timeslots_mechanic_date_time_unique_idx')
   ) {
     throw new HttpError(409, 'timeslot overlap', 'TIMESLOT_OVERLAP');
+  }
+  if (
+    mappings.appointmentServiceReportsPrimaryKey &&
+    (sqliteError.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' || sqliteError.code === 'SQLITE_CONSTRAINT_UNIQUE') &&
+    sqliteError.message.includes('appointment_service_reports.appointment_id')
+  ) {
+    throw new HttpError(409, 'appointment already completed', 'APPOINTMENT_ALREADY_COMPLETED');
   }
 
   throw error;

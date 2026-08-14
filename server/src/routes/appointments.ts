@@ -41,11 +41,37 @@ const BookAppointmentSchema = z
   })
   .strict();
 
+const CompleteAppointmentSchema = z
+  .object({
+    summary: z.string().trim().min(3).max(240),
+    diagnosis: NullableTrimmedString(1000),
+    workPerformed: z.string().trim().min(3).max(2000),
+    partsUsed: NullableTrimmedString(1000),
+    recommendations: NullableTrimmedString(1000),
+    items: z
+      .array(
+        z
+          .object({
+            description: z.string().trim().min(2).max(160),
+            amountCents: z.number().int().min(0),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(30),
+  })
+  .strict();
+
 const appointmentNotFound = () => new HttpError(404, 'appointment not found', 'APPOINTMENT_NOT_FOUND');
 
 function notificationBody(action: 'confirmado' | 'cancelado', mechanicName: string, date: string, startTime: string) {
   const [, month, day] = date.split('-');
   return `Seu agendamento com ${mechanicName} em ${day}/${month} às ${startTime.slice(0, 5)} foi ${action}.`;
+}
+
+function completionNotificationBody(mechanicName: string, date: string, startTime: string) {
+  const [, month, day] = date.split('-');
+  return `Seu atendimento com ${mechanicName} em ${day}/${month} às ${startTime.slice(0, 5)} foi finalizado.`;
 }
 
 function mechanicNotificationBody(action: 'agendou' | 'cancelou', clientName: string, date: string, startTime: string) {
@@ -363,6 +389,112 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
 
       const items = loadServiceItems(db, [result.appointment.id]).get(result.appointment.id) ?? [];
       return serializeAppointment(result.appointment, result.viewer, items);
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/appointments/:id/complete',
+    { preHandler: authenticate },
+    async (request) => {
+      const parsed = CompleteAppointmentSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new HttpError(400, 'invalid request body', 'VALIDATION_FAILED');
+      }
+
+      const appointment = runImmediateTransaction<AppointmentViewRow>(
+        db,
+        (tx) => {
+          const caller = tx
+            .select({ role: profiles.role, name: profiles.name })
+            .from(profiles)
+            .where(eq(profiles.id, request.user!.sub))
+            .get();
+          if (caller?.role !== 'mechanic') {
+            throw appointmentNotFound();
+          }
+
+          const row = tx
+            .select(appointmentViewColumnsFor('mechanic'))
+            .from(appointments)
+            .innerJoin(profiles, eq(profiles.id, appointments.clientId))
+            .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+            .where(and(eq(appointments.id, request.params.id), eq(appointments.mechanicId, request.user!.sub)))
+            .get();
+          if (!row) {
+            throw appointmentNotFound();
+          }
+
+          switch (row.status) {
+            case 'confirmado':
+            case 'nao_finalizado':
+              break;
+            case 'acabado':
+              throw new HttpError(409, 'appointment already completed', 'APPOINTMENT_ALREADY_COMPLETED');
+            case 'cancelado':
+              throw new HttpError(
+                409,
+                'cannot complete appointment with status cancelado',
+                'APPOINTMENT_NOT_COMPLETABLE',
+              );
+          }
+
+          const totalAmountCents = parsed.data.items.reduce((total, item) => total + item.amountCents, 0);
+          const report = tx
+            .insert(appointmentServiceReports)
+            .values({
+              appointmentId: row.id,
+              mechanicId: request.user!.sub,
+              summary: parsed.data.summary,
+              diagnosis: parsed.data.diagnosis,
+              workPerformed: parsed.data.workPerformed,
+              partsUsed: parsed.data.partsUsed,
+              recommendations: parsed.data.recommendations,
+              totalAmountCents,
+            })
+            .returning()
+            .get();
+
+          tx.insert(appointmentServiceItems)
+            .values(
+              parsed.data.items.map((item, sortOrder) => ({
+                id: randomUUID(),
+                appointmentId: row.id,
+                description: item.description,
+                amountCents: item.amountCents,
+                sortOrder,
+              })),
+            )
+            .run();
+          tx.update(appointments).set({ status: 'acabado' }).where(eq(appointments.id, row.id)).run();
+          tx.insert(notifications)
+            .values({
+              id: randomUUID(),
+              recipientId: row.clientId,
+              appointmentId: row.id,
+              type: 'appointment_completed',
+              title: 'Atendimento finalizado',
+              body: completionNotificationBody(caller.name, row.date, row.startTime),
+            })
+            .run();
+
+          return {
+            ...row,
+            status: 'acabado',
+            mechanicName: caller.name,
+            serviceSummary: report.summary,
+            serviceDiagnosis: report.diagnosis,
+            workPerformed: report.workPerformed,
+            partsUsed: report.partsUsed,
+            recommendations: report.recommendations,
+            totalAmountCents: report.totalAmountCents,
+            closedAt: report.closedAt,
+          };
+        },
+        { appointmentServiceReportsPrimaryKey: true },
+      );
+
+      const items = loadServiceItems(db, [appointment.id]).get(appointment.id) ?? [];
+      return serializeAppointment(appointment, 'mechanic', items);
     },
   );
 }
