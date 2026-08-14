@@ -10,8 +10,6 @@ for (const file of ['.env', '.env.local']) {
 }
 
 const required = {
-  EXPO_PUBLIC_SUPABASE_URL: ['SUPABASE_URL'],
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: ['SUPABASE_ANON_KEY'],
   EXPO_PUBLIC_API_URL: ['API_URL'],
 };
 

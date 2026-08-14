@@ -3,12 +3,11 @@
 A car-workshop booking system: a self-hosted Node.js/SQLite API (`server/`) and three Expo
 apps — `oficina` (client-facing), `mechanic`, and `admin`.
 
-**As of Phase 2, `oficina` is fully off Supabase and wired to `server/`.** Register, login, logout,
-session restore, mechanic browsing, appointment booking and cancellation, appointment list/detail,
-notifications, and profile editing work against the local server. `mechanic` and `admin` still
-point at the dead Supabase project and remain out of scope until Phases 2b and 3.
+**As of Phase 2b, `oficina` and `mechanic` are fully off Supabase and wired to `server/`.** Client
+booking and mechanic availability, agenda, cancellation, completion, notifications, profile, and
+session flows use the local API. `admin` remains on the dead Supabase project until Phase 3.
 
-## Quickstart — server + `oficina` together
+## Quickstart — server + Expo apps
 
 From a clean checkout, in two terminals:
 
@@ -62,12 +61,42 @@ Confirming the wire actually works end to end, automatically, without touching a
 [`tests-e2e/`](tests-e2e/) — `npm test` from that directory boots both halves itself, seeds a known
 client, and drives a browser through register/login/logout/reload/wrong-password.
 
+**Terminal 3 — `mechanic`**
+
+```bash
+cd mechanic
+cp .env.example .env
+# EXPO_PUBLIC_API_URL=http://localhost:3000 is already the web default
+npm install
+npm run web        # or: npm run android / npm run ios
+```
+
+Seeded mechanic credentials all use password `SenhaDev123!`:
+
+| Mechanic | Email | Specialty |
+|---|---|---|
+| Carlos Silva | `carlos.silva@oficina.dev` | Motor e Câmbio |
+| Ana Souza | `ana.souza@oficina.dev` | Freios e Suspensão |
+| João Pereira | `joao.pereira@oficina.dev` | Elétrica Automotiva |
+
+Mechanic walkthrough from a fresh `npm run seed:dev`:
+
+1. Log in as `carlos.silva@oficina.dev` / `SenhaDev123!`.
+2. In **Agenda**, open **Próximos** and select Mariana Costa's Honda Civic appointment.
+3. Enter summary, work performed, and at least one priced service item; press **Finalizar serviço**.
+   Reopen appointment and confirm completed report and line items remain visible.
+4. Open **Disponibilidade**, choose a future date, and confirm rows distinguish **Disponível**,
+   **Bloqueado**, and **Reservado**.
+5. Create a slot or interval batch. Block a free slot, unblock it, then delete it; reserved slot
+   must not allow availability toggle.
+6. Open **Perfil**, change name or specialty, save, reload, and confirm update persists.
+
 ## Connectivity — talking to the server from something that isn't a browser on this machine
 
-`oficina`'s `EXPO_PUBLIC_API_URL` is a plain URL the client `fetch`es directly — there's no proxy
+Each rewired app's `EXPO_PUBLIC_API_URL` is a plain URL the client `fetch`es directly — there's no proxy
 or tunnel, so it has to resolve to wherever the server is actually reachable from:
 
-| Running `oficina` on... | Set `EXPO_PUBLIC_API_URL` to |
+| Running `oficina` or `mechanic` on... | Set `EXPO_PUBLIC_API_URL` to |
 |---|---|
 | A web browser on the same machine as the server | `http://localhost:3000` (the `.env.example` default) |
 | **An Android emulator** | `http://10.0.2.2:3000` — the emulator's virtual network maps `10.0.2.2` to the host machine's `localhost`. Using `localhost` from inside the emulator points at the emulator itself, not your host, and the request fails to connect. |
@@ -100,5 +129,6 @@ record the result (device/OS version, what was checked, pass/fail) here or in th
 |---|---|
 | `server/` | The API — see [`server/README.md`](server/README.md) for env vars, seeding, and troubleshooting native-addon builds |
 | `oficina/` | Client-facing app — fully wired to `server/` |
-| `mechanic/`, `admin/` | Still wired to the dead Supabase project; scheduled for Phases 2b and 3 |
+| `mechanic/` | Mechanic-facing app — fully wired to `server/` |
+| `admin/` | Still wired to the dead Supabase project; scheduled for Phase 3 |
 | `tests-e2e/` | The one Playwright spec guarding the whole auth wire — server + `oficina` together |

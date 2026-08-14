@@ -135,8 +135,8 @@ are preserved. Each subfolder still has its own `package.json`, `node_modules` a
 only version control was unified.
 
 A cross-cutting change is now **one commit**, which is the point: `types/models.ts`,
-`constants/theme.ts` and `notification-service.ts` are copy-pasted between apps and were drifting
-(§17.4).
+`constants/theme.ts`, wire clients, secure-storage adapters, and error maps are copy-pasted between
+apps and have drifted (§17.4).
 
 ⚠️ **Consequences of the absorb, both live:**
 - **The three app CI workflows no longer run.** GitHub reads `.github/workflows/` only at the
@@ -174,8 +174,8 @@ substantial):
   components/
     ui/                Generation-1 primitives (Button, Card, Badge, …)  ← what screens use
     app/               Generation-2 primitives (AppButton, AppCard, …)   ← partial adoption
-  services/            ⬅ THE BACKEND BOUNDARY. Only these files talk to Supabase.
-    api.ts             Supabase client construction + AppState auto-refresh wiring
+  services/            ⬅ THE BACKEND BOUNDARY. Only these files talk to a backend.
+    api.ts             oficina's HTTP client; mechanic uses wire-client.ts; admin still uses Supabase
     auth-service.ts    login / signup / session / profile fetch
     mechanic-service.ts, timeslot-service.ts, appointment-service.ts, notification-service.ts
   stores/              Zustand: auth, appointment, timeslot, mechanic, notification
@@ -183,7 +183,7 @@ substantial):
   constants/           theme.ts (design tokens), config.ts (app constants)
   config/env.ts        EXPO_PUBLIC_* env access, single place
   types/models.ts      Domain TypeScript types
-  utils/               date.ts, format.ts  (+ secure-storage.ts in oficina ONLY)
+  utils/               date.ts, format.ts  (+ secure-storage.ts in oficina and mechanic)
   scripts/             check-env, export-web, seed*, setup-git-hooks, sql/ (legacy migrations)
   tests/e2e/ + playwright.config.ts   Per-app Playwright suite (see §15.2)
   dist/                Committed static web export output
@@ -201,7 +201,7 @@ substantial):
 | `stores/` | 5 stores | **2 only**: `auth-store.ts`, `admin-store.ts` |
 | `components/` | full `ui/` + `app/` sets | **no generation-1 set** — only `components/admin/AdminShell.tsx` and `components/ui/AdminControls.tsx` |
 | extra dirs | — | `features/admin/filter-utils.ts` — **client-side UI filter state** only (see the warning below) |
-| native session storage | `oficina`: `expo-secure-store` via `utils/secure-storage.ts`<br>`mechanic`: `@react-native-async-storage/async-storage` | `@react-native-async-storage/async-storage` |
+| native session storage | `oficina` and `mechanic`: `expo-secure-store` via `utils/secure-storage.ts` | `@react-native-async-storage/async-storage` |
 | design tokens | consumed from `constants/theme.ts` | largely bypassed (208 literal hexes) |
 
 ⚠️ `admin/package.json` also depends on **`pg` (^8.21.0)** — a Node Postgres driver inside an Expo
@@ -272,8 +272,8 @@ functions spread across three repos' `scripts/sql/` folders.
 | **1. Foundation & Auth Walking Skeleton** | Portable server, full schema + triggers, signup/login/me/logout, admin seed script | ✅ **Complete** (2026-08-08) |
 | **1.5 Prove the Wire** | Rewire `oficina` **auth only** onto the existing Phase 1 endpoints; global error handler; CORS; `seed:dev`; root CI; first new e2e spec | ✅ **Complete** (2026-08-12) — see [`SPEC-phase-1.5-prove-the-wire.md`](SPEC-phase-1.5-prove-the-wire.md). Carries one debt: hand-verification on an Android emulator and a physical device was deferred to pre-production (ticket 06) |
 | **2. Booking & Appointments — `oficina` vertical** | Role guard, `public_mechanics` reads, server-side availability, book, client-cancel, appointment list/detail, notifications + fan-out for those two writes, `profiles.role` triggers (D-R). **Ends with `@supabase/supabase-js` deleted from `oficina`** | ✅ **Complete** (2026-08-12) |
-| **2b. Mechanic vertical** | Timeslot CRUD + **overlap (D-J)**, completion + service report, mechanic-cancel branch, complete fan-out, `mechanic` app rewired, shared-package extraction | ⬜ Not started (**current phase**) |
-| **3. Admin Management** | create/delete mechanic, dashboard, lists, details, financial report, `admin` app rewired | ⬜ Not started |
+| **2b. Mechanic vertical** | Timeslot CRUD + **overlap (D-J/D-S)**, completion + service report, mechanic-cancel branch, complete fan-out, `mechanic` app rewired and fully off Supabase; shared-package extraction deferred | ✅ **Complete** (2026-08-14) |
+| **3. Admin Management** | create/delete mechanic, dashboard, lists, details, financial report, `admin` app rewired, shared-package debt discharged with all three app consumers | ⬜ Not started (**current phase**) |
 | ~~**4. Notifications**~~ | **Dissolved into Phases 2–3 by D-K.** The client UI already exists; fan-out belongs inside the transactions that cause it | — |
 
 **Phases 2–3 were re-cut on 2026-08-12 (D-Q).** The roadmap previously sliced by *capability*
@@ -387,14 +387,11 @@ Note: `admin/services/auth-service.ts` `login(identifier, …)` accepts an "iden
 phone) — after migration this must be email-only.
 
 **UC-A3 · Session persists across app restart**
-Legacy: `supabase-js` persists the session and auto-refreshes when `AppState` becomes `active`
-(that listener lives in **`services/api.ts`**, not in `_layout.tsx`). Native storage differs per
-app — **`oficina` uses `expo-secure-store`** via `utils/secure-storage.ts`; **`mechanic` and
-`admin` use `@react-native-async-storage/async-storage`**, which is *not* encrypted. Web uses
-`localStorage` in all three.
-Target: a single long-lived JWT (default **30 days**, `JWT_EXPIRY_SECONDS=2592000`) stored by the
-app; there is **no refresh-token flow**. `GET /auth/me` re-reads the profile fresh from the DB on
-every boot, so a changed profile/role is reflected immediately.
+`oficina` and `mechanic` store one long-lived JWT (default **30 days**,
+`JWT_EXPIRY_SECONDS=2592000`) through `expo-secure-store` on native and `localStorage` on web;
+there is **no refresh-token flow**. `GET /auth/me` re-reads the profile fresh from the DB on every
+boot, so a changed profile/role is reflected immediately. `admin` still uses legacy Supabase
+session persistence and unencrypted AsyncStorage until Phase 3.
 
 **UC-A4 · Logout invalidates the session**
 Rules: logout writes the token's `jti` into `token_blocklist` with the token's **own `exp`**.
@@ -481,12 +478,13 @@ unfinalized-sync call. Target: `GET /appointments?scope=mechanic`.
 screen in the project)
 Create single slots, create **batches** with quick intervals (+1h, +1h30, +2h) starting from
 `08:00` or from the day's last `end_time`, toggle a slot's availability, delete a slot.
-Client-side validation already enforced there: `YYYY-MM-DD` and `HH:mm` formats, no past dates,
-`end_time > start_time`, **no overlap with an existing slot on that date**.
+Client-side validation retains `YYYY-MM-DD` and `HH:mm` formats and `end_time > start_time` as
+pre-submit UX. Past-time and overlap enforcement now belongs to the server.
 DB-side: `timeslots_time_order_check` (`end_time > start_time`) and a unique index on
 `(mechanic_id, date, start_time, end_time)`.
-⚠️ **Overlap is only checked client-side.** The database prevents exact duplicates, not partial
-overlaps. If the server should enforce it, that is new behavior to add deliberately.
+~~⚠️ **Overlap is only checked client-side.** The database prevents exact duplicates, not partial
+overlaps. If the server should enforce it, that is new behavior to add deliberately.~~ ✅ Resolved by
+ticket 03's server-side half-open overlap enforcement in `POST /timeslots` and ratified by D-S.
 
 **UC-M3 · Cancel an assigned appointment**
 Rules: only the assigned mechanic; allowed from `confirmado` **or** `nao_finalizado`; already
@@ -1042,26 +1040,30 @@ Handwritten migrations (triggers, data backfills) are legitimate — separate st
 | POST | `/auth/logout` | Bearer | — | `204` | 401 `UNAUTHENTICATED` |
 | GET | `/mechanics` | Bearer | — | `200 PublicMechanic[]` ordered by name | 401 `UNAUTHENTICATED` |
 | GET | `/mechanics/:id` | Bearer | — | `200 PublicMechanic` | 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
-| GET | `/mechanics/:id/timeslots` | Bearer | query `date?: YYYY-MM-DD` | `200 TimeSlot[]`; available, unbooked, active-mechanic future slots only; no date means next seven calendar days | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
-| PATCH | `/profiles/me` | Bearer | strict `{name(1–120)}` | `200 ProfileUser` | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` |
+| GET | `/mechanics/:id/timeslots` | Bearer | query `date?: YYYY-MM-DD, includeUnavailable?: 'true'` | `200 TimeSlot[]`; default is available, unbooked, active-mechanic future slots and a seven-day window without `date`; owner + `includeUnavailable=true` requires `date` and returns that whole day with `hasActiveAppointment`; parameter is ignored for non-owners | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
+| POST | `/timeslots` | mechanic Bearer | strict slot or non-empty slot array: `{date, startTime, endTime}`; one date per batch | `201 TimeSlot[]`; atomic batch | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` · 409 `TIMESLOT_EXPIRED`/`TIMESLOT_OVERLAP` · 503 `DATABASE_BUSY` |
+| PATCH | `/timeslots/:id` | mechanic Bearer | strict `{isAvailable}` | `200 TimeSlot`; owner only | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 404 `TIMESLOT_NOT_FOUND` · 409 `TIMESLOT_HAS_APPOINTMENT` · 503 `DATABASE_BUSY` |
+| DELETE | `/timeslots/:id` | mechanic Bearer | — | `204`; owner only; finished appointments do not block deletion | 401 `UNAUTHENTICATED` · 404 `TIMESLOT_NOT_FOUND` · 409 `TIMESLOT_HAS_APPOINTMENT` · 503 `DATABASE_BUSY` |
+| PATCH | `/profiles/me` | Bearer | strict `{name(1–120), specialty?(1+)}`; `specialty` mechanic-only | `200 ProfileUser` | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` |
 | GET | `/notifications` | Bearer | — | `200 Notification[]`; newest first, limit 50 | 401 `UNAUTHENTICATED` |
 | GET | `/notifications/unread-count` | Bearer | — | `200 {count}` | 401 `UNAUTHENTICATED` |
 | POST | `/notifications/:id/read` | Bearer | — | `204`; idempotent | 401 `UNAUTHENTICATED` · 404 `NOTIFICATION_NOT_FOUND` |
 | POST | `/notifications/read-all` | Bearer | — | `204`; idempotent | 401 `UNAUTHENTICATED` |
 | POST | `/appointments` | client Bearer | strict `{timeslotId, vehicleInfo? (≤120), notes? (≤1000)}` | `201 Appointment` | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` · 404 `TIMESLOT_NOT_FOUND` · 409 `MECHANIC_UNAVAILABLE`/`TIMESLOT_UNAVAILABLE`/`TIMESLOT_EXPIRED` · 503 `DATABASE_BUSY` |
-| GET | `/appointments` | Bearer | — | `200 Appointment[]` for client; newest appointment date/time first | 401 `UNAUTHENTICATED` · 501 `NOT_IMPLEMENTED` for other roles |
-| GET | `/appointments/:id` | Bearer | — | `200 Appointment` for owning client | 401 `UNAUTHENTICATED` · 404 `APPOINTMENT_NOT_FOUND` |
-| POST | `/appointments/:id/cancel` | Bearer | — | `200 Appointment`; idempotent when already cancelled; frees its timeslot | 401 `UNAUTHENTICATED` · 404 `APPOINTMENT_NOT_FOUND` · 409 `APPOINTMENT_NOT_CANCELLABLE` · 503 `DATABASE_BUSY` |
+| GET | `/appointments` | Bearer | — | `200 Appointment[]` scoped to owning client or assigned mechanic; viewer-aware contact fields; newest appointment date/time first | 401 `UNAUTHENTICATED` · 501 `NOT_IMPLEMENTED` for admin |
+| GET | `/appointments/:id` | Bearer | — | `200 Appointment` for owning client or assigned mechanic, including report and ordered `serviceItems` | 401 `UNAUTHENTICATED` · 404 `APPOINTMENT_NOT_FOUND` |
+| POST | `/appointments/:id/cancel` | Bearer | — | `200 Appointment`; client or assigned-mechanic branch; idempotent when already cancelled; frees its timeslot | 401 `UNAUTHENTICATED` · 404 `APPOINTMENT_NOT_FOUND` · 409 `APPOINTMENT_NOT_CANCELLABLE` · 503 `DATABASE_BUSY` |
+| POST | `/appointments/:id/complete` | mechanic Bearer | strict `{summary, diagnosis?, workPerformed, partsUsed?, recommendations?, items[1..30]}` | `200 Appointment`; assigned mechanic only; report, ordered items, status, close time, timeslot state and notification commit atomically | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 404 `APPOINTMENT_NOT_FOUND` · 409 `APPOINTMENT_ALREADY_COMPLETED`/`APPOINTMENT_NOT_COMPLETABLE` · 503 `DATABASE_BUSY` |
 
-`ProfileUser` = `{id, name, email, role, phone, avatarUrl}`. This is the exact shared shape returned
+`ProfileUser` = `{id, name, email, role, phone, avatarUrl, specialty}`. This is the exact seven-field shared shape returned
 by signup, login, `/auth/me`, and `/profiles/me`; `createdAt` is not serialized.
 `PublicMechanic` = `{id, name, specialty, avatarUrl, updatedAt}`.
 `TimeSlot` = `{id, mechanicId, date, startTime, endTime, isAvailable}`.
 `Notification` = `{id, recipientId, appointmentId, type, title, body, readAt, createdAt}`.
 `Appointment` = `{id, clientId, mechanicId, timeslotId, date, startTime, endTime, status,
 vehicleInfo, notes, createdAt, mechanicName, mechanicPhone, serviceSummary, serviceDiagnosis,
-workPerformed, partsUsed, recommendations, totalAmountCents, closedAt, serviceItems}`; Phase 2
-always serializes `serviceItems: []` because completion belongs to Phase 2b.
+workPerformed, partsUsed, recommendations, totalAmountCents, closedAt, serviceItems}`; contact fields
+are viewer-aware and completed appointments serialize line items in `sortOrder` order.
 
 **Standard error envelope:** application failures return
 `{ error: '<lowercase message>', code: '<machine-readable code>' }`; Fastify-generated 4xx errors
@@ -1084,8 +1086,12 @@ Client error messages, transcribed from `oficina/services/error-messages.ts`:
 | `EMAIL_TAKEN` | Este e-mail já está cadastrado. |
 | `TIMESLOT_UNAVAILABLE` | Horário indisponível. Escolha outro. |
 | `TIMESLOT_EXPIRED` | Este horário já passou. Escolha outro. |
+| `TIMESLOT_OVERLAP` | Este horário se sobrepõe a outro já cadastrado. |
+| `TIMESLOT_HAS_APPOINTMENT` | Este horário possui um agendamento e não pode ser alterado. |
 | `MECHANIC_UNAVAILABLE` | Este mecânico não está disponível no momento. |
 | `APPOINTMENT_NOT_CANCELLABLE` | Este agendamento não pode mais ser cancelado. |
+| `APPOINTMENT_ALREADY_COMPLETED` | Este agendamento já foi concluído. |
+| `APPOINTMENT_NOT_COMPLETABLE` | Este agendamento não pode ser concluído. |
 | `NOT_IMPLEMENTED` | Recurso indisponível nesta versão. |
 | `DATABASE_BUSY` | Servidor ocupado. Tente novamente. |
 | `INTERNAL_ERROR` | Algo deu errado. Tente novamente. |
@@ -1094,27 +1100,8 @@ Client error messages, transcribed from `oficina/services/error-messages.ts`:
 
 ### 10.2 To build — proposed contracts
 
-⚠️ **Paths and shapes below are proposals**; Phases 2–4 have not been formally planned. Keep them
-close to what the client apps already expect so rewiring stays mechanical. If a user is available,
-confirm; **if not, apply the defaults in §10.3 and record the decision** rather than inventing an
-alternative.
-
-**Phase 2 — booking & lifecycle**
-
-| Method | Path | Role | Notes |
-|---|---|---|---|
-| GET | `/mechanics` | any/none | from `public_mechanics` |
-| GET | `/mechanics/:id` | any | public projection |
-| PATCH | `/mechanics/:id` | self or admin | name/avatar/phone/specialty. `credentials` and `is_active` are **admin-only** (§10.3 D-I) |
-| GET | `/mechanics/:id/timeslots?date=&availableOnly=` | any | applies the availability rules of UC-C2 |
-| POST | `/timeslots` | mechanic (self) | create slot |
-| PATCH | `/timeslots/:id` | mechanic (owner) | toggle `isAvailable` |
-| DELETE | `/timeslots/:id` | mechanic (owner) | must refuse if an active appointment references it |
-| POST | `/appointments` | client | `{timeslotId, vehicleInfo?, notes?}` → 201; **409 on slot conflict** |
-| GET | `/appointments` | client/mechanic/admin | scoped by role; runs the lazy status sync first |
-| GET | `/appointments/:id` | participant or admin | includes report + items |
-| POST | `/appointments/:id/cancel` | client or mechanic | branches per §8.2 |
-| POST | `/appointments/:id/complete` | mechanic (assigned) | `{summary, diagnosis?, workPerformed, partsUsed?, recommendations?, items[]}` |
+Phases 2 and 2b are implemented and listed in §10.1. Remaining contracts below are Phase 3
+proposals; apply §10.3 defaults and record any decision rather than inventing an alternative.
 
 **Phase 3 — admin**
 
@@ -1157,6 +1144,7 @@ may override.
 | **D-P** | `notifications` table shape | **Narrowed to `id, recipientId, appointmentId, type, title, body, readAt, createdAt`.** `actorId`, `data` and `updatedAt` are dropped | Ratified 2026-08-12. **Amends D-K by applying it.** D-K made the built UI the specification; reading it shows the UI consumes only `id`, `type`, `title`, `body`, `readAt` and `createdAt` (the screen renders a relative timestamp) — so the specification points at a *narrower* table than §7.2's reverse-engineered eleven columns, not a wider one. `appointmentId` is kept as the one unused column with an obvious near-term consumer (tapping a notification to open its appointment) and because it is the FK that makes a notification meaningful. Nothing is in production (D-L), so this is a free `DROP`/recreate, not the table-rebuild dance §7.2 warns about |
 | **D-R** | Enforcing the `profiles.role` value set | **Two `BEFORE INSERT`/`BEFORE UPDATE OF role` triggers using `RAISE(ABORT)` — NOT the `CHECK` constraint §17.2 proposes.** | Ratified 2026-08-12. ⚠️ **§17.2's suggestion is dangerous and must not be followed.** SQLite cannot add a `CHECK` to an existing table, so it implies a create-copy-drop-rename rebuild. That rebuild was written out and **executed against a seeded database: it deleted every mechanic, timeslot, appointment and notification row while reporting success.** `DROP TABLE profiles` performs an implicit delete which fires `ON DELETE CASCADE` on `mechanics.id` and cascades transitively; `PRAGMA defer_foreign_keys` does **not** stop it (it defers violation *checking*, not cascade *actions*); and `PRAGMA foreign_key_check` then reports clean precisely because the cascade left no orphans. `PRAGMA foreign_keys = OFF` would work but must be set **before** `BEGIN`, which a Drizzle-migrator `.sql` file cannot do. Triggers need no rebuild, no trigger teardown, no index recreation, and never expose the cascade. Two consequences worth carrying forward: `ON DELETE CASCADE` fires on `DROP TABLE`, and a check that detects only *orphans* cannot detect an operation that removed the children as well |
 | **D-Q** | Phase slicing | **Slice by app vertical, not by capability.** Each phase builds only the endpoints one app consumes, rewires that app, and ends with that app fully off Supabase | Ratified 2026-08-12; §4.2 re-cut accordingly. Carries Phase 1.5's thesis forward — no endpoint ships without a real client calling it in the same phase, which is the failure mode ("no client has ever called it") 1.5 was created to break. Accepted cost: the booking lifecycle is split across phases, so an appointment is bookable in Phase 2 but not completable until Phase 2b |
+| **D-S** | Timeslot overlap semantics | **Intervals are half-open; unavailable slots still block; overlap is checked on creation only; batches contain one date; expiry is datetime-granular in São Paulo time.** | Ratified 2026-08-14. **Amends D-J by closing its unstated semantics.** Touching endpoints such as 09:00–10:00 and 10:00–11:00 are accepted; any genuine overlap with a free, blocked, or booked slot is rejected; a batch is atomic and cannot mix dates; and a slot earlier today is expired even though its calendar date is today. D-J's server-side transactional enforcement remains intact |
 
 **Cross-cutting reminder:** §13.2's status codes (403/404/409) follow from these defaults and
 should be treated as the intended contract, not as competing proposals.
@@ -1237,10 +1225,11 @@ React Compiler enabled), **zustand 5** for state, **zod 4** for validation, `rea
 `date-fns` (+ `ptBR` locale), `@expo/vector-icons` (MaterialIcons) and `lucide-react-native`,
 `react-native-reanimated`, `react-native-web` for the web target.
 
-**Not shared — check per app:** `expo-secure-store` (**`oficina` only**);
-`@react-native-async-storage/async-storage` + `@react-native-community/datetimepicker`
-(**`mechanic` and `admin` only**); `pg` (**`admin` only** — a Node Postgres driver in an Expo app,
-dead weight, remove during the rewire).
+**Not shared — check per app:** `expo-secure-store` (**`oficina` and `mechanic`**);
+`@react-native-community/datetimepicker` (**`mechanic` and `admin`**);
+`@react-native-async-storage/async-storage` and `pg` (**`admin` only** — `pg` is a Node Postgres
+driver in an Expo app, dead weight to remove during the rewire). `mechanic` removed
+`@supabase/supabase-js`, AsyncStorage, and `react-native-url-polyfill` after its wire rewire.
 
 Imports use the **`@/*` path alias** mapped to the app root (`tsconfig.json` `compilerOptions.paths`).
 `@/services/...`, `@/components/...`, `@/constants/theme` are the normal forms — match them.
@@ -1257,8 +1246,7 @@ screen (app/**)  →  store (stores/*.ts, zustand)  →  service (services/*.ts)
    hooks/use-auth, use-theme                    THE ONLY BACKEND BOUNDARY
 ```
 
-**Hard rule (holds today):** screens never import `services/api.ts` — only `services/*.ts` and each
-`app/_layout.tsx` do.
+**Hard rule (holds today):** screens never import a wire client directly; only service modules do.
 **Soft convention (violated in places):** screens should go through a store rather than calling a
 service directly. `oficina/app/(auth)/register.tsx` and `admin/app/(admin)/appointments.tsx` import
 services directly; follow the store path in new code, but do not be surprised by the exceptions.
@@ -1269,15 +1257,10 @@ services do I/O and `snake_case → camelCase` mapping; screens render and show
 
 ### 12.3 Session bootstrap (`app/_layout.tsx`)
 
-Today: loads Inter fonts, holds the splash screen until fonts are ready, calls
-`authService.getCurrentSessionUser()` once, and subscribes to
-`supabase.auth.onAuthStateChange` — `SIGNED_IN` schedules a deferred profile load,
-`SIGNED_OUT` clears the user. A `profileRequestId` ref invalidates stale in-flight profile loads
-(a real race that was fixed; preserve the pattern).
-
-After migration this becomes: read the stored JWT → `GET /auth/me` → set user (or clear on 401).
-There is no auth-state event stream to subscribe to, so the subscription block is deleted and
-login/logout must update the store directly.
+`oficina` and `mechanic` load fonts, hold the splash screen until ready, read the JWT from
+`expo-secure-store` on native (`localStorage` on web), call `GET /auth/me`, then set or clear the
+user. Login/logout update the store directly; there is no auth-state subscription. `admin` still
+uses its legacy Supabase bootstrap until Phase 3.
 
 ### 12.4 Route guards
 
@@ -1290,22 +1273,20 @@ Navigation: `oficina` and `mechanic` use a bottom tab bar (custom `BottomNavBar`
 
 ### 12.5 Auth store (representative of all stores)
 
-`stores/auth-store.ts` exposes `user, isAuthenticated, isLoading, isBootstrappingSession,
-isAuthActionLoading, role, error` and `loginByEmail, loginByPhone, logout, updateProfile, setUser,
-setBootstrappingSession`. `isLoading` is derived (`bootstrapping || actionLoading`). `logout()`
+`stores/auth-store.ts` in `oficina` and `mechanic` exposes `user, isAuthenticated, isLoading,
+isBootstrappingSession, isAuthActionLoading, role, error` and `loginByEmail, logout, updateProfile,
+setUser, setBootstrappingSession`. `isLoading` is derived (`bootstrapping || actionLoading`). `logout()`
 **clears local state first, then calls the backend**, and swallows backend errors — logout must
 always succeed locally. `hooks/use-auth.ts` wraps the store and adds `isAdmin/isMechanic/isClient`.
-
-`loginByPhone` is legacy and should be removed when phone auth is formally dropped.
 
 ### 12.6 Environment
 
 `config/env.ts` reads `process.env.EXPO_PUBLIC_*` with **static dot-notation only** — Expo inlines
 those at build time, so dynamic access silently yields `undefined`. `scripts/check-env.js` runs in
 the build scripts to fail early on missing values.
-Current vars: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
-After migration: a single **`EXPO_PUBLIC_API_URL`** — treated as settled; §14.4, §14.5 and §16
-step 6 all use that name.
+`oficina` and `mechanic` each require one variable: **`EXPO_PUBLIC_API_URL`**. `mechanic` no longer
+declares or checks either Supabase variable. `admin` still requires
+`EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` until Phase 3.
 
 ---
 
@@ -1417,17 +1398,13 @@ npm run start             # Expo dev server; then press w / a / i
 
 Other scripts: `android` · `ios` · `web` · `build:web` (`node scripts/export-web.js` → `dist/`) ·
 `vercel-build` (**all three apps**, each with a `vercel.json`) · `lint` (`expo lint`) ·
-`env:check` · `hooks:setup` · `e2e` + `e2e:ui` (**all three apps** — each has its own
-`playwright.config.ts`, see §15.2) · `seed`, `seed:mechanics:auth`, `seed:mechanics:data`
-(**legacy Supabase seeding — replace with server-side seeds**;
-⚠️ in `admin/` these three scripts are **already broken**: they invoke `node scripts/seed.js` and
-friends, which do not exist in `admin/scripts/`).
+`env:check` · `hooks:setup`. `mechanic` deleted its three legacy Supabase seed scripts; use
+`server`'s `npm run seed:dev`. `admin` still declares `seed`, `seed:mechanics:auth`, and
+`seed:mechanics:data`, but those scripts are already broken because their files do not exist.
 
-⚠️ **You cannot actually run any of the three apps end-to-end right now.** They need a live
-Supabase project, and that project is documented as unreachable (§17.1). What still works:
-`expo start --web` (the app boots, screens that don't fetch render), `expo lint`, and TypeScript
-checking. What does not: login, and every screen that loads data. **Visual and behavioral
-verification is blocked until the server rewire lands** — plan tasks accordingly and do not claim a
+`oficina` and `mechanic` run end-to-end against the local server. `admin` still needs the dead
+Supabase project, so its data paths remain blocked until Phase 3. Native visual and behavioral
+verification remains deferred — do not claim a
 UI fix is verified when it could not have been.
 
 ### 14.4 Recommended local topology after migration
@@ -1435,9 +1412,8 @@ UI fix is verified when it could not have been.
 Run the server on `:3000`, point every app's `EXPO_PUBLIC_API_URL` at it. On Android emulator use
 `http://10.0.2.2:3000`; on a physical device use the host's LAN IP.
 
-**CORS is required for the web builds and is not configured yet** — Fastify has no CORS plugin
-registered. Per §10.3 (D-G), register `@fastify/cors` **inside `buildApp`** (so tests exercise the
-same config the server runs) with these origins:
+**CORS is configured inside `buildApp` per D-G**, so tests exercise the same origin allowlist as
+the running server:
 
 | Origin | Why |
 |---|---|
@@ -1452,21 +1428,11 @@ cookie.
 
 ### 14.5 CI, git conventions and secrets
 
-Each **app** repo (`oficina`, `mechanic`, `admin`) has `.github/workflows/security-and-build.yml`:
-
-- **`secrets-scan`** — gitleaks on every pull request **and** every push to `master` (only
-  `eas-build-check` is gated to pushes). ⚠️ Committing a real `.env` fails CI. Keep secrets out of
-  tracked files; `.env.example` only.
-- **`eas-build-check`** — on push to **`master`** (the default branch is `master`, not `main`):
-  `npm ci` then `npm run env:check`, with `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-  injected from GitHub repo secrets.
-
-⚠️ **This CI job will fail the moment you do §16 step 6.** Swapping the Supabase vars for
-`EXPO_PUBLIC_API_URL` requires updating the workflow's `env:` block **and** the GitHub repo secrets
-in the same change — see §16 step 6b.
-
-`server/` has no workflow yet; adding one that runs `npm test` would be a sensible small task.
-Each app also installs a `.githooks/pre-commit` via `npm run hooks:setup`.
+Root `.github/workflows/ci.yml` runs gitleaks on every pull request and push to `master`, then uses
+path filters for server build/tests and `oficina`/`mechanic` typecheck + lint jobs. App jobs pin
+Node 24; server jobs use `server/.nvmrc`. ⚠️ Committing a real `.env` fails CI. Keep secrets out of
+tracked files; `.env.example` only. Each app also installs a `.githooks/pre-commit` via
+`npm run hooks:setup`.
 
 ---
 
@@ -1588,6 +1554,10 @@ No unit test setup. `expo lint` only. Each app has a `.githooks/pre-commit` inst
 
 ## 16. Client rewiring plan (Supabase → server)
 
+`oficina` and `mechanic` have completed this plan. Phase 3 applies it to `admin`; descriptions
+below remain the checklist for that final consumer, with the shared-package debt in §17.4 folded
+into the work.
+
 Per app, the whole job is these files:
 
 1. **`services/api.ts`** — replace `createClient(...)` with a small typed `fetch` wrapper:
@@ -1596,11 +1566,9 @@ Per app, the whole job is these files:
    screens match on it), handle 401 by clearing the session.
    **Also delete the `AppState` auto-refresh listener that lives in this file** (all three apps) —
    there is no token refresh to drive.
-2. **Token storage** — `localStorage` on web. On native it differs per app:
-   `oficina` already has `utils/secure-storage.ts` (expo-secure-store) — reuse it. **`mechanic` and
-   `admin` have no such file**; they use unencrypted AsyncStorage. Recommended: copy
-   `utils/secure-storage.ts` into both and add `expo-secure-store`, since a 30-day JWT in
-   unencrypted storage is a real exposure. If you keep AsyncStorage, say so explicitly.
+2. **Token storage** — `localStorage` on web. `oficina` and `mechanic` use
+   `utils/secure-storage.ts` with `expo-secure-store` on native. `admin` still uses unencrypted
+   AsyncStorage; Phase 3 must move it to the shared secure-storage boundary.
 3. **`services/auth-service.ts`** — `login` → `POST /auth/login`; `signUp` → `POST /auth/signup`
    (now returns a token, so the "signup then login" dance disappears); `logout` →
    `POST /auth/logout` + clear storage; `getCurrentSessionUser` → `GET /auth/me`.
@@ -1621,8 +1589,8 @@ Per app, the whole job is these files:
 9. **`admin/services/admin-service.ts`** — the RPC calls become `GET /admin/*`; keep the response
    TypeScript interfaces unchanged so the screens don't move.
 
-**Order of operations:** finish server Phase 2 → rewire `oficina` (smallest surface, highest
-value) → `mechanic` → `admin` (needs Phase 3) → notifications (Phase 4) → repoint `tests-e2e`.
+**Order of operations:** server Phase 2 → `oficina` → server Phase 2b → `mechanic` are complete.
+Next: Phase 3 server/admin work and shared-package extraction, then remaining end-to-end coverage.
 Do not rewire an app before the endpoints it needs exist and are tested.
 
 ---
@@ -1640,9 +1608,9 @@ Do not rewire an app before the endpoints it needs exist and are tested.
   every referencing row; `PRAGMA defer_foreign_keys` defers violation checking rather than cascade
   actions and does not prevent deletion; and `PRAGMA foreign_key_check` afterwards reports clean
   because the cascade already removed the orphans it would have flagged.
-- **No production data migration.** The new DB starts empty. There is no seed script for the
-  server yet beyond `seed-admin` — mechanics and timeslots must be created through the app or a
-  new seed script.
+- **No production data migration.** The new DB starts empty. `server`'s idempotent `seed:dev`
+  supplies three active mechanics, two clients, one admin, timeslots, appointments, and a completed
+  service report for local development; `seed:admin` remains the production-style admin bootstrap.
 - **Cascade deletes are wide.** Deleting a `profiles` row removes the mechanic, their timeslots,
   and every appointment (and, transitively, reports and items). Only the `admin_action_log`
   `before_state` snapshot survives.
@@ -1652,7 +1620,8 @@ Do not rewire an app before the endpoints it needs exist and are tested.
 - `sync_acabado_appointments` is a misleading alias — it does not produce `acabado`. Do not "fix"
   it into something else without asking.
 - Client cancel and mechanic cancel have **different** allowed source statuses (§8.2).
-- Timeslot **overlap** is validated only in the mechanic UI, never in the database.
+- ~~Timeslot **overlap** is validated only in the mechanic UI, never in the database.~~ ✅ Resolved
+  by ticket 03's transactional server-side overlap enforcement and D-S's closed semantics.
 - The `mechanics.credentials` write permission is ambiguous post-approval-removal (UC-M5).
 - Password minimum length disagrees between the edge function (6) and the server (8) — **resolved
   by §10.3 D-E: use 8.**
@@ -1695,10 +1664,11 @@ There is also `supabase/docs/specs/easy-first-notifications.md` — read it befo
   password hashes or full tokens.
 - **Hosting undecided** — keep the server free of platform-specific code.
 - ~~Three separate git repos~~ **Resolved 2026-08-11 by the monorepo (§3)** — a cross-cutting change
-  is now one commit. Still true, and now *fixable*: there is no shared package, so
-  `types/models.ts`, `constants/theme.ts` and `notification-service.ts` remain **copy-pasted**
-  between apps and have already drifted. Extracting a shared package is now a realistic option
-  where before it was not; it is not yet scheduled.
+  is now one commit. There is still no shared package, so types, wire clients, secure-storage
+  adapters, error maps, theme constants, and notification services remain copy-pasted and have
+  drifted. **Phase 3 must discharge this deferred debt with three consumers — `oficina`,
+  `mechanic`, and `admin` — rather than the two consumers present when extraction was first
+  deferred.**
 - Each app repo carries `.agents/AGENT_RULES.md` (terse-response style rules, security rules,
   "confirm before touching >3 files"), `.Jules/` learning notes, and `.planning/codebase/`
   analysis docs. Those `codebase/` docs are still useful reference. `server/.planning/` is
@@ -1765,6 +1735,8 @@ gate on `server/` any more. If you find that instruction quoted anywhere else, i
 | nao_finalizado | not finalized (past date, not closed out) | `AppointmentStatus` |
 | acabado | finished / closed | `AppointmentStatus` |
 | cancelado | cancelled | `AppointmentStatus` |
+| bloqueado | blocked — mechanic withheld the hour | `timeslots.is_available = false`; unavailable is the union of blocked + booked |
+| reservado | booked — an appointment holds the hour | `timeslots.is_available = false`; unavailable is the union of blocked + booked |
 | especialidade | specialty | `mechanics.specialty` |
 | credenciais | credentials | `mechanics.credentials` (default `PENDENTE`) |
 | PENDENTE | pending | default credentials value |

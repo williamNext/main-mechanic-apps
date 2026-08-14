@@ -17,19 +17,17 @@ Ainda não implementado:
 
 ## Modelo de segredos
 - `public-build-vars`: seguro no bundle do cliente.
-  - `EXPO_PUBLIC_SUPABASE_URL`
-  - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+  - `EXPO_PUBLIC_API_URL`
 - `private-server-secrets`: nunca enviar ao app mobile.
-  - service-role keys
-  - admin tokens
+  - `JWT_SECRET`
+  - chaves administrativas
 
 ## Configuração de ambiente
 1. Crie `.env` a partir de `.env.example`.
 2. Configure:
-   - `EXPO_PUBLIC_SUPABASE_URL`
-   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-3. Na Vercel, configure as mesmas chaves em Project Settings > Environment Variables para `Production` e `Preview`.
-4. Não configure `SUPABASE_SERVICE_ROLE_KEY` neste app cliente; ela é um segredo privado de servidor.
+   - `EXPO_PUBLIC_API_URL`
+3. Na Vercel, configure a mesma chave em Project Settings > Environment Variables para `Production` e `Preview`.
+4. Não configure segredos do servidor neste app cliente.
 
 ## Deploy na Vercel
 Antes de publicar, valide que as variáveis públicas de build existem e que o export web conclui:
@@ -39,8 +37,7 @@ npm run vercel-build
 ```
 
 Se o build remoto falhar com `Missing required env var`, adicione na Vercel:
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_API_URL`
 
 Depois de salvar as variáveis, faça um redeploy sem cache e valide a URL publicada.
 
@@ -54,7 +51,8 @@ npm run start
 ## Validação e seed
 ```bash
 npm run env:check
-npm run seed
+cd ../server
+npm run seed:dev
 ```
 
 Workflow executa:

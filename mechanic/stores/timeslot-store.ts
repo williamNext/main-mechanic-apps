@@ -13,7 +13,6 @@ interface TimeSlotState {
   fetchKey: string | null;
 
   fetchByMechanic: (mechanicId: string, date: string, options?: { force?: boolean }) => Promise<void>;
-  fetchAvailable: (mechanicId: string, date?: string, options?: { force?: boolean }) => Promise<void>;
   addSlot: (data: CreateTimeSlotInput | CreateTimeSlotInput[]) => Promise<TimeSlot[]>;
   toggleAvailability: (slotId: string, isAvailable: boolean) => Promise<void>;
   removeSlot: (slotId: string) => Promise<void>;
@@ -40,22 +39,6 @@ export const useTimeSlotStore = create<TimeSlotState>((set, get) => ({
       set({ slots, fetchKey, fetchedAt: Date.now(), isLoading: false });
     } catch {
       set({ error: 'Falha ao carregar horários', isLoading: false });
-    }
-  },
-
-  fetchAvailable: async (mechanicId, date, options) => {
-    const fetchKey = `available:${mechanicId}:${date ?? 'all'}`;
-    const { fetchedAt, fetchKey: currentFetchKey } = get();
-    const cacheFresh = fetchedAt !== null && Date.now() - fetchedAt < TIMESLOTS_CACHE_TTL_MS;
-
-    if (!options?.force && currentFetchKey === fetchKey && cacheFresh) return;
-
-    set({ isLoading: true, error: null });
-    try {
-      const available = await timeslotService.getAvailableSlotsByMechanic(mechanicId, date);
-      set({ slots: available, fetchKey, fetchedAt: Date.now(), isLoading: false });
-    } catch {
-      set({ error: 'Falha ao carregar horários disponíveis', isLoading: false });
     }
   },
 

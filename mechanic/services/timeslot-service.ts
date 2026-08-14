@@ -16,11 +16,6 @@ export async function getSlotsByMechanic(
   return request<TimeSlot[]>(`/mechanics/${encodeURIComponent(mechanicId)}/timeslots?${query}`);
 }
 
-export async function getAvailableSlotsByMechanic(mechanicId: string, date?: string): Promise<TimeSlot[]> {
-  const dateQuery = date ? `?date=${encodeURIComponent(date)}` : '';
-  return request<TimeSlot[]>(`/mechanics/${encodeURIComponent(mechanicId)}/timeslots${dateQuery}`);
-}
-
 export async function createSlot(slot: CreateTimeSlotInput | CreateTimeSlotInput[]): Promise<TimeSlot[]> {
   return request<TimeSlot[]>('/timeslots', {
     method: 'POST',
