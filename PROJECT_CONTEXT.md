@@ -546,9 +546,7 @@ the flattened service-report fields).
 
 **UC-AD5 · Appointment detail** — `admin_get_appointment_detail(appointmentId)` → one
 `AdminAppointmentRow` including `serviceItems[]`.
-⚠️ **RPC exists, UI does not.** `admin-service.ts` has no corresponding function and there is no
-appointment-detail route in `admin/app/(admin)/`. Port it only if the detail screen is also being
-built.
+⚠️ **Not ported:** no UI consumes it and `admin-service.ts` has no function for it.
 
 **UC-AD6 · Financial report** — `app/(admin)/finance.tsx` ←
 `admin_financial_report(from, to, mechanicId, search)` → `{ range, generatedAt,
@@ -1042,6 +1040,7 @@ Handwritten migrations (triggers, data backfills) are legitimate — separate st
 | GET | `/admin/dashboard` | admin Bearer | query `from?: YYYY-MM-DD, to?: YYYY-MM-DD` | `200 AdminDashboardSummary`; defaults to current São Paulo month through today | 400 `VALIDATION_FAILED`/`INVALID_DATE_RANGE` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` |
 | GET | `/admin/mechanics` | admin Bearer | query `search?, page?, pageSize?`; page size capped at 100 | `200 PaginatedResult<AdminMechanicRow>`; ordered by name then id | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` |
 | GET | `/admin/mechanics/:id` | admin Bearer | query `from?: YYYY-MM-DD, to?: YYYY-MM-DD` | `200 AdminMechanicDetail`; defaults to current São Paulo month through today | 400 `VALIDATION_FAILED`/`INVALID_DATE_RANGE` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` · 404 `MECHANIC_NOT_FOUND` |
+| GET | `/admin/appointments` | admin Bearer | query `from?, to?, status?, mechanicId?, search?, page?, pageSize?`; page size capped at 100 | `200 PaginatedResult<AdminAppointmentRow>`; ordered by date, start time, then id descending | 400 `VALIDATION_FAILED`/`INVALID_DATE_RANGE` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` |
 | GET | `/mechanics` | Bearer | — | `200 PublicMechanic[]` ordered by name | 401 `UNAUTHENTICATED` |
 | GET | `/mechanics/:id` | Bearer | — | `200 PublicMechanic` | 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
 | GET | `/mechanics/:id/timeslots` | Bearer | query `date?: YYYY-MM-DD, includeUnavailable?: 'true'` | `200 TimeSlot[]`; default is available, unbooked, active-mechanic future slots and a seven-day window without `date`; owner + `includeUnavailable=true` requires `date` and returns that whole day with `hasActiveAppointment`; parameter is ignored for non-owners | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
@@ -1115,6 +1114,9 @@ proposals; apply §10.3 defaults and record any decision rather than inventing a
 all accepting the `AdminFilters` query params, all returning the JSON shapes already declared in
 `admin/types/models.ts` (§6.4). **Match those TypeScript interfaces exactly** — they are the
 cheapest available contract test.
+
+`GET /admin/appointments/:id` / **UC-AD5 is not ported**: no UI consumes it and
+`admin-service.ts` has no function for it.
 
 **Phase 4 — notifications**
 

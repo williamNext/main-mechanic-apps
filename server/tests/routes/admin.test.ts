@@ -794,3 +794,254 @@ describe('GET /admin/mechanics and GET /admin/mechanics/:id', () => {
     expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });
   });
 });
+
+describe('GET /admin/appointments', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let adminToken: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-15T15:00:00.000Z'));
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    const adminId = insertProfile(testDb, { id: 'appointment-admin', role: 'admin' });
+    adminToken = signAccessToken({ userId: adminId, role: 'admin' }).token;
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await app.close();
+    testDb.cleanup();
+  });
+
+  function get(url: string, token = adminToken) {
+    return app.inject({
+      method: 'GET',
+      url,
+      headers: { authorization: `Bearer ${token}` },
+    });
+  }
+
+  it('returns the exact paginated appointment contract with counterparties, report fields, and service items', async () => {
+    const mechanicId = insertMechanicFixture(testDb, {
+      id: 'inactive-contract-mechanic',
+      name: 'Marcos Contract',
+      phone: '+5511888888888',
+      specialty: 'Cambio',
+      isActive: false,
+    });
+    const clientId = insertProfile(testDb, {
+      id: 'contract-client',
+      name: 'Carla Contract',
+      phone: '+5511777777777',
+      role: 'client',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'contract-appointment',
+      clientId,
+      mechanicId,
+      date: '2026-08-15',
+      startTime: '13:00',
+      endTime: '14:00',
+      status: 'acabado',
+      revenueCents: 23456,
+      vehicleInfo: 'Honda Civic 2020',
+      notes: 'Vibracao em alta velocidade',
+    });
+    testDb.connection
+      .prepare(
+        `UPDATE appointment_service_reports
+         SET diagnosis = 'Rolamento gasto', parts_used = 'Rolamento', recommendations = 'Revisar em 30 dias'
+         WHERE appointment_id = 'contract-appointment'`,
+      )
+      .run();
+    testDb.connection
+      .prepare(
+        `INSERT INTO appointment_service_items (id, appointment_id, description, amount_cents, sort_order)
+         VALUES ('item-later', 'contract-appointment', 'Mao de obra', 10000, 1),
+                ('item-first', 'contract-appointment', 'Rolamento', 13456, 0)`,
+      )
+      .run();
+
+    const response = await get('/admin/appointments?from=2026-08-15&to=2026-08-15');
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(['page', 'pageSize', 'rows', 'total']);
+    expect(Object.keys(body.rows[0]).sort()).toEqual([
+      'clientId', 'clientName', 'clientPhone', 'closedAt', 'createdAt', 'date', 'endTime', 'id', 'mechanicId',
+      'mechanicName', 'mechanicPhone', 'notes', 'partsUsed', 'recommendations', 'serviceDiagnosis', 'serviceItems',
+      'serviceSummary', 'specialty', 'startTime', 'status', 'timeSlotId', 'totalAmountCents', 'vehicleInfo',
+      'workPerformed',
+    ]);
+    expect(body).toEqual({
+      rows: [
+        {
+          id: 'contract-appointment',
+          clientId,
+          clientName: 'Carla Contract',
+          clientPhone: '+5511777777777',
+          mechanicId,
+          mechanicName: 'Marcos Contract',
+          mechanicPhone: '+5511888888888',
+          specialty: 'Cambio',
+          timeSlotId: null,
+          date: '2026-08-15',
+          startTime: '13:00',
+          endTime: '14:00',
+          status: 'acabado',
+          vehicleInfo: 'Honda Civic 2020',
+          notes: 'Vibracao em alta velocidade',
+          serviceSummary: 'Servico concluido',
+          serviceDiagnosis: 'Rolamento gasto',
+          workPerformed: 'Trabalho concluido',
+          partsUsed: 'Rolamento',
+          recommendations: 'Revisar em 30 dias',
+          totalAmountCents: 23456,
+          closedAt: expect.any(String),
+          serviceItems: [
+            { id: 'item-first', description: 'Rolamento', amountCents: 13456, sortOrder: 0 },
+            { id: 'item-later', description: 'Mao de obra', amountCents: 10000, sortOrder: 1 },
+          ],
+          createdAt: expect.any(String),
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
+  });
+
+  it('composes status and opaque mechanic filters', async () => {
+    const seedMechanicId = insertMechanicFixture(testDb, { id: 'seed-mechanic-1', name: 'Seed Mechanic' });
+    const otherMechanicId = insertMechanicFixture(testDb, { id: 'other-mechanic', name: 'Other Mechanic' });
+    const clientId = insertProfile(testDb, { id: 'filter-client', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'seed-canceled', clientId, mechanicId: seedMechanicId, date: '2026-08-15', status: 'cancelado',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'seed-finished', clientId, mechanicId: seedMechanicId, date: '2026-08-15', status: 'acabado',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'other-canceled', clientId, mechanicId: otherMechanicId, date: '2026-08-15', status: 'cancelado',
+    });
+
+    const response = await get(
+      '/admin/appointments?from=2026-08-15&to=2026-08-15&status=cancelado&mechanicId=seed-mechanic-1',
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ total: 1 });
+    expect(response.json().rows.map((row: { id: string }) => row.id)).toEqual(['seed-canceled']);
+  });
+
+  it('searches appointment fields case-insensitively and treats LIKE wildcards literally', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'search-mechanic', name: 'Marina 50%_Especial' });
+    const otherMechanicId = insertMechanicFixture(testDb, { id: 'search-lookalike', name: 'Marina 50XXEspecial' });
+    const clientId = insertProfile(testDb, { id: 'search-client', name: 'Cliente Alvo', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'literal-search-match', clientId, mechanicId, date: '2026-08-15', status: 'acabado', revenueCents: 100,
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'search-lookalike-row', clientId, mechanicId: otherMechanicId, date: '2026-08-15', status: 'acabado',
+    });
+
+    const nameResponse = await get('/admin/appointments?from=2026-08-15&to=2026-08-15&search=CLIENTE%20ALVO');
+    const literalResponse = await get(
+      `/admin/appointments?from=2026-08-15&to=2026-08-15&search=${encodeURIComponent('50%_')}`,
+    );
+
+    expect(nameResponse.json().total).toBe(2);
+    expect(literalResponse.json().rows.map((row: { id: string }) => row.id)).toEqual(['literal-search-match']);
+  });
+
+  it('orders by date, start time, and id descending across genuine ties', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'order-mechanic', name: 'Order Mechanic' });
+    const clientId = insertProfile(testDb, { id: 'order-client', role: 'client' });
+    const fixtures = [
+      { id: 'older-date', date: '2026-08-14', startTime: '16:00' },
+      { id: 'earlier-time', date: '2026-08-15', startTime: '09:00' },
+      { id: 'tie-a', date: '2026-08-15', startTime: '11:00' },
+      { id: 'tie-z', date: '2026-08-15', startTime: '11:00' },
+    ];
+    for (const fixture of fixtures) {
+      insertAppointmentFixture(testDb, {
+        ...fixture,
+        clientId,
+        mechanicId,
+        endTime: fixture.startTime === '16:00' ? '17:00' : fixture.startTime === '11:00' ? '12:00' : '10:00',
+        status: 'acabado',
+      });
+    }
+
+    const response = await get('/admin/appointments?from=2026-08-14&to=2026-08-15');
+
+    expect(response.json().rows.map((row: { id: string }) => row.id)).toEqual([
+      'tie-z',
+      'tie-a',
+      'earlier-time',
+      'older-date',
+    ]);
+  });
+
+  it('paginates without overlap and page union equals the full ordered set', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'page-mechanic', name: 'Page Mechanic' });
+    const clientId = insertProfile(testDb, { id: 'page-client', role: 'client' });
+    for (const id of ['page-a', 'page-b', 'page-c', 'page-d']) {
+      insertAppointmentFixture(testDb, {
+        id, clientId, mechanicId, date: '2026-08-15', startTime: '10:00', endTime: '11:00', status: 'acabado',
+      });
+    }
+
+    const page1 = (await get('/admin/appointments?from=2026-08-15&to=2026-08-15&page=1&pageSize=2')).json();
+    const page2 = (await get('/admin/appointments?from=2026-08-15&to=2026-08-15&page=2&pageSize=2')).json();
+    const ids1 = page1.rows.map((row: { id: string }) => row.id);
+    const ids2 = page2.rows.map((row: { id: string }) => row.id);
+
+    expect(ids1.filter((id: string) => ids2.includes(id))).toEqual([]);
+    expect([...ids1, ...ids2]).toEqual(['page-d', 'page-c', 'page-b', 'page-a']);
+    expect(page1.total).toBe(4);
+    expect(page2.total).toBe(4);
+  });
+
+  it('caps pageSize at 100', async () => {
+    const response = await get('/admin/appointments?pageSize=500');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ page: 1, pageSize: 100 });
+  });
+
+  it('synchronizes a stale confirmed row before selecting it', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'sync-mechanic', name: 'Sync Mechanic' });
+    const clientId = insertProfile(testDb, { id: 'sync-client', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'stale-list-row', clientId, mechanicId, date: '2026-08-14', status: 'confirmado',
+    });
+    const storedBefore = testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get('stale-list-row');
+
+    const response = await get('/admin/appointments?from=2026-08-14&to=2026-08-14');
+    const storedAfter = testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get('stale-list-row');
+
+    expect(storedBefore).toEqual({ status: 'confirmado' });
+    expect(response.json().rows[0]).toMatchObject({ id: 'stale-list-row', status: 'nao_finalizado' });
+    expect(storedAfter).toEqual({ status: 'nao_finalizado' });
+  });
+
+  it('returns INVALID_DATE_RANGE when from is later than to', async () => {
+    const response = await get('/admin/appointments?from=2026-08-16&to=2026-08-15');
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid date range', code: 'INVALID_DATE_RANGE' });
+  });
+
+  it('rejects a non-admin token', async () => {
+    const clientId = insertProfile(testDb, { id: 'appointment-reader-client', role: 'client' });
+    const clientToken = signAccessToken({ userId: clientId, role: 'client' }).token;
+
+    const response = await get('/admin/appointments', clientToken);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });
+  });
+});

@@ -95,6 +95,53 @@ function getAdminMechanicRows(db: Db, search?: SQL) {
     .where(search);
 }
 
+const adminAppointmentColumns = {
+  id: appointments.id,
+  clientId: appointments.clientId,
+  clientName: sql<string | null>`(select name from ${profiles} where ${profiles.id} = ${appointments.clientId})`,
+  clientPhone: sql<string | null>`(select phone from ${profiles} where ${profiles.id} = ${appointments.clientId})`,
+  mechanicId: appointments.mechanicId,
+  mechanicName: sql<string | null>`(select name from ${profiles} where ${profiles.id} = ${appointments.mechanicId})`,
+  mechanicPhone: sql<string | null>`(select phone from ${profiles} where ${profiles.id} = ${appointments.mechanicId})`,
+  specialty: sql<string | null>`(select specialty from ${mechanics} where ${mechanics.id} = ${appointments.mechanicId})`,
+  timeSlotId: appointments.timeslotId,
+  date: appointments.date,
+  startTime: appointments.startTime,
+  endTime: appointments.endTime,
+  status: appointments.status,
+  vehicleInfo: appointments.vehicleInfo,
+  notes: appointments.notes,
+  serviceSummary: appointmentServiceReports.summary,
+  serviceDiagnosis: appointmentServiceReports.diagnosis,
+  workPerformed: appointmentServiceReports.workPerformed,
+  partsUsed: appointmentServiceReports.partsUsed,
+  recommendations: appointmentServiceReports.recommendations,
+  totalAmountCents: appointmentServiceReports.totalAmountCents,
+  closedAt: appointmentServiceReports.closedAt,
+  createdAt: appointments.createdAt,
+};
+
+function appointmentSearch(search: string): SQL | undefined {
+  if (!search) return undefined;
+  const pattern = `%${escapeLikePattern(search)}%`;
+  return sql`(
+    lower(coalesce((select name from ${profiles} where ${profiles.id} = ${appointments.clientId}), '')) LIKE lower(${pattern}) ESCAPE '\\'
+    OR lower(coalesce((select name from ${profiles} where ${profiles.id} = ${appointments.mechanicId}), '')) LIKE lower(${pattern}) ESCAPE '\\'
+    OR lower(coalesce((select phone from ${profiles} where ${profiles.id} = ${appointments.clientId}), '')) LIKE lower(${pattern}) ESCAPE '\\'
+    OR lower(coalesce((select phone from ${profiles} where ${profiles.id} = ${appointments.mechanicId}), '')) LIKE lower(${pattern}) ESCAPE '\\'
+    OR lower(coalesce(${appointments.vehicleInfo}, '')) LIKE lower(${pattern}) ESCAPE '\\'
+    OR lower(coalesce(${appointmentServiceReports.summary}, '')) LIKE lower(${pattern}) ESCAPE '\\'
+  )`;
+}
+
+function getAdminAppointmentRows(db: Db, predicate?: SQL) {
+  return db
+    .select(adminAppointmentColumns)
+    .from(appointments)
+    .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+    .where(predicate);
+}
+
 function loadAdminServiceItems(db: Db, appointmentIds: string[]) {
   const grouped = new Map<string, Array<{ id: string; description: string; amountCents: number; sortOrder: number }>>();
   if (appointmentIds.length === 0) return grouped;
@@ -283,6 +330,40 @@ export function adminRoutes(app: FastifyInstance, db: Db) {
       .limit(pageBounds.limit)
       .offset(pageBounds.offset)
       .all();
+
+    return { rows, total, page, pageSize };
+  });
+
+  app.get('/admin/appointments', { preHandler: requireAdmin(db) }, async (request) => {
+    syncUnfinalized(db);
+    const { from, to, status, mechanicId, search, page, pageSize } = parseAdminFilters(request.query);
+    const predicate = and(
+      gte(appointments.date, from),
+      sql`${appointments.date} <= ${to}`,
+      status === 'all' ? undefined : eq(appointments.status, status),
+      mechanicId ? eq(appointments.mechanicId, mechanicId) : undefined,
+      appointmentSearch(search),
+    );
+    const pageBounds = pagination(page, pageSize);
+    const total = db
+      .select({ value: count(appointments.id) })
+      .from(appointments)
+      .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+      .where(predicate)
+      .get()!.value;
+    const pageRows = getAdminAppointmentRows(db, predicate)
+      .orderBy(...totalOrder([desc(appointments.date), desc(appointments.startTime)], appointments.id, 'desc'))
+      .limit(pageBounds.limit)
+      .offset(pageBounds.offset)
+      .all();
+    const itemsByAppointment = loadAdminServiceItems(
+      db,
+      pageRows.map((appointment) => appointment.id),
+    );
+    const rows = pageRows.map((appointment) => ({
+      ...appointment,
+      serviceItems: itemsByAppointment.get(appointment.id) ?? [],
+    }));
 
     return { rows, total, page, pageSize };
   });
