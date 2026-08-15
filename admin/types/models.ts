@@ -168,6 +168,13 @@ export interface PaginatedResult<T> {
   pageSize: number;
 }
 
+export interface DeactivateMechanicsResult {
+  deactivatedCount: number;
+  requestedCount: number;
+  ignoredCount: number;
+  cancelledAppointmentCount: number;
+}
+
 export interface AdminMechanicDetail {
   mechanic: AdminMechanicRow;
   range: {

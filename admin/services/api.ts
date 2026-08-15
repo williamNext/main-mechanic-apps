@@ -1,12 +1,9 @@
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
-import { createClient } from '@supabase/supabase-js';
 import { env } from '@/config/env';
 import { SecureStorage } from '@/utils/secure-storage';
 
 export const AUTH_TOKEN_KEY = 'auth_token';
-
-export const supabase = createClient(env.EXPO_PUBLIC_SUPABASE_URL, env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
 
 export async function getStoredToken(): Promise<string | null> {
   if (Platform.OS === 'web') {

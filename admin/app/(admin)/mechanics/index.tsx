@@ -28,29 +28,28 @@ function approvalStatus(isActive: boolean, credentials: string) {
 
 export default function MechanicsScreen() {
   const router = useRouter();
-  const { mechanics, filters, loading, error, setFilters, fetchMechanics, deleteMechanics, createMechanic } = useAdminStore();
+  const { mechanics, filters, loading, error, setFilters, fetchMechanics, deactivateMechanics, createMechanic } = useAdminStore();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmWord, setConfirmWord] = useState('');
 
-  // Create mechanic modal state
   const [createOpen, setCreateOpen] = useState(false);
-  const [nome, setNome] = useState('');
-  const [celular, setCelular] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
-  const [especialidade, setEspecialidade] = useState('');
-  const [credenciais, setCredenciais] = useState('');
+  const [password, setPassword] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [credentials, setCredentials] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   function openCreateModal() {
-    setNome('');
-    setCelular('');
+    setName('');
+    setPhone('');
     setEmail('');
-    setSenha('');
-    setEspecialidade('');
-    setCredenciais('');
+    setPassword('');
+    setSpecialty('');
+    setCredentials('');
     setShowPassword(false);
     setValidationError(null);
     setCreateOpen(true);
@@ -58,17 +57,17 @@ export default function MechanicsScreen() {
 
   async function handleCreateMechanic() {
     setValidationError(null);
-    if (!nome.trim() || !celular.trim() || !email.trim() || !senha.trim() || !especialidade.trim() || !credenciais.trim()) {
+    if (!name.trim() || !phone.trim() || !email.trim() || !password.trim() || !specialty.trim() || !credentials.trim()) {
       setValidationError('Todos os campos são obrigatórios.');
       return;
     }
-    const cleanPhone = celular.replace(/\D/g, '');
+    const cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length < 11) {
       setValidationError('O celular deve conter DDD e 9 dígitos (ex: 11999999999).');
       return;
     }
-    if (senha.length < 6) {
-      setValidationError('A senha deve ter no mínimo 6 caracteres.');
+    if (password.length < 8) {
+      setValidationError('A senha deve ter no mínimo 8 caracteres.');
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -78,12 +77,12 @@ export default function MechanicsScreen() {
     }
 
     const ok = await createMechanic({
-      nome: nome.trim(),
-      celular: cleanPhone,
+      name: name.trim(),
+      phone: cleanPhone,
       email: email.trim().toLowerCase(),
-      senha,
-      especialidade: especialidade.trim(),
-      credenciais: credenciais.trim(),
+      password,
+      specialty: specialty.trim(),
+      credentials: credentials.trim(),
     });
 
     if (ok) {
@@ -132,7 +131,7 @@ export default function MechanicsScreen() {
   }
 
   async function confirmDelete() {
-    const ok = await deleteMechanics([...selectedIds]);
+    const ok = await deactivateMechanics([...selectedIds]);
     if (!ok) return;
     setConfirmOpen(false);
     setConfirmWord('');
@@ -180,7 +179,7 @@ export default function MechanicsScreen() {
                 label="Excluir selecionados"
                 variant="danger"
                 disabled={selectedCount === 0}
-                loading={loading.deleteMechanics}
+                loading={loading.deactivateMechanics}
                 icon={<Trash2 size={15} color="#ffffff" />}
                 onPress={() => {
                   setConfirmWord('');
@@ -268,7 +267,7 @@ export default function MechanicsScreen() {
               <ActionButton
                 label="Cancelar"
                 variant="secondary"
-                disabled={loading.deleteMechanics}
+                disabled={loading.deactivateMechanics}
                 onPress={() => {
                   setConfirmOpen(false);
                   setConfirmWord('');
@@ -278,7 +277,7 @@ export default function MechanicsScreen() {
                 label="Excluir"
                 variant="danger"
                 disabled={!confirmationMatches || selectedCount === 0}
-                loading={loading.deleteMechanics}
+                loading={loading.deactivateMechanics}
                 onPress={confirmDelete}
               />
             </View>
@@ -300,8 +299,8 @@ export default function MechanicsScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Nome Completo</Text>
               <TextInput
-                value={nome}
-                onChangeText={setNome}
+                value={name}
+                onChangeText={setName}
                 placeholder="Ex: João Silva"
                 placeholderTextColor="#98a2b3"
                 style={styles.input}
@@ -313,8 +312,8 @@ export default function MechanicsScreen() {
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.label}>Celular (com DDD)</Text>
                 <TextInput
-                  value={celular}
-                  onChangeText={(text) => setCelular(formatPhone(text))}
+                  value={phone}
+                  onChangeText={(text) => setPhone(formatPhone(text))}
                   placeholder="Ex: (11) 99999-9999"
                   placeholderTextColor="#98a2b3"
                   keyboardType="phone-pad"
@@ -343,9 +342,9 @@ export default function MechanicsScreen() {
               <Text style={styles.label}>Senha de Acesso</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
-                  value={senha}
-                  onChangeText={setSenha}
-                  placeholder="Mínimo 6 caracteres"
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Mínimo 8 caracteres"
                   placeholderTextColor="#98a2b3"
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
@@ -362,8 +361,8 @@ export default function MechanicsScreen() {
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.label}>Especialidade</Text>
                 <TextInput
-                  value={especialidade}
-                  onChangeText={setEspecialidade}
+                  value={specialty}
+                  onChangeText={setSpecialty}
                   placeholder="Ex: Motor, Suspensão"
                   placeholderTextColor="#98a2b3"
                   style={styles.input}
@@ -373,8 +372,8 @@ export default function MechanicsScreen() {
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.label}>Credenciais (ex: CREA)</Text>
                 <TextInput
-                  value={credenciais}
-                  onChangeText={setCredenciais}
+                  value={credentials}
+                  onChangeText={setCredentials}
                   placeholder="Ex: CREA-123456"
                   placeholderTextColor="#98a2b3"
                   style={styles.input}

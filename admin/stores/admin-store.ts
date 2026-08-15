@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { getDefaultFilters, sanitizeFilters } from '@/features/admin/filter-utils';
 import * as adminService from '@/services/admin-service';
+import { isApiError } from '@/services/api';
+import { getApiErrorMessage } from '@/services/error-messages';
 import {
   AdminAppointmentRow,
   AdminDashboardSummary,
@@ -11,7 +13,7 @@ import {
   PaginatedResult,
 } from '@/types/models';
 
-type LoadKey = 'dashboard' | 'mechanics' | 'appointments' | 'finance' | 'detail' | 'deleteMechanics' | 'createMechanic';
+type LoadKey = 'dashboard' | 'mechanics' | 'appointments' | 'finance' | 'detail' | 'deactivateMechanics' | 'createMechanic';
 
 interface AdminState {
   filters: AdminFilters;
@@ -30,14 +32,14 @@ interface AdminState {
   fetchAppointments: (patch?: Partial<AdminFilters>) => Promise<void>;
   fetchFinancialReport: (patch?: Partial<AdminFilters>) => Promise<void>;
   fetchMechanicDetail: (mechanicId: string) => Promise<void>;
-  deleteMechanics: (mechanicIds: string[]) => Promise<boolean>;
+  deactivateMechanics: (mechanicIds: string[]) => Promise<boolean>;
   createMechanic: (params: {
-    nome: string;
-    celular: string;
+    name: string;
+    phone: string;
     email: string;
-    senha: string;
-    especialidade: string;
-    credenciais: string;
+    password: string;
+    specialty: string;
+    credentials: string;
   }) => Promise<boolean>;
   clearError: () => void;
 }
@@ -48,6 +50,11 @@ const emptyPage = <T,>(): PaginatedResult<T> => ({
   page: 1,
   pageSize: 25,
 });
+
+function getAdminErrorMessage(error: unknown, fallback: string): string {
+  if (isApiError(error)) return getApiErrorMessage(error.code);
+  return error instanceof Error ? error.message : fallback;
+}
 
 export const useAdminStore = create<AdminState>((set, get) => {
   const setLoading = (key: LoadKey, value: boolean) => {
@@ -60,7 +67,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
     try {
       await task();
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Falha na solicitação administrativa' });
+      set({ error: getAdminErrorMessage(error, 'Falha na solicitação administrativa') });
     } finally {
       setLoading(key, false);
     }
@@ -79,7 +86,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
       appointments: false,
       finance: false,
       detail: false,
-      deleteMechanics: false,
+      deactivateMechanics: false,
       createMechanic: false,
     },
     error: null,
@@ -130,19 +137,19 @@ export const useAdminStore = create<AdminState>((set, get) => {
       });
     },
 
-    deleteMechanics: async (mechanicIds) => {
-      setLoading('deleteMechanics', true);
+    deactivateMechanics: async (mechanicIds) => {
+      setLoading('deactivateMechanics', true);
       set({ error: null });
       try {
-        await adminService.deleteMechanics(mechanicIds);
+        await adminService.deactivateMechanics(mechanicIds);
         await get().fetchMechanics();
         await get().fetchDashboard();
         return true;
       } catch (error) {
-        set({ error: error instanceof Error ? error.message : 'Falha ao excluir mecânicos' });
+        set({ error: getAdminErrorMessage(error, 'Falha ao excluir mecânicos') });
         return false;
       } finally {
-        setLoading('deleteMechanics', false);
+        setLoading('deactivateMechanics', false);
       }
     },
 
@@ -155,7 +162,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
         await get().fetchDashboard();
         return true;
       } catch (error) {
-        set({ error: error instanceof Error ? error.message : 'Falha ao criar mecânico' });
+        set({ error: getAdminErrorMessage(error, 'Falha ao criar mecânico') });
         return false;
       } finally {
         setLoading('createMechanic', false);
