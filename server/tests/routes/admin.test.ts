@@ -268,6 +268,18 @@ function insertAppointmentFixture(
   }
 }
 
+function insertServiceItemFixture(
+  testDb: TestDb,
+  input: { id: string; appointmentId: string; description: string; amountCents: number; sortOrder?: number },
+) {
+  testDb.connection
+    .prepare(
+      `INSERT INTO appointment_service_items (id, appointment_id, description, amount_cents, sort_order)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(input.id, input.appointmentId, input.description, input.amountCents, input.sortOrder ?? 0);
+}
+
 describe('GET /admin/dashboard', () => {
   let testDb: TestDb;
   let app: FastifyInstance;
@@ -1040,6 +1052,186 @@ describe('GET /admin/appointments', () => {
     const clientToken = signAccessToken({ userId: clientId, role: 'client' }).token;
 
     const response = await get('/admin/appointments', clientToken);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });
+  });
+});
+
+describe('GET /admin/finance', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let adminToken: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-15T15:00:00.000Z'));
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    const adminId = insertProfile(testDb, { role: 'admin' });
+    adminToken = signAccessToken({ userId: adminId, role: 'admin' }).token;
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await app.close();
+    testDb.cleanup();
+  });
+
+  async function get(query = '', token = adminToken) {
+    return app.inject({
+      method: 'GET',
+      url: `/admin/finance${query}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+  }
+
+  it('returns the exact populated contract using report revenue, gap filling, and total ordering', async () => {
+    const clientId = insertProfile(testDb, { id: 'finance-client', name: 'Cliente Financeiro', role: 'client' });
+    const zetaId = insertMechanicFixture(testDb, {
+      id: 'finance-zeta', name: 'Zeta', specialty: 'Suspensao', isActive: false,
+    });
+    const alphaId = insertMechanicFixture(testDb, {
+      id: 'finance-alpha', name: 'Alpha', specialty: 'Eletrica',
+    });
+    const highId = insertMechanicFixture(testDb, {
+      id: 'finance-high', name: 'High', specialty: 'Freios',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'zeta-appointment', clientId, mechanicId: zetaId, date: '2026-08-14', status: 'acabado',
+      revenueCents: 30000, vehicleInfo: 'Sedan Z',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'alpha-appointment', clientId, mechanicId: alphaId, date: '2026-08-14', status: 'acabado',
+      revenueCents: 30000, vehicleInfo: 'Sedan A',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'high-appointment', clientId, mechanicId: highId, date: '2026-08-12', status: 'acabado',
+      revenueCents: 50000, vehicleInfo: 'SUV H',
+    });
+    testDb.connection
+      .prepare("UPDATE appointment_service_reports SET closed_at = '2026-08-14T18:00:00.000Z'")
+      .run();
+    insertServiceItemFixture(testDb, {
+      id: 'zeta-item', appointmentId: 'zeta-appointment', description: 'Zeta service', amountCents: 3,
+    });
+    insertServiceItemFixture(testDb, {
+      id: 'alpha-item', appointmentId: 'alpha-appointment', description: 'Alpha service', amountCents: 2,
+    });
+    insertServiceItemFixture(testDb, {
+      id: 'high-item', appointmentId: 'high-appointment', description: 'Brake service', amountCents: 1,
+    });
+
+    const response = await get('?from=2026-08-12&to=2026-08-14');
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(body).sort()).toEqual([
+      'appointments', 'byMechanic', 'byService', 'generatedAt', 'range', 'revenueByDay', 'revenueByMonth', 'summary',
+    ]);
+    expect(body.range).toEqual({ from: '2026-08-12', to: '2026-08-14' });
+    expect(body.generatedAt).toBe('2026-08-15T15:00:00.000Z');
+    expect(body.summary).toEqual({ appointments: 3, revenueCents: 110000, averageTicketCents: 36666 });
+    expect(body.revenueByDay).toEqual([
+      { date: '2026-08-12', appointments: 1, revenueCents: 50000 },
+      { date: '2026-08-13', appointments: 0, revenueCents: 0 },
+      { date: '2026-08-14', appointments: 2, revenueCents: 60000 },
+    ]);
+    expect(body.revenueByMonth).toEqual([{ month: '2026-08', appointments: 3, revenueCents: 110000 }]);
+    expect(body.byMechanic).toEqual([
+      { mechanicId: highId, mechanicName: 'High', specialty: 'Freios', appointments: 1, revenueCents: 50000 },
+      { mechanicId: alphaId, mechanicName: 'Alpha', specialty: 'Eletrica', appointments: 1, revenueCents: 30000 },
+      { mechanicId: zetaId, mechanicName: 'Zeta', specialty: 'Suspensao', appointments: 1, revenueCents: 30000 },
+    ]);
+    expect(body.byService).toEqual([
+      { description: 'Brake service', quantity: 1, revenueCents: 50000 },
+      { description: 'Alpha service', quantity: 1, revenueCents: 30000 },
+      { description: 'Zeta service', quantity: 1, revenueCents: 30000 },
+    ]);
+    expect(body.appointments.map((row: { id: string }) => row.id)).toEqual([
+      'zeta-appointment', 'alpha-appointment', 'high-appointment',
+    ]);
+    expect(Object.keys(body.appointments[0]).sort()).toEqual([
+      'clientName', 'closedAt', 'date', 'id', 'mechanicName', 'serviceSummary', 'totalAmountCents', 'vehicleInfo',
+    ]);
+    expect(testDb.connection.prepare('SELECT is_active AS isActive FROM mechanics WHERE id = ?').get(zetaId)).toEqual({
+      isActive: 0,
+    });
+  });
+
+  it('uses the current Sao Paulo month by default and splits an explicit cross-month range', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'month-mechanic', name: 'Month Mechanic' });
+    const clientId = insertProfile(testDb, { id: 'month-client', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'previous-month', clientId, mechanicId, date: '2026-07-31', status: 'acabado', revenueCents: 45000,
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'current-month', clientId, mechanicId, date: '2026-08-15', status: 'acabado', revenueCents: 15000,
+    });
+
+    const defaultResponse = await get();
+    const explicitResponse = await get('?from=2026-07-31&to=2026-08-15');
+
+    expect(defaultResponse.json()).toMatchObject({
+      range: { from: '2026-08-01', to: '2026-08-15' },
+      summary: { appointments: 1, revenueCents: 15000, averageTicketCents: 15000 },
+    });
+    expect(explicitResponse.json().revenueByMonth).toEqual([
+      { month: '2026-07', appointments: 1, revenueCents: 45000 },
+      { month: '2026-08', appointments: 1, revenueCents: 15000 },
+    ]);
+  });
+
+  it('applies opaque mechanic and escaped search filters independently to every aggregate', async () => {
+    const targetId = insertMechanicFixture(testDb, {
+      id: 'seed-mechanic-1', name: 'Target Mechanic', phone: '+551150%_1234',
+    });
+    const otherId = insertMechanicFixture(testDb, { id: 'other-mechanic', name: 'Other Mechanic' });
+    const clientId = insertProfile(testDb, { id: 'filter-client', name: 'Filter Client', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'target-report', clientId, mechanicId: targetId, date: '2026-08-15', status: 'acabado', revenueCents: 12000,
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'other-report', clientId, mechanicId: otherId, date: '2026-08-15', status: 'acabado', revenueCents: 34000,
+    });
+
+    const mechanicBody = (await get('?mechanicId=seed-mechanic-1')).json();
+    const searchBody = (await get(`?search=${encodeURIComponent('50%_')}`)).json();
+
+    expect(mechanicBody.summary).toEqual({ appointments: 1, revenueCents: 12000, averageTicketCents: 12000 });
+    expect(mechanicBody.appointments.map((row: { id: string }) => row.id)).toEqual(['target-report']);
+    expect(searchBody.summary).toEqual({ appointments: 1, revenueCents: 12000, averageTicketCents: 12000 });
+    expect(searchBody.byMechanic.map((row: { mechanicId: string }) => row.mechanicId)).toEqual(['seed-mechanic-1']);
+  });
+
+  it('synchronizes stale confirmed appointments before computing the report', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'finance-stale-mechanic', name: 'Stale Mechanic' });
+    const clientId = insertProfile(testDb, { id: 'finance-stale-client', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'finance-stale', clientId, mechanicId, date: '2026-08-14', status: 'confirmado',
+    });
+
+    const response = await get('?from=2026-08-14&to=2026-08-14');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().summary).toEqual({ appointments: 0, revenueCents: 0, averageTicketCents: 0 });
+    expect(testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get('finance-stale')).toEqual({
+      status: 'nao_finalizado',
+    });
+  });
+
+  it('returns INVALID_DATE_RANGE when from is later than to', async () => {
+    const response = await get('?from=2026-08-16&to=2026-08-15');
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid date range', code: 'INVALID_DATE_RANGE' });
+  });
+
+  it('rejects a non-admin token', async () => {
+    const clientId = insertProfile(testDb, { id: 'finance-reader-client', role: 'client' });
+    const clientToken = signAccessToken({ userId: clientId, role: 'client' }).token;
+
+    const response = await get('', clientToken);
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });

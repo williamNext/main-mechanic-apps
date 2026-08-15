@@ -174,6 +174,12 @@ function nextDate(date: string): string {
   return next.toISOString().slice(0, 10);
 }
 
+function nextMonth(month: string): string {
+  const next = new Date(`${month}-01T00:00:00.000Z`);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  return next.toISOString().slice(0, 7);
+}
+
 function compareText(left: string, right: string): number {
   if (left < right) return -1;
   if (left > right) return 1;
@@ -305,6 +311,116 @@ function getAdminDashboard(db: Db, from: string, to: string, today: string) {
   };
 }
 
+function getAdminFinancialReport(db: Db, from: string, to: string, mechanicId: string | null | undefined, search: string) {
+  const predicate = and(
+    gte(appointments.date, from),
+    sql`${appointments.date} <= ${to}`,
+    eq(appointments.status, 'acabado'),
+    mechanicId ? eq(appointments.mechanicId, mechanicId) : undefined,
+    appointmentSearch(search),
+  );
+  const revenue = sql<number>`coalesce(sum(${appointmentServiceReports.totalAmountCents}), 0)`.mapWith(Number);
+  const summaryRow = db
+    .select({ appointments: count(appointments.id), revenueCents: revenue })
+    .from(appointments)
+    .innerJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+    .where(predicate)
+    .get()!;
+  const dailyRows = db
+    .select({ date: appointments.date, appointments: count(appointments.id), revenueCents: revenue })
+    .from(appointments)
+    .innerJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+    .where(predicate)
+    .groupBy(appointments.date)
+    .orderBy(asc(appointments.date))
+    .all();
+  const month = sql<string>`substr(${appointments.date}, 1, 7)`;
+  const monthlyRows = db
+    .select({ month, appointments: count(appointments.id), revenueCents: revenue })
+    .from(appointments)
+    .innerJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+    .where(predicate)
+    .groupBy(month)
+    .orderBy(asc(month))
+    .all();
+  const mechanicName = sql<string>`(select name from ${profiles} where ${profiles.id} = ${appointments.mechanicId})`;
+  const specialty = sql<string>`(select specialty from ${mechanics} where ${mechanics.id} = ${appointments.mechanicId})`;
+  const byMechanic = db
+    .select({
+      mechanicId: appointments.mechanicId,
+      mechanicName,
+      specialty,
+      appointments: count(appointments.id),
+      revenueCents: revenue,
+    })
+    .from(appointments)
+    .innerJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+    .where(predicate)
+    .groupBy(appointments.mechanicId)
+    .orderBy(desc(revenue), asc(mechanicName), asc(appointments.mechanicId))
+    .all();
+  const serviceRevenue = sql<number>`coalesce(sum(${appointmentServiceReports.totalAmountCents}), 0)`.mapWith(Number);
+  const byService = db
+    .select({
+      description: appointmentServiceItems.description,
+      quantity: count(appointmentServiceItems.id),
+      revenueCents: serviceRevenue,
+    })
+    .from(appointmentServiceItems)
+    .innerJoin(
+      appointmentServiceReports,
+      eq(appointmentServiceReports.appointmentId, appointmentServiceItems.appointmentId),
+    )
+    .innerJoin(appointments, eq(appointments.id, appointmentServiceReports.appointmentId))
+    .where(predicate)
+    .groupBy(appointmentServiceItems.description)
+    .orderBy(desc(serviceRevenue), asc(appointmentServiceItems.description))
+    .all();
+  const reportAppointments = db
+    .select({
+      id: appointments.id,
+      date: appointments.date,
+      clientName: sql<string | null>`(select name from ${profiles} where ${profiles.id} = ${appointments.clientId})`,
+      mechanicName,
+      vehicleInfo: appointments.vehicleInfo,
+      serviceSummary: appointmentServiceReports.summary,
+      totalAmountCents: appointmentServiceReports.totalAmountCents,
+      closedAt: appointmentServiceReports.closedAt,
+    })
+    .from(appointments)
+    .innerJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+    .where(predicate)
+    .orderBy(desc(appointments.date), desc(appointmentServiceReports.closedAt), desc(appointments.id))
+    .all();
+
+  const dailyByDate = new Map(dailyRows.map((row) => [row.date, row]));
+  const revenueByDay = [];
+  for (let date = from; date <= to; date = nextDate(date)) {
+    revenueByDay.push(dailyByDate.get(date) ?? { date, appointments: 0, revenueCents: 0 });
+  }
+
+  const monthlyByMonth = new Map(monthlyRows.map((row) => [row.month, row]));
+  const revenueByMonth = [];
+  for (let currentMonth = from.slice(0, 7); currentMonth <= to.slice(0, 7); currentMonth = nextMonth(currentMonth)) {
+    revenueByMonth.push(monthlyByMonth.get(currentMonth) ?? { month: currentMonth, appointments: 0, revenueCents: 0 });
+  }
+
+  return {
+    range: { from, to },
+    generatedAt: new Date().toISOString(),
+    summary: {
+      ...summaryRow,
+      averageTicketCents:
+        summaryRow.appointments === 0 ? 0 : Math.trunc(summaryRow.revenueCents / summaryRow.appointments),
+    },
+    revenueByDay,
+    revenueByMonth,
+    byMechanic,
+    byService,
+    appointments: reportAppointments,
+  };
+}
+
 export function adminRoutes(app: FastifyInstance, db: Db) {
   app.get('/admin/dashboard', { preHandler: requireAdmin(db) }, async (request) => {
     syncUnfinalized(db);
@@ -366,6 +482,13 @@ export function adminRoutes(app: FastifyInstance, db: Db) {
     }));
 
     return { rows, total, page, pageSize };
+  });
+
+  app.get('/admin/finance', { preHandler: requireAdmin(db) }, async (request) => {
+    syncUnfinalized(db);
+    const { from, to, mechanicId, search } = parseAdminFilters(request.query);
+
+    return getAdminFinancialReport(db, from, to, mechanicId, search);
   });
 
   app.get<{ Params: { id: string } }>('/admin/mechanics/:id', { preHandler: requireAdmin(db) }, async (request) => {
