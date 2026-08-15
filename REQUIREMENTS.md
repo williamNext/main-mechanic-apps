@@ -47,9 +47,9 @@
 
 | ID | Requirement | Phase | Status |
 |---|---|---|---|
-| **ADMIN-01** | Admin can create a mechanic account (auth user + profile + mechanic record) in one authenticated action, replacing the `admin-create-mechanic` edge function | 3 | ⬜ Pending |
-| **ADMIN-02** | Admin can deactivate and reactivate a mechanic account, retaining service history and recording before/after state in `admin_action_log`, replacing destructive mechanic deletion | 3 | ⬜ Pending |
-| **ADMIN-03** | Admin can retrieve dashboard summary, mechanic list/detail, appointment list/detail and financial reports, replacing the `admin_*` reporting RPCs | 3 | ⬜ Pending |
+| **ADMIN-01** | Admin can create a mechanic account (auth user + profile + mechanic record) in one authenticated action, replacing the `admin-create-mechanic` edge function | 3 | ✅ Done |
+| **ADMIN-02** | Admin can deactivate and reactivate a mechanic account, retaining service history and recording before/after state in `admin_action_log`, replacing destructive mechanic deletion | 3 | ✅ Done |
+| **ADMIN-03** | Admin can retrieve dashboard summary, mechanic list/detail, appointment list/detail and financial reports, replacing the `admin_*` reporting RPCs | 3 | ✅ Done |
 
 ### Notifications
 
@@ -109,7 +109,7 @@ Tracked, deliberately deferred, not in the current roadmap.
 | **1 — Foundation & auth walking skeleton** ✅ | AUTH-01, AUTH-02, AUTH-03, DATA-01, DATA-02, DATA-03, INFRA-01, INFRA-02 | Completed 2026-08-08 |
 | **1.5 — Prove the wire** (current) | INFRA-03 … INFRA-07 | `.scratch/phase-1.5-prove-the-wire/issues/01`–`07` |
 | **2 — Booking & appointment lifecycle** | AUTH-04, BOOK-01 … BOOK-05, NOTIF-01, NOTIF-02 | Not yet broken down |
-| **3 — Admin management** | ADMIN-01, ADMIN-02, ADMIN-03 | Not yet broken down |
+| **3 — Admin management** | ADMIN-01, ADMIN-02, ADMIN-03 | `.scratch/phase-3-admin-management/issues/01`–`12`, tickets 01–11 done, 12 (e2e) remaining |
 | ~~**4 — Notifications**~~ | Dissolved into Phases 2–3 by D-K | — |
 
 **Coverage:** 26 v1 requirements, all mapped to a phase, none unmapped.

@@ -272,8 +272,10 @@ functions spread across three repos' `scripts/sql/` folders.
 | **1.5 Prove the Wire** | Rewire `oficina` **auth only** onto the existing Phase 1 endpoints; global error handler; CORS; `seed:dev`; root CI; first new e2e spec | ✅ **Complete** (2026-08-12) — see [`SPEC-phase-1.5-prove-the-wire.md`](SPEC-phase-1.5-prove-the-wire.md). Carries one debt: hand-verification on an Android emulator and a physical device was deferred to pre-production (ticket 06) |
 | **2. Booking & Appointments — `oficina` vertical** | Role guard, `public_mechanics` reads, server-side availability, book, client-cancel, appointment list/detail, notifications + fan-out for those two writes, `profiles.role` triggers (D-R). **Ends with `@supabase/supabase-js` deleted from `oficina`** | ✅ **Complete** (2026-08-12) |
 | **2b. Mechanic vertical** | Timeslot CRUD + **overlap (D-J/D-S)**, completion + service report, mechanic-cancel branch, complete fan-out, `mechanic` app rewired and fully off Supabase; shared-package extraction deferred | ✅ **Complete** (2026-08-14) |
-| **3. Admin Management** | create/delete mechanic, dashboard, lists, details, financial report, `admin` app rewired, shared-package debt discharged with all three app consumers | ⬜ Not started (**current phase**) |
+| **3. Admin Management** | Create/deactivate/reactivate mechanic, dashboard, lists, details, financial report, `admin` app rewired and fully off Supabase | 🔶 Tickets 01–11 complete; ticket 12 (e2e) remaining (**current phase**) |
+| **3b. Shared package extraction** | Extract the copy-pasted `http.ts`, `error-messages.ts` and `secure-storage.ts` (three copies each, across `oficina`/`mechanic`/`admin`) into one shared package, now that all three consumers are final | ⬜ Not started — specced after Phase 3 ships |
 | ~~**4. Notifications**~~ | **Dissolved into Phases 2–3 by D-K.** The client UI already exists; fan-out belongs inside the transactions that cause it | — |
+| **Hosting, deployment & backups** | Concrete hosting target, deployment, backups, rate limiting, structured logging | ⬜ Not started, unplanned as yet — last phase |
 
 **Phases 2–3 were re-cut on 2026-08-12 (D-Q).** The roadmap previously sliced by *capability*
 ("Booking & Appointment Lifecycle"), which would have built the whole booking surface server-side
@@ -1162,6 +1164,7 @@ may override.
 | **D-T** | Shared `AdminFilters` parsing and ordering | **Use `{ from, to, status, mechanicId, search, page, pageSize }`; default `from` to the first day of the current São Paulo month and `to` to today via `getSaoPauloDateTimeParts()`; default `page` to 1 and `pageSize` to 20, capped at 100; validate `mechanicId` as a non-empty trimmed string, not a UUID; escape `%`, `_`, and the escape character itself for future SQL `LIKE` search; append an explicit id tiebreak to every ordering.** | Search has no accent folding (diacritic-insensitive matching): better-sqlite3 ships no ICU collation, and this project will not build one for six fields. Total ordering prevents duplicate or skipped rows across paginated reads and makes every response array deterministic. |
 | **D-U** | `syncUnfinalized` scope for admin reads | **Every future `/admin/*` read calls `syncUnfinalized(db)` before it queries, widening D-F/D-O from each appointment list/detail handler to every admin read.** | Inherits both conditions verbatim: D-O's cheap `SELECT EXISTS(...)` guard keeps the common-case read a pure read, and D-F's rule that the sweep runs before any read transaction opens (never nested inside one) stands unchanged. |
 | **D-V** | Mechanic removal semantics | **Deactivate instead of delete; see [ADR 0001](docs/adr/0001-deactivate-instead-of-delete-mechanics.md).** | Extends D-I's admin-only write surface to its removal/restore operations rather than reopening who may write `mechanics.is_active`. Gives up legacy delete parity and true erasure to retain client service history and finished-job revenue. |
+| **D-W** | Shared-package extraction, deferred a third time | **Not discharged in Phase 3, moved to Phase 3b.** §4.2 and §17.4 previously instructed Phase 3 to discharge this debt with all three consumers present | Ratified 2026-08-15. The extraction's input is `admin`'s rewired `services/*.ts`, which only exist once Phase 3's own rewire (tickets 8–11) lands — attempting the extraction inside the same phase that produces its input risks building the shared shape around not-yet-final code. Phase 3b runs immediately after, with every consumer (`oficina`, `mechanic`, `admin`) final and nothing left to wait for. |
 
 **Cross-cutting reminder:** §13.2's status codes (403/404/409) follow from these defaults and
 should be treated as the intended contract, not as competing proposals.
@@ -1640,7 +1643,11 @@ Do not rewire an app before the endpoints it needs exist and are tested.
 - Client cancel and mechanic cancel have **different** allowed source statuses (§8.2).
 - ~~Timeslot **overlap** is validated only in the mechanic UI, never in the database.~~ ✅ Resolved
   by ticket 03's transactional server-side overlap enforcement and D-S's closed semantics.
-- The `mechanics.credentials` write permission is ambiguous post-approval-removal (UC-M5).
+- ~~The `mechanics.credentials` write permission is ambiguous post-approval-removal (UC-M5).~~ ✅
+  Resolved by **D-I**: `mechanics.credentials` and `is_active` are admin-only writes. Not reopened
+  by Phase 3's admin-management work, only exercised by it — `POST /admin/mechanics` writes
+  `credentials` at creation and there is deliberately no `PATCH /admin/mechanics/:id` to write it
+  again afterward (SPEC-phase-3-admin-management.md, "Not built").
 - Password minimum length disagrees between the edge function (6) and the server (8) — **resolved
   by §10.3 D-E: use 8.**
 - Legacy `admin_delete_mechanics` granted `DELETE` on `profiles`/`mechanics` to all authenticated
@@ -1684,9 +1691,11 @@ There is also `supabase/docs/specs/easy-first-notifications.md` — read it befo
 - ~~Three separate git repos~~ **Resolved 2026-08-11 by the monorepo (§3)** — a cross-cutting change
   is now one commit. There is still no shared package, so types, wire clients, secure-storage
   adapters, error maps, theme constants, and notification services remain copy-pasted and have
-  drifted. **Phase 3 must discharge this deferred debt with three consumers — `oficina`,
-  `mechanic`, and `admin` — rather than the two consumers present when extraction was first
-  deferred.**
+  drifted — now **three** copies each of `http.ts`, `error-messages.ts` and `secure-storage.ts`
+  rather than two, since Phase 3 knowingly added `admin`'s third copy of `secure-storage.ts` (§16)
+  rather than leave unencrypted token storage in place for one more phase. **Deferred a third time,
+  to Phase 3b (D-W)**, not discharged inside Phase 3 itself: the extraction's input is `admin`'s
+  rewired services, which only exist once Phase 3's own rewire is complete.
 - Each app repo carries `.agents/AGENT_RULES.md` (terse-response style rules, security rules,
   "confirm before touching >3 files"), `.Jules/` learning notes, and `.planning/codebase/`
   analysis docs. Those `codebase/` docs are still useful reference. `server/.planning/` is

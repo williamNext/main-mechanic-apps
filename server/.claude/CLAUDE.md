@@ -41,6 +41,6 @@ Where any document disagrees with `PROJECT_CONTEXT.md` §8, §8 wins.
 
 ## Planning
 
-Planning artifacts live at the repository root: `PROJECT_CONTEXT.md`, `REQUIREMENTS.md`, the current `SPEC-*.md`, and tickets under `.scratch/<phase>/issues/`.
+Planning artifacts live at the repository root: `PROJECT_CONTEXT.md`, `REQUIREMENTS.md`, the current `SPEC-*.md`, and tickets under `docs/phases/<phase>/issues/` (the location Phase 2b established; a phase's own orchestration session may also keep a working copy under `.scratch/<phase>/issues/`, which dies with that session).
 
 `.planning/` in this directory is a **frozen historical record** of the GSD workflow used to build Phase 1 — deprecated 2026-08-11, read-only. See [`.planning/README.md`](.planning/README.md). Do not update it, and do not treat its `ROADMAP.md` or `STATE.md` as current; both predate Phase 1.5 and the dissolution of Phase 4.
