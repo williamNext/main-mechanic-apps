@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { hashPassword } from '../src/auth/hash.js';
 import { config } from '../src/config/index.js';
 import { createDb, type Db } from '../src/db/client.js';
+import { getSaoPauloDateTimeParts } from '../src/lib/sao-paulo-time.js';
 import {
   appointmentServiceItems,
   appointmentServiceReports,
@@ -100,6 +101,15 @@ function dateOffset(daysFromToday: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function previousMonthDate(): string {
+  const [yearText, monthText] = getSaoPauloDateTimeParts().date.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const previousYear = month === 1 ? year - 1 : year;
+  const previousMonth = month === 1 ? 12 : month - 1;
+  return `${previousYear}-${String(previousMonth).padStart(2, '0')}-15`;
+}
+
 export interface SeedDevResult {
   mechanicIds: string[];
   clientId: string;
@@ -185,6 +195,14 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
     endTime: '15:00',
     isAvailable: false,
   };
+  const previousMonthCompletedTimeslot = {
+    id: 'seed-timeslot-completed-previous-month',
+    mechanicId: MECHANIC_SEEDS[0].id,
+    date: previousMonthDate(),
+    startTime: '16:00',
+    endTime: '17:00',
+    isAvailable: false,
+  };
   const inactiveTimeslots = [
     {
       id: 'seed-timeslot-inactive-0',
@@ -242,6 +260,7 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
 
     upsertTimeslot(tx, activePastTimeslot);
     upsertTimeslot(tx, completedTimeslot);
+    upsertTimeslot(tx, previousMonthCompletedTimeslot);
     inactiveTimeslots.forEach((slot) => upsertTimeslot(tx, slot));
 
     upsertProfile(tx, CLIENT_SEED, 'client', sharedHash);
@@ -297,6 +316,19 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       notes: 'Cliente relatou ruído ao frear e vibração no volante.',
     });
 
+    upsertAppointment(tx, {
+      id: 'seed-appointment-acabado-previous-month',
+      clientId: CLIENT_SEED.id,
+      mechanicId: MECHANIC_SEEDS[0].id,
+      timeslotId: previousMonthCompletedTimeslot.id,
+      date: previousMonthCompletedTimeslot.date,
+      startTime: previousMonthCompletedTimeslot.startTime,
+      endTime: previousMonthCompletedTimeslot.endTime,
+      status: 'acabado',
+      vehicleInfo: 'Chevrolet Onix 2020',
+      notes: 'Revisão preventiva concluída no mês anterior.',
+    });
+
     const serviceItems = [
       { id: 'seed-service-item-0', description: 'Diagnóstico do sistema de freios', amountCents: 15000, sortOrder: 0 },
       { id: 'seed-service-item-1', description: 'Jogo de pastilhas de freio dianteiras', amountCents: 32000, sortOrder: 1 },
@@ -330,10 +362,37 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
         .onConflictDoUpdate({ target: appointmentServiceItems.id, set: values })
         .run();
     });
+
+    const previousMonthReportValues = {
+      appointmentId: 'seed-appointment-acabado-previous-month',
+      mechanicId: MECHANIC_SEEDS[0].id,
+      summary: 'Revisão preventiva concluída',
+      diagnosis: 'Filtros saturados e óleo próximo do limite recomendado.',
+      workPerformed: 'Troca de óleo e filtros, inspeção dos freios e calibração dos pneus.',
+      partsUsed: 'Óleo do motor e filtros de óleo e ar.',
+      recommendations: 'Retornar para nova revisão em 10.000 km.',
+      totalAmountCents: 45000,
+    };
+    tx.insert(appointmentServiceReports)
+      .values(previousMonthReportValues)
+      .onConflictDoUpdate({ target: appointmentServiceReports.appointmentId, set: previousMonthReportValues })
+      .run();
+
+    const previousMonthItemValues = {
+      id: 'seed-service-item-previous-month-0',
+      appointmentId: 'seed-appointment-acabado-previous-month',
+      description: 'Troca de óleo e filtros',
+      amountCents: 45000,
+      sortOrder: 0,
+    };
+    tx.insert(appointmentServiceItems)
+      .values(previousMonthItemValues)
+      .onConflictDoUpdate({ target: appointmentServiceItems.id, set: previousMonthItemValues })
+      .run();
   });
 
   const mechanicIds = MECHANIC_SEEDS.map((m) => m.id);
-  const timeslotCount = mechanicIds.length * dates.length * SLOTS_PER_DAY.length + 2 + inactiveTimeslots.length;
+  const timeslotCount = mechanicIds.length * dates.length * SLOTS_PER_DAY.length + 3 + inactiveTimeslots.length;
   console.log(
     `Seeded ${mechanicIds.length} active mechanics, 1 inactive mechanic, 2 clients, 1 admin, ${timeslotCount} timeslots.`,
   );

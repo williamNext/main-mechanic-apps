@@ -32,6 +32,13 @@ function dateOffset(daysFromToday: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function previousMonth(date: string): string {
+  const [yearText, monthText] = date.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
+}
+
 describe('seedDev', () => {
   let testDb: ReturnType<typeof makeTestDb>;
   let app: FastifyInstance;
@@ -52,7 +59,7 @@ describe('seedDev', () => {
     expect(result.mechanicIds).toHaveLength(3);
     expect(result.clientIds).toEqual(['seed-client-1', 'seed-client-2']);
     expect(result.secondClientId).toBe('seed-client-2');
-    expect(result.timeslotCount).toBe(67);
+    expect(result.timeslotCount).toBe(68);
 
     const mechanicRows = testDb.db.select().from(profiles).where(eq(profiles.role, 'mechanic')).all();
     expect(mechanicRows).toHaveLength(4);
@@ -67,7 +74,7 @@ describe('seedDev', () => {
     expect(clientRows.find((profile) => profile.id === 'seed-client-1')?.phone).toBe('+5511988880001');
 
     const timeslotRows = testDb.db.select().from(timeslots).all();
-    expect(timeslotRows).toHaveLength(67);
+    expect(timeslotRows).toHaveLength(68);
 
     const mechanicTableRows = testDb.db.select().from(mechanics).all();
     expect(mechanicTableRows).toHaveLength(4);
@@ -130,11 +137,65 @@ describe('seedDev', () => {
     expect(inactiveRows.map((r) => r.id).sort()).toEqual(['seed-timeslot-inactive-0', 'seed-timeslot-inactive-1']);
   });
 
-  it('seeds one appointment in every lifecycle status', async () => {
+  it('seeds every lifecycle status plus the additional previous-month completed appointment', async () => {
     await seedDev(testDb.db);
 
     const rows = testDb.db.select().from(appointments).all();
-    expect(rows.map((row) => row.status).sort()).toEqual(['acabado', 'cancelado', 'confirmado', 'nao_finalizado']);
+    expect(rows.map((row) => row.status).sort()).toEqual([
+      'acabado',
+      'acabado',
+      'cancelado',
+      'confirmado',
+      'nao_finalizado',
+    ]);
+  });
+
+  it('seeds a priced completed appointment in the previous Sao Paulo calendar month', async () => {
+    await seedDev(testDb.db);
+
+    const appointment = testDb.db
+      .select()
+      .from(appointments)
+      .where(eq(appointments.id, 'seed-appointment-acabado-previous-month'))
+      .get();
+    const expectedMonth = previousMonth(dateOffset(0));
+    expect(appointment).toMatchObject({
+      timeslotId: 'seed-timeslot-completed-previous-month',
+      status: 'acabado',
+    });
+    expect(appointment?.date.slice(0, 7)).toBe(expectedMonth);
+
+    const slot = testDb.db
+      .select()
+      .from(timeslots)
+      .where(eq(timeslots.id, 'seed-timeslot-completed-previous-month'))
+      .get();
+    expect(slot).toMatchObject({ isAvailable: false, date: appointment?.date });
+
+    const report = testDb.db
+      .select()
+      .from(appointmentServiceReports)
+      .where(eq(appointmentServiceReports.appointmentId, appointment!.id))
+      .get();
+    expect(report).toMatchObject({
+      mechanicId: 'seed-mechanic-1',
+      summary: 'Revisão preventiva concluída',
+      diagnosis: expect.any(String),
+      workPerformed: expect.any(String),
+      partsUsed: expect.any(String),
+      recommendations: expect.any(String),
+      totalAmountCents: 45000,
+    });
+
+    const items = testDb.db
+      .select()
+      .from(appointmentServiceItems)
+      .where(eq(appointmentServiceItems.appointmentId, appointment!.id))
+      .all();
+    expect(items).toEqual([
+      expect.objectContaining({ description: 'Troca de óleo e filtros', amountCents: 45000, sortOrder: 0 }),
+    ]);
+    expect(items.reduce((total, item) => total + item.amountCents, 0)).toBe(report?.totalAmountCents);
   });
 
   it('seeds a completed appointment with an unavailable dedicated timeslot and full ordered report', async () => {
@@ -259,8 +320,8 @@ describe('seedDev', () => {
     };
 
     expect(countsAfter).toEqual(countsBefore);
-    expect(countsAfter.appointmentServiceReports).toBe(1);
-    expect(countsAfter.appointmentServiceItems).toBe(3);
+    expect(countsAfter.appointmentServiceReports).toBe(2);
+    expect(countsAfter.appointmentServiceItems).toBe(4);
 
     const res = await app.inject({
       method: 'POST',
