@@ -194,12 +194,31 @@ describe('POST /admin/mechanics', () => {
 
 function insertMechanicFixture(
   testDb: TestDb,
-  overrides: { id: string; name: string; isActive?: boolean; specialty?: string },
+  overrides: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string | null;
+    isActive?: boolean;
+    specialty?: string;
+    credentials?: string;
+  },
 ) {
-  const id = insertProfile(testDb, { id: overrides.id, name: overrides.name, role: 'mechanic' });
+  const id = insertProfile(testDb, {
+    id: overrides.id,
+    name: overrides.name,
+    email: overrides.email,
+    phone: overrides.phone,
+    role: 'mechanic',
+  });
   testDb.connection
     .prepare('INSERT INTO mechanics (id, specialty, credentials, is_active) VALUES (?, ?, ?, ?)')
-    .run(id, overrides.specialty ?? 'Freios', 'ASE', overrides.isActive === false ? 0 : 1);
+    .run(
+      id,
+      overrides.specialty ?? 'Freios',
+      overrides.credentials ?? 'ASE',
+      overrides.isActive === false ? 0 : 1,
+    );
   return id;
 }
 
@@ -212,14 +231,31 @@ function insertAppointmentFixture(
     date: string;
     status: AppointmentStatus;
     revenueCents?: number;
+    startTime?: string;
+    endTime?: string;
+    timeslotId?: string;
+    vehicleInfo?: string;
+    notes?: string;
   },
 ) {
   testDb.connection
     .prepare(
-      `INSERT INTO appointments (id, client_id, mechanic_id, date, start_time, end_time, status)
-       VALUES (?, ?, ?, ?, '09:00', '10:00', ?)`,
+      `INSERT INTO appointments
+       (id, client_id, mechanic_id, timeslot_id, date, start_time, end_time, status, vehicle_info, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(input.id, input.clientId, input.mechanicId, input.date, input.status);
+    .run(
+      input.id,
+      input.clientId,
+      input.mechanicId,
+      input.timeslotId ?? null,
+      input.date,
+      input.startTime ?? '09:00',
+      input.endTime ?? '10:00',
+      input.status,
+      input.vehicleInfo ?? null,
+      input.notes ?? null,
+    );
 
   if (input.revenueCents !== undefined) {
     testDb.connection
@@ -465,6 +501,294 @@ describe('GET /admin/dashboard', () => {
       url: '/admin/dashboard',
       headers: { authorization: `Bearer ${clientToken}` },
     });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });
+  });
+});
+
+describe('GET /admin/mechanics and GET /admin/mechanics/:id', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let adminToken: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-15T15:00:00.000Z'));
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    const adminId = insertProfile(testDb, { id: 'admin-reader', role: 'admin' });
+    adminToken = signAccessToken({ userId: adminId, role: 'admin' }).token;
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await app.close();
+    testDb.cleanup();
+  });
+
+  function get(url: string, token = adminToken) {
+    return app.inject({
+      method: 'GET',
+      url,
+      headers: { authorization: `Bearer ${token}` },
+    });
+  }
+
+  it('returns the exact paginated mechanic row contract with appointment aggregates', async () => {
+    const mechanicId = insertMechanicFixture(testDb, {
+      id: 'aggregate-mechanic',
+      name: 'Ana Aggregate',
+      email: 'ana@example.com',
+      phone: '+5511999999999',
+      specialty: 'Motor',
+      credentials: 'CRT-9',
+    });
+    const clientId = insertProfile(testDb, { id: 'aggregate-client', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'aggregate-confirmed', clientId, mechanicId, date: '2026-08-15', status: 'confirmado',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'aggregate-finished', clientId, mechanicId, date: '2026-08-10', status: 'acabado',
+    });
+
+    const response = await get('/admin/mechanics');
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(['page', 'pageSize', 'rows', 'total']);
+    expect(body).toEqual({
+      rows: [
+        {
+          id: mechanicId,
+          name: 'Ana Aggregate',
+          email: 'ana@example.com',
+          phone: '+5511999999999',
+          avatarUrl: null,
+          createdAt: expect.any(String),
+          specialty: 'Motor',
+          credentials: 'CRT-9',
+          isActive: true,
+          appointmentsTotal: 2,
+          appointmentsConfirmed: 1,
+          lastAppointmentDate: '2026-08-15',
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
+  });
+
+  it('searches name and email substrings case-insensitively', async () => {
+    insertMechanicFixture(testDb, {
+      id: 'name-match', name: 'Marina Costa', email: 'other@example.com',
+    });
+    insertMechanicFixture(testDb, {
+      id: 'email-match', name: 'Different Person', email: 'garage.target@example.com',
+    });
+
+    const nameResponse = await get('/admin/mechanics?search=RINA');
+    const emailResponse = await get('/admin/mechanics?search=TARGET');
+
+    expect(nameResponse.json().rows.map((row: { id: string }) => row.id)).toEqual(['name-match']);
+    expect(emailResponse.json().rows.map((row: { id: string }) => row.id)).toEqual(['email-match']);
+  });
+
+  it('matches percent, underscore, and backslash in search literally instead of as LIKE wildcards', async () => {
+    insertMechanicFixture(testDb, {
+      id: 'literal-match', name: 'Oferta 50%_\\Especial', email: 'literal@example.com',
+    });
+    insertMechanicFixture(testDb, {
+      id: 'wildcard-lookalike', name: 'Oferta 50XXEspecial', email: 'lookalike@example.com',
+    });
+
+    const response = await get(`/admin/mechanics?search=${encodeURIComponent('50%_\\')}`);
+
+    expect(response.json().rows.map((row: { id: string }) => row.id)).toEqual(['literal-match']);
+  });
+
+  it('documents the current accent-folding gap', async () => {
+    insertMechanicFixture(testDb, { id: 'accented', name: 'José Almeida' });
+
+    const response = await get('/admin/mechanics?search=jose');
+
+    expect(response.json()).toMatchObject({ rows: [], total: 0 });
+  });
+
+  it('caps pageSize at 100', async () => {
+    const response = await get('/admin/mechanics?pageSize=500');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ page: 1, pageSize: 100 });
+  });
+
+  it('paginates without overlap and page union equals the full ordered set', async () => {
+    insertMechanicFixture(testDb, { id: 'delta', name: 'Delta' });
+    insertMechanicFixture(testDb, { id: 'alpha', name: 'Alpha' });
+    insertMechanicFixture(testDb, { id: 'charlie', name: 'Charlie' });
+    insertMechanicFixture(testDb, { id: 'bravo', name: 'Bravo' });
+
+    const page1 = (await get('/admin/mechanics?page=1&pageSize=2')).json();
+    const page2 = (await get('/admin/mechanics?page=2&pageSize=2')).json();
+    const ids1 = page1.rows.map((row: { id: string }) => row.id);
+    const ids2 = page2.rows.map((row: { id: string }) => row.id);
+
+    expect(ids1.filter((id: string) => ids2.includes(id))).toEqual([]);
+    expect([...ids1, ...ids2]).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
+    expect(page1.total).toBe(4);
+    expect(page2.total).toBe(4);
+  });
+
+  it('orders same-named mechanics stably by id', async () => {
+    insertMechanicFixture(testDb, { id: 'same-z', name: 'Same Name' });
+    insertMechanicFixture(testDb, { id: 'same-a', name: 'Same Name' });
+
+    const response = await get('/admin/mechanics');
+
+    expect(response.json().rows.map((row: { id: string }) => row.id)).toEqual(['same-a', 'same-z']);
+  });
+
+  it('returns detail stats, upcoming slot usage, full appointment rows, and deterministic recent ordering', async () => {
+    const mechanicId = insertMechanicFixture(testDb, {
+      id: 'detail-mechanic',
+      name: 'Detail Mechanic',
+      phone: '+5511888888888',
+      specialty: 'Suspensao',
+    });
+    const clientId = insertProfile(testDb, {
+      id: 'detail-client', name: 'Detail Client', phone: '+5511777777777', role: 'client',
+    });
+    testDb.connection
+      .prepare(
+        `INSERT INTO timeslots (id, mechanic_id, date, start_time, end_time, is_available)
+         VALUES ('past-slot', ?, '2026-08-14', '08:00', '09:00', 1),
+                ('open-slot', ?, '2026-08-15', '10:00', '11:00', 1),
+                ('blocked-slot', ?, '2026-08-16', '11:00', '12:00', 0)`,
+      )
+      .run(mechanicId, mechanicId, mechanicId);
+    insertAppointmentFixture(testDb, {
+      id: 'tie-z', clientId, mechanicId, date: '2026-08-15', startTime: '11:00', endTime: '12:00',
+      status: 'confirmado', vehicleInfo: 'Sedan', notes: 'Check noise',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'tie-a', clientId, mechanicId, date: '2026-08-15', startTime: '11:00', endTime: '12:00',
+      status: 'cancelado',
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'finished', clientId, mechanicId, date: '2026-08-14', startTime: '15:00', endTime: '16:00',
+      status: 'acabado', revenueCents: 12345,
+    });
+    insertAppointmentFixture(testDb, {
+      id: 'outside-range', clientId, mechanicId, date: '2026-08-01', status: 'acabado',
+    });
+    testDb.connection
+      .prepare(
+        `UPDATE appointment_service_reports
+         SET diagnosis = 'Bearing', parts_used = 'Hub', recommendations = 'Return soon'
+         WHERE appointment_id = 'finished'`,
+      )
+      .run();
+    testDb.connection
+      .prepare(
+        `INSERT INTO appointment_service_items (id, appointment_id, description, amount_cents, sort_order)
+         VALUES ('service-item', 'finished', 'Wheel bearing', 12345, 0)`,
+      )
+      .run();
+
+    const response = await get('/admin/mechanics/detail-mechanic?from=2026-08-14&to=2026-08-15');
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(body).sort()).toEqual([
+      'appointmentStats', 'mechanic', 'range', 'recentAppointments', 'slotStats',
+    ]);
+    expect(body.range).toEqual({ from: '2026-08-14', to: '2026-08-15' });
+    expect(body.appointmentStats).toEqual({ total: 3, confirmed: 1, unfinished: 0, finished: 1, canceled: 1 });
+    expect(body.slotStats).toEqual({ totalUpcoming: 2, availableUpcoming: 1 });
+    expect(body.recentAppointments.map((row: { id: string }) => row.id)).toEqual(['tie-z', 'tie-a', 'finished']);
+    expect(Object.keys(body.recentAppointments[0]).sort()).toEqual([
+      'clientId', 'clientName', 'clientPhone', 'closedAt', 'createdAt', 'date', 'endTime', 'id', 'mechanicId',
+      'mechanicName', 'mechanicPhone', 'notes', 'partsUsed', 'recommendations', 'serviceDiagnosis', 'serviceItems',
+      'serviceSummary', 'specialty', 'startTime', 'status', 'timeSlotId', 'totalAmountCents', 'vehicleInfo',
+      'workPerformed',
+    ]);
+    expect(body.recentAppointments.find((row: { id: string }) => row.id === 'finished')).toMatchObject({
+      clientId,
+      clientName: 'Detail Client',
+      clientPhone: '+5511777777777',
+      mechanicId,
+      mechanicName: 'Detail Mechanic',
+      mechanicPhone: '+5511888888888',
+      specialty: 'Suspensao',
+      serviceSummary: 'Servico concluido',
+      serviceDiagnosis: 'Bearing',
+      workPerformed: 'Trabalho concluido',
+      partsUsed: 'Hub',
+      recommendations: 'Return soon',
+      totalAmountCents: 12345,
+      serviceItems: [{ id: 'service-item', description: 'Wheel bearing', amountCents: 12345, sortOrder: 0 }],
+    });
+  });
+
+  it('synchronizes stale confirmed appointments independently before list and detail reads', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'stale-reader', name: 'Stale Reader' });
+    const clientId = insertProfile(testDb, { id: 'stale-reader-client', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'stale-for-list', clientId, mechanicId, date: '2026-08-14', status: 'confirmado',
+    });
+
+    const listResponse = await get('/admin/mechanics?search=Stale%20Reader');
+
+    expect(listResponse.json().rows[0]).toMatchObject({ appointmentsTotal: 1, appointmentsConfirmed: 0 });
+    expect(testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get('stale-for-list')).toEqual({
+      status: 'nao_finalizado',
+    });
+
+    insertAppointmentFixture(testDb, {
+      id: 'stale-for-detail', clientId, mechanicId, date: '2026-08-14', status: 'confirmado',
+    });
+    const detailResponse = await get('/admin/mechanics/stale-reader?from=2026-08-14&to=2026-08-14');
+
+    expect(detailResponse.json().appointmentStats).toMatchObject({ total: 2, confirmed: 0, unfinished: 2 });
+    expect(testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get('stale-for-detail')).toEqual({
+      status: 'nao_finalizado',
+    });
+  });
+
+  it('keeps a deactivated mechanic visible and openable', async () => {
+    insertMechanicFixture(testDb, { id: 'inactive-reader', name: 'Inactive Reader', isActive: false });
+
+    const listResponse = await get('/admin/mechanics');
+    const detailResponse = await get('/admin/mechanics/inactive-reader');
+
+    expect(listResponse.json().rows).toHaveLength(1);
+    expect(listResponse.json().rows[0]).toMatchObject({ id: 'inactive-reader', isActive: false });
+    expect(detailResponse.statusCode).toBe(200);
+    expect(detailResponse.json().mechanic).toMatchObject({ id: 'inactive-reader', isActive: false });
+  });
+
+  it('returns MECHANIC_NOT_FOUND for an unknown free-form id', async () => {
+    const response = await get('/admin/mechanics/not-a-uuid');
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: 'mechanic not found', code: 'MECHANIC_NOT_FOUND' });
+  });
+
+  it('returns INVALID_DATE_RANGE on detail when from is later than to', async () => {
+    insertMechanicFixture(testDb, { id: 'range-mechanic', name: 'Range Mechanic' });
+
+    const response = await get('/admin/mechanics/range-mechanic?from=2026-08-16&to=2026-08-15');
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid date range', code: 'INVALID_DATE_RANGE' });
+  });
+
+  it.each(['/admin/mechanics', '/admin/mechanics/any-id'])('rejects non-admin access to %s', async (url) => {
+    const clientId = insertProfile(testDb, { id: `client-${url.length}`, role: 'client' });
+    const clientToken = signAccessToken({ userId: clientId, role: 'client' }).token;
+
+    const response = await get(url, clientToken);
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });

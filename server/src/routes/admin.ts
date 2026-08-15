@@ -1,14 +1,22 @@
 import { randomUUID } from 'node:crypto';
-import { count, eq, gte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, sql, type SQL } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parseAdminFilters } from '../admin/filters.js';
 import { requireAdmin } from '../admin/guard.js';
+import { pagination, totalOrder } from '../admin/query-helpers.js';
 import { syncUnfinalized } from '../appointments/sync-unfinalized.js';
 import { runImmediateTransaction } from '../appointments/transactions.js';
 import { hashPassword } from '../auth/hash.js';
 import type { Db } from '../db/client.js';
-import { appointmentServiceReports, appointments, mechanics, profiles, timeslots } from '../db/schema.js';
+import {
+  appointmentServiceItems,
+  appointmentServiceReports,
+  appointments,
+  mechanics,
+  profiles,
+  timeslots,
+} from '../db/schema.js';
 import { HttpError } from '../errors.js';
 import { getSaoPauloDateTimeParts } from '../lib/sao-paulo-time.js';
 
@@ -45,6 +53,72 @@ function isProfilesEmailUniqueConstraintError(error: unknown): boolean {
 
 function countWhere(predicate: SQL): SQL<number> {
   return sql<number>`coalesce(sum(case when ${predicate} then 1 else 0 end), 0)`.mapWith(Number);
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
+function mechanicSearch(search: string): SQL | undefined {
+  if (!search) return undefined;
+  const pattern = `%${escapeLikePattern(search)}%`;
+  return sql`(lower(${profiles.name}) LIKE lower(${pattern}) ESCAPE '\\' OR lower(${profiles.email}) LIKE lower(${pattern}) ESCAPE '\\')`;
+}
+
+const adminMechanicColumns = {
+  id: mechanics.id,
+  name: profiles.name,
+  email: profiles.email,
+  phone: profiles.phone,
+  avatarUrl: profiles.avatarUrl,
+  createdAt: profiles.createdAt,
+  specialty: mechanics.specialty,
+  credentials: mechanics.credentials,
+  isActive: mechanics.isActive,
+  appointmentsTotal: sql<number>`(
+    select count(*) from ${appointments} where ${appointments.mechanicId} = ${mechanics.id}
+  )`.mapWith(Number),
+  appointmentsConfirmed: sql<number>`(
+    select count(*) from ${appointments}
+    where ${appointments.mechanicId} = ${mechanics.id} and ${appointments.status} = 'confirmado'
+  )`.mapWith(Number),
+  lastAppointmentDate: sql<string | null>`(
+    select max(${appointments.date}) from ${appointments} where ${appointments.mechanicId} = ${mechanics.id}
+  )`,
+};
+
+function getAdminMechanicRows(db: Db, search?: SQL) {
+  return db
+    .select(adminMechanicColumns)
+    .from(mechanics)
+    .innerJoin(profiles, eq(profiles.id, mechanics.id))
+    .where(search);
+}
+
+function loadAdminServiceItems(db: Db, appointmentIds: string[]) {
+  const grouped = new Map<string, Array<{ id: string; description: string; amountCents: number; sortOrder: number }>>();
+  if (appointmentIds.length === 0) return grouped;
+
+  const rows = db
+    .select({
+      appointmentId: appointmentServiceItems.appointmentId,
+      id: appointmentServiceItems.id,
+      description: appointmentServiceItems.description,
+      amountCents: appointmentServiceItems.amountCents,
+      sortOrder: appointmentServiceItems.sortOrder,
+    })
+    .from(appointmentServiceItems)
+    .where(inArray(appointmentServiceItems.appointmentId, appointmentIds))
+    .orderBy(asc(appointmentServiceItems.sortOrder), asc(appointmentServiceItems.id))
+    .all();
+
+  for (const { appointmentId, ...item } of rows) {
+    const items = grouped.get(appointmentId) ?? [];
+    items.push(item);
+    grouped.set(appointmentId, items);
+  }
+
+  return grouped;
 }
 
 function nextDate(date: string): string {
@@ -191,6 +265,116 @@ export function adminRoutes(app: FastifyInstance, db: Db) {
     const today = getSaoPauloDateTimeParts().date;
 
     return getAdminDashboard(db, from, to, today);
+  });
+
+  app.get('/admin/mechanics', { preHandler: requireAdmin(db) }, async (request) => {
+    syncUnfinalized(db);
+    const { search, page, pageSize } = parseAdminFilters(request.query);
+    const searchPredicate = mechanicSearch(search);
+    const pageBounds = pagination(page, pageSize);
+    const total = db
+      .select({ value: count(mechanics.id) })
+      .from(mechanics)
+      .innerJoin(profiles, eq(profiles.id, mechanics.id))
+      .where(searchPredicate)
+      .get()!.value;
+    const rows = getAdminMechanicRows(db, searchPredicate)
+      .orderBy(...totalOrder([asc(profiles.name)], mechanics.id))
+      .limit(pageBounds.limit)
+      .offset(pageBounds.offset)
+      .all();
+
+    return { rows, total, page, pageSize };
+  });
+
+  app.get<{ Params: { id: string } }>('/admin/mechanics/:id', { preHandler: requireAdmin(db) }, async (request) => {
+    syncUnfinalized(db);
+    const { from, to } = parseAdminFilters(request.query);
+    const mechanic = getAdminMechanicRows(db, eq(mechanics.id, request.params.id)).get();
+    if (!mechanic) {
+      throw new HttpError(404, 'mechanic not found', 'MECHANIC_NOT_FOUND');
+    }
+
+    const appointmentStats = db
+      .select({
+        total: count(appointments.id),
+        confirmed: countWhere(eq(appointments.status, 'confirmado')),
+        unfinished: countWhere(eq(appointments.status, 'nao_finalizado')),
+        finished: countWhere(eq(appointments.status, 'acabado')),
+        canceled: countWhere(eq(appointments.status, 'cancelado')),
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.mechanicId, mechanic.id),
+          gte(appointments.date, from),
+          sql`${appointments.date} <= ${to}`,
+        ),
+      )
+      .get()!;
+    const today = getSaoPauloDateTimeParts().date;
+    const slotStats = db
+      .select({
+        totalUpcoming: count(timeslots.id),
+        availableUpcoming: countWhere(eq(timeslots.isAvailable, true)),
+      })
+      .from(timeslots)
+      .where(and(eq(timeslots.mechanicId, mechanic.id), gte(timeslots.date, today)))
+      .get()!;
+    const recentRows = db
+      .select({
+        id: appointments.id,
+        clientId: appointments.clientId,
+        clientName: sql<string | null>`(select name from ${profiles} where ${profiles.id} = ${appointments.clientId})`,
+        clientPhone: sql<string | null>`(select phone from ${profiles} where ${profiles.id} = ${appointments.clientId})`,
+        mechanicId: appointments.mechanicId,
+        timeSlotId: appointments.timeslotId,
+        date: appointments.date,
+        startTime: appointments.startTime,
+        endTime: appointments.endTime,
+        status: appointments.status,
+        vehicleInfo: appointments.vehicleInfo,
+        notes: appointments.notes,
+        serviceSummary: appointmentServiceReports.summary,
+        serviceDiagnosis: appointmentServiceReports.diagnosis,
+        workPerformed: appointmentServiceReports.workPerformed,
+        partsUsed: appointmentServiceReports.partsUsed,
+        recommendations: appointmentServiceReports.recommendations,
+        totalAmountCents: appointmentServiceReports.totalAmountCents,
+        closedAt: appointmentServiceReports.closedAt,
+        createdAt: appointments.createdAt,
+      })
+      .from(appointments)
+      .leftJoin(appointmentServiceReports, eq(appointmentServiceReports.appointmentId, appointments.id))
+      .where(
+        and(
+          eq(appointments.mechanicId, mechanic.id),
+          gte(appointments.date, from),
+          sql`${appointments.date} <= ${to}`,
+        ),
+      )
+      .orderBy(...totalOrder([desc(appointments.date), desc(appointments.startTime)], appointments.id, 'desc'))
+      .limit(20)
+      .all();
+    const itemsByAppointment = loadAdminServiceItems(
+      db,
+      recentRows.map((appointment) => appointment.id),
+    );
+    const recentAppointments = recentRows.map((appointment) => ({
+      ...appointment,
+      mechanicName: mechanic.name,
+      mechanicPhone: mechanic.phone,
+      specialty: mechanic.specialty,
+      serviceItems: itemsByAppointment.get(appointment.id) ?? [],
+    }));
+
+    return {
+      mechanic,
+      range: { from, to },
+      appointmentStats,
+      slotStats,
+      recentAppointments,
+    };
   });
 
   app.post('/admin/mechanics', { preHandler: requireAdmin(db) }, async (request, reply) => {
