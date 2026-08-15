@@ -13,9 +13,6 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "env:check": "node scripts/check-env.js",
-    "seed": "node scripts/seed.js",
-    "seed:mechanics:auth": "node scripts/create-mechanic-auth-users.js",
-    "seed:mechanics:data": "node scripts/seed-mechanics-data.js",
     "hooks:setup": "node scripts/setup-git-hooks.js"
   },
   "dependencies": {
@@ -26,7 +23,6 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
-    "@supabase/supabase-js": "^2.105.4",
     "date-fns": "^4.1.0",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
@@ -44,7 +40,6 @@
     "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.10",
     "lucide-react-native": "^1.14.0",
-    "pg": "^8.21.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.75.0",

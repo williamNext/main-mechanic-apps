@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Modal, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { AdminShell } from '@/components/admin/AdminShell';
 import {
+  ActionButton,
+  CalendarDateInput,
   DataTable,
   EmptyState,
   LoadingState,
@@ -34,25 +36,53 @@ function appointmentTone(status: string) {
 
 export default function MechanicDetailScreen() {
   const id = safeParam(useLocalSearchParams<{ id: string }>().id);
-  const { selectedMechanic, loading, error, fetchMechanicDetail } = useAdminStore();
+  const { selectedMechanic, filters, loading, error, setFilters, fetchMechanicDetail, reactivateMechanic } = useAdminStore();
+  const [reactivationOpen, setReactivationOpen] = useState(false);
+  const [reactivationSucceeded, setReactivationSucceeded] = useState(false);
 
   useEffect(() => {
     if (id) void fetchMechanicDetail(id);
-  }, [id, fetchMechanicDetail]);
+  }, [id, filters.from, filters.to, fetchMechanicDetail]);
 
   const mechanic = selectedMechanic?.mechanic;
 
+  async function confirmReactivation() {
+    if (!id) return;
+    const ok = await reactivateMechanic(id);
+    if (!ok) return;
+    setReactivationOpen(false);
+    setReactivationSucceeded(true);
+  }
+
   return (
     <AdminShell title="Detalhe do mecânico">
+      <Panel>
+        <SectionHeader title="Período" />
+        <View style={styles.rangeFilters}>
+          <CalendarDateInput label="De" value={filters.from} onChangeDate={(from) => setFilters({ from })} />
+          <CalendarDateInput label="Até" value={filters.to} onChangeDate={(to) => setFilters({ to })} />
+        </View>
+      </Panel>
+
       {loading.detail ? <LoadingState /> : null}
       {error ? <EmptyState title="Falha na solicitação" body={error} /> : null}
-      {!mechanic && !loading.detail ? <EmptyState title="Mecânico não encontrado" body="Registro indisponível ou excluído." /> : null}
+      {!mechanic && !loading.detail ? <EmptyState title="Mecânico não encontrado" body="Registro indisponível." /> : null}
+      {reactivationSucceeded ? (
+        <View style={styles.successBanner}>
+          <Text style={styles.successBannerText}>Mecânico reativado.</Text>
+        </View>
+      ) : null}
 
       {mechanic && selectedMechanic ? (
         <>
           <Panel>
             <SectionHeader
               title={mechanic.name}
+              action={
+                !mechanic.isActive ? (
+                  <ActionButton label="Reativar mecânico" variant="primary" onPress={() => setReactivationOpen(true)} />
+                ) : undefined
+              }
             />
             <View style={styles.detailGrid}>
               <Info label="Especialidade" value={mechanic.specialty} />
@@ -69,7 +99,10 @@ export default function MechanicDetailScreen() {
           <View style={styles.metrics}>
             <MetricCard label="Agendamentos" value={selectedMechanic.appointmentStats.total} />
             <MetricCard label="Confirmados" value={selectedMechanic.appointmentStats.confirmed} tone="good" />
+            <MetricCard label="Não finalizados" value={selectedMechanic.appointmentStats.unfinished ?? 0} />
+            <MetricCard label="Finalizados" value={selectedMechanic.appointmentStats.finished} />
             <MetricCard label="Cancelados" value={selectedMechanic.appointmentStats.canceled} tone="danger" />
+            <MetricCard label="Horários futuros" value={selectedMechanic.slotStats.totalUpcoming} />
             <MetricCard label="Horários disponíveis" value={selectedMechanic.slotStats.availableUpcoming} />
           </View>
 
@@ -99,6 +132,36 @@ export default function MechanicDetailScreen() {
 
         </>
       ) : null}
+
+      <Modal transparent visible={reactivationOpen} animationType="fade" onRequestClose={() => setReactivationOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Reativar mecânico</Text>
+            <Text style={styles.modalBody}>
+              Reativar este mecânico o tornará disponível para novos agendamentos. Agendamentos cancelados durante a desativação não serão restaurados.
+            </Text>
+            {error ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerText}>{error}</Text>
+              </View>
+            ) : null}
+            <View style={styles.modalActions}>
+              <ActionButton
+                label="Cancelar"
+                variant="secondary"
+                disabled={loading.reactivateMechanic}
+                onPress={() => setReactivationOpen(false)}
+              />
+              <ActionButton
+                label="Reativar"
+                variant="primary"
+                loading={loading.reactivateMechanic}
+                onPress={confirmReactivation}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </AdminShell>
   );
 }
@@ -113,6 +176,11 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  rangeFilters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   actions: {
     flexDirection: 'row',
     gap: 8,
@@ -141,6 +209,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  successBanner: {
+    backgroundColor: '#ecfdf3',
+    borderWidth: 1,
+    borderColor: '#6ce9a6',
+    borderRadius: 8,
+    padding: 10,
+  },
+  successBannerText: {
+    color: '#027a48',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  errorBanner: {
+    backgroundColor: '#fef3f2',
+    borderWidth: 1,
+    borderColor: '#fda29b',
+    borderRadius: 8,
+    padding: 10,
+  },
+  errorBannerText: {
+    color: '#b42318',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(16, 24, 40, 0.52)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    padding: 18,
+    gap: 14,
+  },
+  modalTitle: {
+    color: '#101828',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  modalBody: {
+    color: '#475467',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   history: {
     gap: 8,

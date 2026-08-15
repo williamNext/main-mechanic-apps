@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CheckSquare, Download, Plus, Square, Trash2 } from 'lucide-react-native';
+import { CheckSquare, Download, Plus, Square, UserMinus } from 'lucide-react-native';
 import { AdminShell } from '@/components/admin/AdminShell';
 import {
   ActionButton,
@@ -15,11 +15,12 @@ import {
   StatusPill,
 } from '@/components/ui/AdminControls';
 import { useAdminStore } from '@/stores/admin-store';
+import { DeactivateMechanicsResult } from '@/types/models';
 import { downloadCsv, mechanicsToCsv } from '@/utils/csv';
 import { formatDateDisplay } from '@/utils/date';
 import { formatPhone } from '@/utils/format';
 
-const DELETE_CONFIRMATION_WORD = 'EXCLUIR';
+const DEACTIVATE_CONFIRMATION_WORD = 'DESATIVAR';
 
 function approvalStatus(isActive: boolean, credentials: string) {
   if (isActive) return <StatusPill label="Ativo" tone="good" />;
@@ -32,6 +33,7 @@ export default function MechanicsScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmWord, setConfirmWord] = useState('');
+  const [deactivationResult, setDeactivationResult] = useState<DeactivateMechanicsResult | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
@@ -100,7 +102,7 @@ export default function MechanicsScreen() {
   const visibleIds = useMemo(() => mechanics.rows.map((mechanic) => mechanic.id), [mechanics.rows]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
   const selectedCount = selectedIds.size;
-  const confirmationMatches = confirmWord.trim().toUpperCase() === DELETE_CONFIRMATION_WORD;
+  const confirmationMatches = confirmWord.trim().toUpperCase() === DEACTIVATE_CONFIRMATION_WORD;
 
   useEffect(() => {
     setSelectedIds((current) => new Set([...current].filter((id) => visibleIds.includes(id))));
@@ -130,9 +132,10 @@ export default function MechanicsScreen() {
     });
   }
 
-  async function confirmDelete() {
-    const ok = await deactivateMechanics([...selectedIds]);
-    if (!ok) return;
+  async function confirmDeactivation() {
+    const result = await deactivateMechanics([...selectedIds]);
+    if (!result) return;
+    setDeactivationResult(result);
     setConfirmOpen(false);
     setConfirmWord('');
     setSelectedIds(new Set());
@@ -176,13 +179,14 @@ export default function MechanicsScreen() {
                 onPress={openCreateModal}
               />
               <ActionButton
-                label="Excluir selecionados"
+                label="Desativar selecionados"
                 variant="danger"
                 disabled={selectedCount === 0}
                 loading={loading.deactivateMechanics}
-                icon={<Trash2 size={15} color="#ffffff" />}
+                icon={<UserMinus size={15} color="#ffffff" />}
                 onPress={() => {
                   setConfirmWord('');
+                  setDeactivationResult(null);
                   setConfirmOpen(true);
                 }}
               />
@@ -200,6 +204,15 @@ export default function MechanicsScreen() {
           <ActionButton label="Aplicar" variant="secondary" onPress={() => fetchMechanics({ page: 1 })} />
         </View>
       </Panel>
+
+      {deactivationResult ? (
+        <View style={styles.successBanner}>
+          <Text style={styles.successBannerText}>
+            Desativação concluída: {deactivationResult.deactivatedCount} mecânico(s) desativado(s), {deactivationResult.ignoredCount} ignorado(s) e{' '}
+            {deactivationResult.cancelledAppointmentCount} agendamento(s) de clientes cancelado(s).
+          </Text>
+        </View>
+      ) : null}
 
       {loading.mechanics ? <LoadingState /> : null}
       {error ? <EmptyState title="Falha na solicitação" body={error} /> : null}
@@ -246,20 +259,25 @@ export default function MechanicsScreen() {
       <Modal transparent visible={confirmOpen} animationType="fade" onRequestClose={() => setConfirmOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Excluir mecânicos selecionados</Text>
+            <Text style={styles.modalTitle}>Desativar mecânicos selecionados</Text>
             <Text style={styles.modalBody}>
-              Esta ação remove {selectedCount} mecânico{selectedCount === 1 ? '' : 's'} e seus agendamentos vinculados. Digite {DELETE_CONFIRMATION_WORD} para confirmar.
+              Ao desativar, {selectedCount} mecânico{selectedCount === 1 ? '' : 's'} deixará{selectedCount === 1 ? '' : 'ão'} de poder receber agendamentos. Agendamentos pendentes (confirmados ou não finalizados) serão cancelados e esses clientes serão notificados. Trabalhos finalizados serão mantidos. Digite {DEACTIVATE_CONFIRMATION_WORD} para confirmar.
             </Text>
+            {error ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerText}>{error}</Text>
+              </View>
+            ) : null}
             <TextInput
               value={confirmWord}
-              onChangeText={(text) => setConfirmWord(text.slice(0, DELETE_CONFIRMATION_WORD.length))}
-              placeholder={DELETE_CONFIRMATION_WORD}
+              onChangeText={(text) => setConfirmWord(text.slice(0, DEACTIVATE_CONFIRMATION_WORD.length))}
+              placeholder={DEACTIVATE_CONFIRMATION_WORD}
               placeholderTextColor="#98a2b3"
               autoCapitalize="characters"
               style={styles.confirmInput}
               onSubmitEditing={() => {
                 if (confirmationMatches && selectedCount > 0) {
-                  void confirmDelete();
+                  void confirmDeactivation();
                 }
               }}
             />
@@ -274,11 +292,11 @@ export default function MechanicsScreen() {
                 }}
               />
               <ActionButton
-                label="Excluir"
+                label="Desativar"
                 variant="danger"
                 disabled={!confirmationMatches || selectedCount === 0}
                 loading={loading.deactivateMechanics}
-                onPress={confirmDelete}
+                onPress={confirmDeactivation}
               />
             </View>
           </View>
@@ -485,6 +503,18 @@ const styles = StyleSheet.create({
     color: '#b42318',
     fontSize: 12,
     fontWeight: '600',
+  },
+  successBanner: {
+    backgroundColor: '#ecfdf3',
+    borderWidth: 1,
+    borderColor: '#6ce9a6',
+    borderRadius: 8,
+    padding: 10,
+  },
+  successBannerText: {
+    color: '#027a48',
+    fontSize: 12,
+    fontWeight: '700',
   },
   formGroup: {
     gap: 4,

@@ -10,10 +10,19 @@ import {
   AdminFilters,
   AdminMechanicDetail,
   AdminMechanicRow,
+  DeactivateMechanicsResult,
   PaginatedResult,
 } from '@/types/models';
 
-type LoadKey = 'dashboard' | 'mechanics' | 'appointments' | 'finance' | 'detail' | 'deactivateMechanics' | 'createMechanic';
+type LoadKey =
+  | 'dashboard'
+  | 'mechanics'
+  | 'appointments'
+  | 'finance'
+  | 'detail'
+  | 'deactivateMechanics'
+  | 'reactivateMechanic'
+  | 'createMechanic';
 
 interface AdminState {
   filters: AdminFilters;
@@ -32,7 +41,8 @@ interface AdminState {
   fetchAppointments: (patch?: Partial<AdminFilters>) => Promise<void>;
   fetchFinancialReport: (patch?: Partial<AdminFilters>) => Promise<void>;
   fetchMechanicDetail: (mechanicId: string) => Promise<void>;
-  deactivateMechanics: (mechanicIds: string[]) => Promise<boolean>;
+  deactivateMechanics: (mechanicIds: string[]) => Promise<DeactivateMechanicsResult | null>;
+  reactivateMechanic: (mechanicId: string) => Promise<boolean>;
   createMechanic: (params: {
     name: string;
     phone: string;
@@ -87,6 +97,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
       finance: false,
       detail: false,
       deactivateMechanics: false,
+      reactivateMechanic: false,
       createMechanic: false,
     },
     error: null,
@@ -141,15 +152,32 @@ export const useAdminStore = create<AdminState>((set, get) => {
       setLoading('deactivateMechanics', true);
       set({ error: null });
       try {
-        await adminService.deactivateMechanics(mechanicIds);
+        const result = await adminService.deactivateMechanics(mechanicIds);
+        await get().fetchMechanics();
+        await get().fetchDashboard();
+        return result;
+      } catch (error) {
+        set({ error: getAdminErrorMessage(error, 'Falha ao desativar mecânicos') });
+        return null;
+      } finally {
+        setLoading('deactivateMechanics', false);
+      }
+    },
+
+    reactivateMechanic: async (mechanicId) => {
+      setLoading('reactivateMechanic', true);
+      set({ error: null });
+      try {
+        await adminService.reactivateMechanic(mechanicId);
+        await get().fetchMechanicDetail(mechanicId);
         await get().fetchMechanics();
         await get().fetchDashboard();
         return true;
       } catch (error) {
-        set({ error: getAdminErrorMessage(error, 'Falha ao excluir mecânicos') });
+        set({ error: getAdminErrorMessage(error, 'Falha ao reativar mecânico') });
         return false;
       } finally {
-        setLoading('deactivateMechanics', false);
+        setLoading('reactivateMechanic', false);
       }
     },
 
