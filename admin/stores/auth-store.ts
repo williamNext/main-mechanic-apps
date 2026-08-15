@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import * as authService from '@/services/auth-service';
 import { AdminUser, Role } from '@/types/models';
 
-const LOGIN_TIMEOUT_MS = 15000;
-
 interface AuthState {
   user: AdminUser | null;
   isLoading: boolean;
@@ -46,11 +44,7 @@ export const useAuthStore = create<AuthState>((set) => {
     loginByIdentifier: async (identifier, password) => {
       setLoadingState({ isAuthActionLoading: true, error: null });
       try {
-        const user = await authService.withTimeout(
-          authService.login(identifier, password),
-          LOGIN_TIMEOUT_MS,
-          'Login expirou',
-        );
+        const user = await authService.login(identifier, password);
         if (user) {
           set({ user, isAuthenticated: true, role: user.role, error: null });
           return true;

@@ -141,8 +141,7 @@ apps and have drifted (§17.4).
 ⚠️ **Consequences of the absorb, both live:**
 - **The three app CI workflows no longer run.** GitHub reads `.github/workflows/` only at the
   repository *root*; `oficina/.github/`, `mechanic/.github/` and `admin/.github/` are now inert.
-  gitleaks and `eas-build-check` are **not running**. A root workflow (gitleaks + `server`
-  typecheck/vitest, path-filtered) is Phase 1.5 scope.
+  Root `.github/workflows/ci.yml` runs gitleaks plus path-filtered server and app checks.
 - **The old `.git` directories were moved, not deleted**, to
   `C:\Users\Pichau\Desktop\projetos-git-archive\`. The three GitHub repos `williamNext/oficina`,
   `/mechanic` and `/admin` are fully pushed and should be archived read-only so there is no
@@ -1567,6 +1566,7 @@ cd tests-e2e && npm install && npx playwright install chromium && npm test
 
 No unit test setup. `expo lint` only. Each app has a `.githooks/pre-commit` installed by
 `npm run hooks:setup`.
+Root CI now runs `admin` typecheck and lint checks when `admin/**` changes.
 
 ---
 
@@ -1600,8 +1600,8 @@ Per app, the whole job is these files:
    `profileRequestId` stale-request guard.
 6. **`config/env.ts` + `.env.example` + `scripts/check-env.js`** — swap the two Supabase vars for
    `EXPO_PUBLIC_API_URL`.
-7. **`.github/workflows/security-and-build.yml` + GitHub repo secrets** — update the `env:` block
-   in the same change, or the `eas-build-check` job fails on the next push to `master` (§14.5).
+7. **`.github/workflows/ci.yml`** — add an `admin` path filter and an `admin-checks` job mirroring
+   existing app jobs: Node 24, `npm ci`, typecheck and lint (§14.5).
 8. **`package.json`** — drop `@supabase/supabase-js` once nothing imports it (and `pg` in `admin`).
    Rewrite or delete the `seed*` scripts (they use the service-role key).
 9. **`admin/services/admin-service.ts`** — the RPC calls become `GET /admin/*`; keep the response

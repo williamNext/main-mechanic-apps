@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/use-auth';
 export default function LoginScreen() {
   const router = useRouter();
   const { isAuthenticated, isAdmin, loginByIdentifier, isAuthActionLoading } = useAuth();
-  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +17,7 @@ export default function LoginScreen() {
 
   const submit = async () => {
     setError(null);
-    const ok = await loginByIdentifier(identifier, password);
+    const ok = await loginByIdentifier(email, password);
     if (ok) {
       router.replace('/(admin)/dashboard');
       return;
@@ -34,16 +34,16 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Email ou telefone</Text>
+          <Text style={styles.label}>E-mail</Text>
           <View style={styles.inputWrap}>
             <Mail size={18} color="#667085" />
             <TextInput
-              value={identifier}
-              onChangeText={(text) => setIdentifier(text.slice(0, 160))}
+              value={email}
+              onChangeText={(text) => setEmail(text.slice(0, 160))}
               autoCapitalize="none"
-              autoComplete="username"
-              keyboardType="default"
-              placeholder="11999999999"
+              autoComplete="email"
+              keyboardType="email-address"
+              placeholder="admin@oficina.com"
               placeholderTextColor="#98a2b3"
               style={styles.input}
               onSubmitEditing={submit}

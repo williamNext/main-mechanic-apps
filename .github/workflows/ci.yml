@@ -23,6 +23,7 @@ jobs:
       server: ${{ steps.filter.outputs.server }}
       mechanic: ${{ steps.filter.outputs.mechanic }}
       oficina: ${{ steps.filter.outputs.oficina }}
+      admin: ${{ steps.filter.outputs.admin }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -35,6 +36,8 @@ jobs:
               - 'mechanic/**'
             oficina:
               - 'oficina/**'
+            admin:
+              - 'admin/**'
 
   server-typecheck:
     needs: changes
@@ -88,6 +91,27 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: mechanic/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+
+  admin-checks:
+    needs: changes
+    if: needs.changes.outputs.admin == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
       - name: Install deps
         run: npm ci
       - name: Typecheck
