@@ -559,15 +559,15 @@ byMechanic[], byService[], appointments[] }`. Revenue always comes from
 
 **UC-AD7 · Reports** — `app/(admin)/reports.tsx`, a second view over the same data.
 
-**UC-AD8 · Create a mechanic**
-Input (PT-BR field names on the wire): `{ nome, celular, email, senha, especialidade,
-credenciais }`. Legacy edge function: verifies caller is admin → `auth.admin.createUser` (phone +
-email pre-confirmed) → insert `profiles` (role `mechanic`) → insert `mechanics` (`is_active:
-true`) → **on any failure, deletes the auth user (manual rollback)**. Validation: all fields
-required, email regex, password ≥ 6.
-Target `POST /admin/mechanics`: one SQLite transaction, so no manual rollback.
-**Decided: English field names (§10.3 D-B)** — `admin-service.createMechanic()` must be updated to
-match. **Decided: password floor 8 (§10.3 D-E)**, not the edge function's 6.
+**UC-AD8 · Create a mechanic** — `POST /admin/mechanics`, behind `requireAdmin(db)`, accepts
+`{ name, phone, email, password, specialty, credentials }`. All six fields are required, email is
+validated and normalized, and password length is 8–200; field failures return `400
+VALIDATION_FAILED`. `isActive` from the request is ignored and the stored value is always `true`.
+The server hashes the password with argon2id, then inserts `profiles` (role `mechanic`) before
+`mechanics` inside one `BEGIN IMMEDIATE` transaction, allowing the existing triggers to publish the
+row to `public_mechanics` before commit. A `profiles.email` collision returns `409 EMAIL_TAKEN`;
+any second-insert failure rolls back the profile automatically. Success returns `201
+AdminMechanicRow`. No notification is sent; the admin hands over the password out of band.
 
 **UC-AD9 · Delete mechanics (bulk)**
 Input `{ mechanicIds: string[] }`, deduped, max 100, UUID-validated. Effects: write one
@@ -1038,6 +1038,7 @@ Handwritten migrations (triggers, data backfills) are legitimate — separate st
 | POST | `/auth/login` | none | `{email, password}` | `200 {token, user: ProfileUser}` | 400 `VALIDATION_FAILED` · 401 `INVALID_CREDENTIALS` |
 | GET | `/auth/me` | Bearer | — | `200 ProfileUser` | 401 `UNAUTHENTICATED` |
 | POST | `/auth/logout` | Bearer | — | `204` | 401 `UNAUTHENTICATED` |
+| POST | `/admin/mechanics` | admin Bearer | `{name, phone, email, password(8–200), specialty, credentials}`; `isActive` ignored and forced `true` | `201 AdminMechanicRow`; profile + mechanic commit atomically | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` · 409 `EMAIL_TAKEN` · 503 `DATABASE_BUSY` |
 | GET | `/mechanics` | Bearer | — | `200 PublicMechanic[]` ordered by name | 401 `UNAUTHENTICATED` |
 | GET | `/mechanics/:id` | Bearer | — | `200 PublicMechanic` | 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
 | GET | `/mechanics/:id/timeslots` | Bearer | query `date?: YYYY-MM-DD, includeUnavailable?: 'true'` | `200 TimeSlot[]`; default is available, unbooked, active-mechanic future slots and a seven-day window without `date`; owner + `includeUnavailable=true` requires `date` and returns that whole day with `hasActiveAppointment`; parameter is ignored for non-owners | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
@@ -1105,8 +1106,8 @@ proposals; apply §10.3 defaults and record any decision rather than inventing a
 
 **Phase 3 — admin**
 
-`POST /admin/mechanics` · `DELETE /admin/mechanics` (bulk body) · `GET /admin/dashboard` ·
-`GET /admin/mechanics` · `GET /admin/mechanics/:id` · `GET /admin/appointments` ·
+`DELETE /admin/mechanics` (bulk body) · `GET /admin/dashboard` · `GET /admin/mechanics` ·
+`GET /admin/mechanics/:id` · `GET /admin/appointments` ·
 `GET /admin/appointments/:id` · `GET /admin/finance` — all behind `requireAuth` + an admin guard,
 all accepting the `AdminFilters` query params, all returning the JSON shapes already declared in
 `admin/types/models.ts` (§6.4). **Match those TypeScript interfaces exactly** — they are the
