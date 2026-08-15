@@ -48,7 +48,7 @@
 | ID | Requirement | Phase | Status |
 |---|---|---|---|
 | **ADMIN-01** | Admin can create a mechanic account (auth user + profile + mechanic record) in one authenticated action, replacing the `admin-create-mechanic` edge function | 3 | ⬜ Pending |
-| **ADMIN-02** | Admin can delete a mechanic account, recorded in `admin_action_log` with before/after state, replacing the `admin-delete-mechanics` edge function | 3 | ⬜ Pending |
+| **ADMIN-02** | Admin can deactivate and reactivate a mechanic account, retaining service history and recording before/after state in `admin_action_log`, replacing destructive mechanic deletion | 3 | ⬜ Pending |
 | **ADMIN-03** | Admin can retrieve dashboard summary, mechanic list/detail, appointment list/detail and financial reports, replacing the `admin_*` reporting RPCs | 3 | ⬜ Pending |
 
 ### Notifications

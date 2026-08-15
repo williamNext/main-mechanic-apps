@@ -13,7 +13,9 @@ import {
   appointmentServiceItems,
   appointmentServiceReports,
   appointments,
+  adminActionLog,
   mechanics,
+  notifications,
   profiles,
   timeslots,
 } from '../db/schema.js';
@@ -29,6 +31,12 @@ const CreateMechanicSchema = z.object({
   credentials: z.string().trim().min(1),
   isActive: z.unknown().optional(),
 }).strict();
+
+const DeactivateMechanicsSchema = z
+  .object({
+    mechanicIds: z.array(z.string().trim().min(1)),
+  })
+  .strict();
 
 type AdminMechanicResponse = {
   id: string;
@@ -49,6 +57,11 @@ function isProfilesEmailUniqueConstraintError(error: unknown): boolean {
     (error as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE' &&
     error.message.includes('profiles.email')
   );
+}
+
+function adminCancellationBody(mechanicName: string, date: string, startTime: string): string {
+  const [, month, day] = date.split('-');
+  return `Seu agendamento com ${mechanicName} em ${day}/${month} às ${startTime.slice(0, 5)} foi cancelado porque o mecânico não está mais disponível.`;
 }
 
 function countWhere(predicate: SQL): SQL<number> {
@@ -628,4 +641,184 @@ export function adminRoutes(app: FastifyInstance, db: Db) {
       throw error;
     }
   });
+
+  app.post('/admin/mechanics/deactivate', { preHandler: requireAdmin(db) }, async (request) => {
+    const parsed = DeactivateMechanicsSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new HttpError(400, 'invalid request body', 'VALIDATION_FAILED');
+    }
+
+    const mechanicIds = [...new Set(parsed.data.mechanicIds)];
+    if (mechanicIds.length === 0 || mechanicIds.length > 100) {
+      throw new HttpError(400, 'invalid request body', 'VALIDATION_FAILED');
+    }
+
+    return runImmediateTransaction(db, (tx) => {
+      const resolvedMechanics = tx
+        .select({
+          id: mechanics.id,
+          name: profiles.name,
+          email: profiles.email,
+          phone: profiles.phone,
+          specialty: mechanics.specialty,
+          credentials: mechanics.credentials,
+          isActive: mechanics.isActive,
+        })
+        .from(mechanics)
+        .innerJoin(profiles, eq(profiles.id, mechanics.id))
+        .where(inArray(mechanics.id, mechanicIds))
+        .all();
+
+      if (resolvedMechanics.length === 0) {
+        throw new HttpError(404, 'no matching mechanics found', 'NO_MATCHING_MECHANICS');
+      }
+
+      const activeMechanics = resolvedMechanics.filter((mechanic) => mechanic.isActive);
+      const activeMechanicIds = activeMechanics.map((mechanic) => mechanic.id);
+      const cancellableAppointments =
+        activeMechanicIds.length === 0
+          ? []
+          : tx
+              .select({
+                id: appointments.id,
+                clientId: appointments.clientId,
+                mechanicId: appointments.mechanicId,
+                timeslotId: appointments.timeslotId,
+                date: appointments.date,
+                startTime: appointments.startTime,
+              })
+              .from(appointments)
+              .where(
+                and(
+                  inArray(appointments.mechanicId, activeMechanicIds),
+                  inArray(appointments.status, ['confirmado', 'nao_finalizado']),
+                ),
+              )
+              .orderBy(asc(appointments.id))
+              .all();
+
+      if (cancellableAppointments.length > 0) {
+        const appointmentIds = cancellableAppointments.map((appointment) => appointment.id);
+        const timeslotIds = cancellableAppointments.flatMap((appointment) =>
+          appointment.timeslotId === null ? [] : [appointment.timeslotId],
+        );
+
+        tx.update(appointments)
+          .set({ status: 'cancelado' })
+          .where(inArray(appointments.id, appointmentIds))
+          .run();
+        if (timeslotIds.length > 0) {
+          tx.update(timeslots).set({ isAvailable: true }).where(inArray(timeslots.id, timeslotIds)).run();
+        }
+
+        const mechanicNames = new Map(activeMechanics.map((mechanic) => [mechanic.id, mechanic.name]));
+        tx.insert(notifications)
+          .values(
+            cancellableAppointments.map((appointment) => ({
+              id: randomUUID(),
+              recipientId: appointment.clientId,
+              appointmentId: appointment.id,
+              type: 'appointment_canceled',
+              title: 'Agendamento cancelado',
+              body: adminCancellationBody(
+                mechanicNames.get(appointment.mechanicId)!,
+                appointment.date,
+                appointment.startTime,
+              ),
+            })),
+          )
+          .run();
+      }
+
+      if (activeMechanics.length > 0) {
+        const cancelledByMechanic = new Map<string, string[]>();
+        for (const appointment of cancellableAppointments) {
+          const ids = cancelledByMechanic.get(appointment.mechanicId) ?? [];
+          ids.push(appointment.id);
+          cancelledByMechanic.set(appointment.mechanicId, ids);
+        }
+
+        tx.insert(adminActionLog)
+          .values(
+            activeMechanics.map((mechanic) => {
+              const cancelledAppointmentIds = cancelledByMechanic.get(mechanic.id) ?? [];
+              return {
+                id: randomUUID(),
+                actorId: request.user!.sub,
+                targetMechanicId: mechanic.id,
+                action: 'deactivate_mechanic' as const,
+                beforeState: JSON.stringify({
+                  ...mechanic,
+                  cancelledAppointmentIds,
+                  cancelledAppointmentCount: cancelledAppointmentIds.length,
+                }),
+                afterState: JSON.stringify({ isActive: false }),
+              };
+            }),
+          )
+          .run();
+        tx.update(mechanics).set({ isActive: false }).where(inArray(mechanics.id, activeMechanicIds)).run();
+      }
+
+      return {
+        deactivatedCount: activeMechanics.length,
+        requestedCount: mechanicIds.length,
+        ignoredCount: mechanicIds.length - activeMechanics.length,
+        cancelledAppointmentCount: cancellableAppointments.length,
+      };
+    });
+  });
+
+  app.post<{ Params: { id: string } }>(
+    '/admin/mechanics/:id/reactivate',
+    { preHandler: requireAdmin(db) },
+    async (request) =>
+      runImmediateTransaction(db, (tx) => {
+        const mechanic = tx
+          .select({
+            id: mechanics.id,
+            name: profiles.name,
+            email: profiles.email,
+            phone: profiles.phone,
+            avatarUrl: profiles.avatarUrl,
+            createdAt: profiles.createdAt,
+            specialty: mechanics.specialty,
+            credentials: mechanics.credentials,
+            isActive: mechanics.isActive,
+          })
+          .from(mechanics)
+          .innerJoin(profiles, eq(profiles.id, mechanics.id))
+          .where(eq(mechanics.id, request.params.id))
+          .get();
+
+        if (!mechanic) {
+          throw new HttpError(404, 'mechanic not found', 'MECHANIC_NOT_FOUND');
+        }
+        if (mechanic.isActive) {
+          return mechanic;
+        }
+
+        tx.insert(adminActionLog)
+          .values({
+            id: randomUUID(),
+            actorId: request.user!.sub,
+            targetMechanicId: mechanic.id,
+            action: 'reactivate_mechanic',
+            beforeState: JSON.stringify({
+              id: mechanic.id,
+              name: mechanic.name,
+              email: mechanic.email,
+              phone: mechanic.phone,
+              specialty: mechanic.specialty,
+              credentials: mechanic.credentials,
+              isActive: mechanic.isActive,
+            }),
+            afterState: JSON.stringify({ isActive: true }),
+          })
+          .run();
+        tx.update(mechanics).set({ isActive: true }).where(eq(mechanics.id, mechanic.id)).run();
+
+        return { ...mechanic, isActive: true };
+      }),
+  );
 }

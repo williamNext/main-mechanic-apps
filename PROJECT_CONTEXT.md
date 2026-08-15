@@ -567,22 +567,24 @@ row to `public_mechanics` before commit. A `profiles.email` collision returns `4
 any second-insert failure rolls back the profile automatically. Success returns `201
 AdminMechanicRow`. No notification is sent; the admin hands over the password out of band.
 
-**UC-AD9 · Delete mechanics (bulk)**
-Input `{ mechanicIds: string[] }`, deduped, max 100, UUID-validated. Effects: write one
-`admin_action_log` row per target with `action='delete_mechanic'`, `before_state` = a JSON
-snapshot `{id,name,email,phone,specialty,credentials,isActive}`, `after_state = {}`, then remove
-the user. Returns `{ deletedCount, requestedCount, ignoredCount }`; raises
-`no matching mechanics found` if nothing matched.
+**UC-AD9 · Deactivate and reactivate mechanics**
+`POST /admin/mechanics/deactivate`, behind `requireAdmin(db)`, accepts `{ mechanicIds: string[] }`.
+Ids are non-empty opaque strings, deduplicated, then capped at 100. One `BEGIN IMMEDIATE`
+transaction resolves existing mechanics, snapshots every resolved row before writing, ignores
+unmatched and already-inactive ids, cancels each active target's `confirmado` and
+`nao_finalizado` appointments, frees their timeslots, sends one client-only
+`appointment_canceled` notification per cancellation, writes one `deactivate_mechanic` audit row
+per mechanic, and sets `is_active=false`. Audit `before_state` is
+`{id,name,email,phone,specialty,credentials,isActive,cancelledAppointmentIds,cancelledAppointmentCount}`;
+`after_state` is `{isActive:false}`. Success returns
+`{deactivatedCount,requestedCount,ignoredCount,cancelledAppointmentCount}`. Empty or over-limit
+input returns `400 VALIDATION_FAILED`; no existing match returns `404 NO_MATCHING_MECHANICS`; write
+contention returns `503 DATABASE_BUSY`.
 
-⚠️ **Two different implementations exist and they delete differently.** The **edge function**
-(what `admin-service.deleteMechanics` actually calls) invokes
-`auth.admin.deleteUser(id)` — `profiles` then disappears via the auth→profiles cascade. The **RPC**
-`admin_delete_mechanics` (`2026-05-24_admin_bulk_delete_mechanics.sql:24`) deletes `profiles` rows
-directly and is **not wired to any UI**. On the new server there is no separate auth table, so port
-the *behavior*: log first, then delete the `profiles` row (cascade removes `mechanics`,
-`timeslots`, `appointments`, `public_mechanics`).
-⚠️ **This is a destructive cascade** — deleting a mechanic deletes their appointment history.
-Preserve the audit-log-before-delete ordering when porting.
+`POST /admin/mechanics/:id/reactivate`, also admin-only, is single-target. It sets
+`is_active=true` and writes one `reactivate_mechanic` audit row. It does not restore appointments or
+timeslot blocks. An already-active mechanic succeeds without change; a missing mechanic returns
+`404 MECHANIC_NOT_FOUND`. No endpoint truly deletes a mechanic.
 
 **UC-AD10 · Settings** — `app/(admin)/settings.tsx`, minimal.
 
@@ -672,10 +674,13 @@ Index `(appointment_id, sort_order)`.
 
 **`admin_action_log`** — audit trail.
 `id` PK · `actor_id` → `profiles.id` **SET NULL** · `target_mechanic_id` → `mechanics.id`
-**SET NULL** · `action` CHECK ∈ (`create_mechanic`,`delete_mechanic`) · `note` (≤500) ·
+**SET NULL** · `action` CHECK ∈ (`create_mechanic`,`delete_mechanic`,`deactivate_mechanic`,
+`reactivate_mechanic`) · `note` (≤500) ·
 `before_state` TEXT DEFAULT `'{}'` · `after_state` TEXT DEFAULT `'{}'` · `created_at`.
 `before_state`/`after_state` hold **JSON as text** (SQLite has no `jsonb`) — serialize/parse in
-the application layer.
+the application layer. Migration `0006` rebuilt this table to widen its `action` CHECK. This rebuild
+is safe because `admin_action_log` is a child table with no incoming foreign keys, so dropping it
+cannot cascade into other tables; §7.2's rebuild prohibition applies to parent tables.
 
 **`notifications`** — shape closed at eight columns by D-P.
 `id` PK · `recipient_id` → `profiles.id` CASCADE · `appointment_id` → `appointments.id` CASCADE ·
@@ -795,16 +800,19 @@ These are the rules the system must never violate.
 
 ### 8.2 Cancellation (`BOOK-02` / `BOOK-03`)
 
-| | Client cancel | Mechanic cancel |
-|---|---|---|
-| Who | the owning `client_id` | the assigned `mechanic_id` |
-| Allowed from | `confirmado` **only** | `confirmado` **or** `nao_finalizado` |
-| Already `cancelado` | silent no-op (success) | silent no-op (success) |
-| Other statuses | error `cannot cancel appointment with status X` | same |
-| Effect | `status='cancelado'` + free the timeslot (`is_available=true`) | identical |
+| | Client cancel | Mechanic cancel | Admin deactivate-cancel |
+|---|---|---|---|
+| Who | the owning `client_id` | the assigned `mechanic_id` | an admin deactivating assigned mechanic |
+| Allowed from | `confirmado` **only** | `confirmado` **or** `nao_finalizado` | `confirmado` **or** `nao_finalizado` |
+| Already `cancelado` | silent no-op (success) | silent no-op (success) | ignored |
+| Other statuses | error `cannot cancel appointment with status X` | same | untouched |
+| Effect | `status='cancelado'` + free the timeslot (`is_available=true`) | identical | identical + client-only `appointment_canceled` notification |
 
 The asymmetry is deliberate and observed in the legacy SQL — preserve it unless the user changes
 it.
+
+Reactivation is one-way: it restores `mechanics.is_active` and `public_mechanics` only. It never
+un-cancels appointments or re-blocks timeslots.
 
 ### 8.3 Status lifecycle (`BOOK-05`)
 
@@ -1154,6 +1162,7 @@ may override.
 | **D-S** | Timeslot overlap semantics | **Intervals are half-open; unavailable slots still block; overlap is checked on creation only; batches contain one date; expiry is datetime-granular in São Paulo time.** | Ratified 2026-08-14. **Amends D-J by closing its unstated semantics.** Touching endpoints such as 09:00–10:00 and 10:00–11:00 are accepted; any genuine overlap with a free, blocked, or booked slot is rejected; a batch is atomic and cannot mix dates; and a slot earlier today is expired even though its calendar date is today. D-J's server-side transactional enforcement remains intact |
 | **D-T** | Shared `AdminFilters` parsing and ordering | **Use `{ from, to, status, mechanicId, search, page, pageSize }`; default `from` to the first day of the current São Paulo month and `to` to today via `getSaoPauloDateTimeParts()`; default `page` to 1 and `pageSize` to 20, capped at 100; validate `mechanicId` as a non-empty trimmed string, not a UUID; escape `%`, `_`, and the escape character itself for future SQL `LIKE` search; append an explicit id tiebreak to every ordering.** | Search has no accent folding (diacritic-insensitive matching): better-sqlite3 ships no ICU collation, and this project will not build one for six fields. Total ordering prevents duplicate or skipped rows across paginated reads and makes every response array deterministic. |
 | **D-U** | `syncUnfinalized` scope for admin reads | **Every future `/admin/*` read calls `syncUnfinalized(db)` before it queries, widening D-F/D-O from each appointment list/detail handler to every admin read.** | Inherits both conditions verbatim: D-O's cheap `SELECT EXISTS(...)` guard keeps the common-case read a pure read, and D-F's rule that the sweep runs before any read transaction opens (never nested inside one) stands unchanged. |
+| **D-V** | Mechanic removal semantics | **Deactivate instead of delete; see [ADR 0001](docs/adr/0001-deactivate-instead-of-delete-mechanics.md).** | Extends D-I's admin-only write surface to its removal/restore operations rather than reopening who may write `mechanics.is_active`. Gives up legacy delete parity and true erasure to retain client service history and finished-job revenue. |
 
 **Cross-cutting reminder:** §13.2's status codes (403/404/409) follow from these defaults and
 should be treated as the intended contract, not as competing proposals.
@@ -1749,6 +1758,7 @@ gate on `server/` any more. If you find that instruction quoted anywhere else, i
 | especialidade | specialty | `mechanics.specialty` |
 | credenciais | credentials | `mechanics.credentials` (default `PENDENTE`) |
 | PENDENTE | pending | default credentials value |
+| Deactivated | a mechanic an admin has removed from service; not bookable, not in `public_mechanics`, all history retained, reversible | `mechanics.is_active = false` |
 | celular | mobile phone | edge function payload |
 | senha | password | edge function payload |
 | nome | name | edge function payload |

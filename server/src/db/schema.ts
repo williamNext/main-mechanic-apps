@@ -67,10 +67,15 @@ export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
  * mechanic-approval flow was removed
  * (admin/scripts/sql/2026-05-25_remove_mechanic_approval_flow.sql) — and
  * lacks any value for mechanic creation entirely. This project carries over
- * no historical rows, so it starts clean with only the two actions Phase 3
- * (ADMIN-01/ADMIN-02, mechanic create/delete) will actually write.
+ * no historical rows and supports create, future true deletion, deactivation,
+ * and reactivation actions for Phase 3's ADMIN-01/ADMIN-02 surface.
  */
-export const ADMIN_ACTIONS = ['create_mechanic', 'delete_mechanic'] as const;
+export const ADMIN_ACTIONS = [
+  'create_mechanic',
+  'delete_mechanic',
+  'deactivate_mechanic',
+  'reactivate_mechanic',
+] as const;
 export type AdminAction = (typeof ADMIN_ACTIONS)[number];
 
 /**

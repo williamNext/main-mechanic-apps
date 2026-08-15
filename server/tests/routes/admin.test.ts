@@ -1237,3 +1237,311 @@ describe('GET /admin/finance', () => {
     expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });
   });
 });
+
+describe('POST /admin/mechanics/deactivate', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let adminToken: string;
+  let adminId: string;
+
+  beforeEach(() => {
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    adminId = insertProfile(testDb, { id: 'deactivate-admin', role: 'admin' });
+    adminToken = signAccessToken({ userId: adminId, role: 'admin' }).token;
+  });
+
+  afterEach(async () => {
+    await app.close();
+    testDb.cleanup();
+  });
+
+  function post(mechanicIds: string[], token = adminToken) {
+    return app.inject({
+      method: 'POST',
+      url: '/admin/mechanics/deactivate',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { mechanicIds },
+    });
+  }
+
+  function insertSlot(id: string, mechanicId: string, date: string, startTime: string, isAvailable = 0) {
+    const hour = Number(startTime.slice(0, 2));
+    const endTime = `${String(hour + 1).padStart(2, '0')}:${startTime.slice(3)}`;
+    testDb.connection
+      .prepare(
+        `INSERT INTO timeslots (id, mechanic_id, date, start_time, end_time, is_available)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(id, mechanicId, date, startTime, endTime, isAvailable);
+  }
+
+  it('cancels outstanding appointments, notifies clients, audits once, preserves finished work, and blocks booking', async () => {
+    const mechanicId = insertMechanicFixture(testDb, {
+      id: 'mechanic-not-a-uuid',
+      name: 'Marcos Lima',
+      email: 'marcos@example.com',
+      phone: '+5511999991111',
+      specialty: 'Freios',
+      credentials: 'CRT-88',
+    });
+    const clientId = insertProfile(testDb, { id: 'departure-client', role: 'client' });
+    const clientToken = signAccessToken({ userId: clientId, role: 'client' }).token;
+    const fixtures = [
+      { id: 'confirmed-one', slotId: 'slot-one', date: '2099-09-01', startTime: '09:00', status: 'confirmado' },
+      { id: 'confirmed-two', slotId: 'slot-two', date: '2099-09-02', startTime: '10:30', status: 'confirmado' },
+      { id: 'unfinished-one', slotId: 'slot-three', date: '2026-08-14', startTime: '11:00', status: 'nao_finalizado' },
+    ] as const;
+    for (const fixture of fixtures) {
+      insertSlot(fixture.slotId, mechanicId, fixture.date, fixture.startTime);
+      insertAppointmentFixture(testDb, {
+        id: fixture.id,
+        clientId,
+        mechanicId,
+        timeslotId: fixture.slotId,
+        date: fixture.date,
+        startTime: fixture.startTime,
+        endTime: `${String(Number(fixture.startTime.slice(0, 2)) + 1).padStart(2, '0')}:${fixture.startTime.slice(3)}`,
+        status: fixture.status,
+      });
+    }
+    insertAppointmentFixture(testDb, {
+      id: 'finished-appointment',
+      clientId,
+      mechanicId,
+      date: '2026-08-01',
+      status: 'acabado',
+      revenueCents: 45678,
+    });
+    insertSlot('still-free-slot', mechanicId, '2099-09-03', '12:00', 1);
+
+    const response = await post([mechanicId]);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      deactivatedCount: 1,
+      requestedCount: 1,
+      ignoredCount: 0,
+      cancelledAppointmentCount: 3,
+    });
+    expect(
+      testDb.connection
+        .prepare("SELECT id FROM appointments WHERE status = 'cancelado' ORDER BY id")
+        .all(),
+    ).toEqual([{ id: 'confirmed-one' }, { id: 'confirmed-two' }, { id: 'unfinished-one' }]);
+    expect(
+      testDb.connection
+        .prepare("SELECT id, is_available AS isAvailable FROM timeslots WHERE id IN ('slot-one', 'slot-two', 'slot-three') ORDER BY id")
+        .all(),
+    ).toEqual([
+      { id: 'slot-one', isAvailable: 1 },
+      { id: 'slot-three', isAvailable: 1 },
+      { id: 'slot-two', isAvailable: 1 },
+    ]);
+    expect(
+      testDb.connection
+        .prepare('SELECT recipient_id AS recipientId, appointment_id AS appointmentId, type, title, body FROM notifications ORDER BY appointment_id')
+        .all(),
+    ).toEqual([
+      {
+        recipientId: clientId,
+        appointmentId: 'confirmed-one',
+        type: 'appointment_canceled',
+        title: 'Agendamento cancelado',
+        body: 'Seu agendamento com Marcos Lima em 01/09 às 09:00 foi cancelado porque o mecânico não está mais disponível.',
+      },
+      {
+        recipientId: clientId,
+        appointmentId: 'confirmed-two',
+        type: 'appointment_canceled',
+        title: 'Agendamento cancelado',
+        body: 'Seu agendamento com Marcos Lima em 02/09 às 10:30 foi cancelado porque o mecânico não está mais disponível.',
+      },
+      {
+        recipientId: clientId,
+        appointmentId: 'unfinished-one',
+        type: 'appointment_canceled',
+        title: 'Agendamento cancelado',
+        body: 'Seu agendamento com Marcos Lima em 14/08 às 11:00 foi cancelado porque o mecânico não está mais disponível.',
+      },
+    ]);
+
+    const auditRows = testDb.connection
+      .prepare('SELECT actor_id AS actorId, target_mechanic_id AS targetMechanicId, action, before_state AS beforeState, after_state AS afterState FROM admin_action_log')
+      .all() as Array<Record<string, string>>;
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({ actorId: adminId, targetMechanicId: mechanicId, action: 'deactivate_mechanic' });
+    expect(JSON.parse(auditRows[0].beforeState)).toEqual({
+      id: mechanicId,
+      name: 'Marcos Lima',
+      email: 'marcos@example.com',
+      phone: '+5511999991111',
+      specialty: 'Freios',
+      credentials: 'CRT-88',
+      isActive: true,
+      cancelledAppointmentIds: ['confirmed-one', 'confirmed-two', 'unfinished-one'],
+      cancelledAppointmentCount: 3,
+    });
+    expect(JSON.parse(auditRows[0].afterState)).toEqual({ isActive: false });
+    expect(testDb.connection.prepare('SELECT id FROM public_mechanics WHERE id = ?').get(mechanicId)).toBeUndefined();
+    expect(testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get('finished-appointment')).toEqual({ status: 'acabado' });
+    expect(testDb.connection.prepare('SELECT total_amount_cents AS total FROM appointment_service_reports WHERE appointment_id = ?').get('finished-appointment')).toEqual({ total: 45678 });
+
+    const booking = await app.inject({
+      method: 'POST',
+      url: '/appointments',
+      headers: { authorization: `Bearer ${clientToken}` },
+      payload: { timeslotId: 'still-free-slot' },
+    });
+    expect(booking.statusCode).toBe(409);
+    expect(booking.json()).toEqual({ error: 'mechanic unavailable', code: 'MECHANIC_UNAVAILABLE' });
+  });
+
+  it('rolls back every deactivation side effect when audit insertion fails mid-transaction', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'rollback-mechanic', name: 'Rollback Mechanic' });
+    const clientId = insertProfile(testDb, { id: 'rollback-client', role: 'client' });
+    insertSlot('rollback-slot', mechanicId, '2099-10-01', '09:00');
+    insertAppointmentFixture(testDb, {
+      id: 'rollback-appointment', clientId, mechanicId, timeslotId: 'rollback-slot', date: '2099-10-01',
+      status: 'confirmado',
+    });
+    testDb.connection.exec(`
+      CREATE TRIGGER force_deactivation_audit_failure
+      BEFORE INSERT ON admin_action_log
+      WHEN NEW.action = 'deactivate_mechanic'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced deactivation audit failure');
+      END
+    `);
+
+    const response = await post([mechanicId]);
+
+    expect(response.statusCode).toBe(500);
+    expect(testDb.connection.prepare("SELECT COUNT(*) AS count FROM appointments WHERE status = 'cancelado'").get()).toEqual({ count: 0 });
+    expect(testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get('rollback-appointment')).toEqual({ status: 'confirmado' });
+    expect(testDb.connection.prepare('SELECT COUNT(*) AS count FROM notifications').get()).toEqual({ count: 0 });
+    expect(testDb.connection.prepare('SELECT COUNT(*) AS count FROM admin_action_log').get()).toEqual({ count: 0 });
+    expect(testDb.connection.prepare('SELECT is_active AS isActive FROM mechanics WHERE id = ?').get(mechanicId)).toEqual({ isActive: 1 });
+    expect(testDb.connection.prepare('SELECT is_available AS isAvailable FROM timeslots WHERE id = ?').get('rollback-slot')).toEqual({ isAvailable: 0 });
+  });
+
+  it('deduplicates opaque non-UUID ids before counting and auditing', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'plain-text-mechanic-id', name: 'Opaque Mechanic' });
+
+    const response = await post([mechanicId, mechanicId]);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ deactivatedCount: 1, requestedCount: 1, ignoredCount: 0, cancelledAppointmentCount: 0 });
+    expect(testDb.connection.prepare('SELECT COUNT(*) AS count FROM admin_action_log').get()).toEqual({ count: 1 });
+  });
+
+  it('counts an already-inactive mechanic and unmatched ids as ignored', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'already-inactive', name: 'Inactive', isActive: false });
+
+    const response = await post([mechanicId, 'missing-id']);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ deactivatedCount: 0, requestedCount: 2, ignoredCount: 2, cancelledAppointmentCount: 0 });
+    expect(testDb.connection.prepare('SELECT COUNT(*) AS count FROM admin_action_log').get()).toEqual({ count: 0 });
+  });
+
+  it('returns NO_MATCHING_MECHANICS when no requested id exists', async () => {
+    const response = await post(['missing-not-a-uuid']);
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: 'no matching mechanics found', code: 'NO_MATCHING_MECHANICS' });
+  });
+
+  it('returns VALIDATION_FAILED for an empty id set', async () => {
+    const response = await post([]);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid request body', code: 'VALIDATION_FAILED' });
+  });
+
+  it('returns VALIDATION_FAILED for 101 distinct ids', async () => {
+    const response = await post(Array.from({ length: 101 }, (_, index) => `mechanic-${index}`));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid request body', code: 'VALIDATION_FAILED' });
+  });
+
+  it('rejects non-admin access', async () => {
+    const clientId = insertProfile(testDb, { id: 'deactivate-guard-client', role: 'client' });
+    const clientToken = signAccessToken({ userId: clientId, role: 'client' }).token;
+
+    const response = await post(['any-id'], clientToken);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });
+  });
+});
+
+describe('POST /admin/mechanics/:id/reactivate', () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+  let adminToken: string;
+
+  beforeEach(() => {
+    testDb = makeTestDb();
+    app = buildApp(testDb.db, testDb.connection);
+    const adminId = insertProfile(testDb, { id: 'reactivate-admin', role: 'admin' });
+    adminToken = signAccessToken({ userId: adminId, role: 'admin' }).token;
+  });
+
+  afterEach(async () => {
+    await app.close();
+    testDb.cleanup();
+  });
+
+  function reactivate(id: string, token = adminToken) {
+    return app.inject({
+      method: 'POST',
+      url: `/admin/mechanics/${id}/reactivate`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+  }
+
+  it('restores public projection without un-canceling appointments', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'one-way-mechanic', name: 'One Way', isActive: false });
+    const clientId = insertProfile(testDb, { id: 'one-way-client', role: 'client' });
+    insertAppointmentFixture(testDb, {
+      id: 'stays-canceled', clientId, mechanicId, date: '2099-09-01', status: 'cancelado', timeslotId: undefined,
+    });
+
+    const response = await reactivate(mechanicId);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: mechanicId, isActive: true });
+    expect(testDb.connection.prepare('SELECT id FROM public_mechanics WHERE id = ?').get(mechanicId)).toEqual({ id: mechanicId });
+    expect(testDb.connection.prepare('SELECT status FROM appointments WHERE id = ?').get('stays-canceled')).toEqual({ status: 'cancelado' });
+    expect(testDb.connection.prepare('SELECT action, before_state AS beforeState, after_state AS afterState FROM admin_action_log').get()).toMatchObject({ action: 'reactivate_mechanic' });
+  });
+
+  it('succeeds without another audit row when mechanic is already active', async () => {
+    const mechanicId = insertMechanicFixture(testDb, { id: 'already-active', name: 'Already Active' });
+
+    const response = await reactivate(mechanicId);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: mechanicId, isActive: true });
+    expect(testDb.connection.prepare('SELECT COUNT(*) AS count FROM admin_action_log').get()).toEqual({ count: 0 });
+  });
+
+  it('returns MECHANIC_NOT_FOUND for an unknown opaque id', async () => {
+    const response = await reactivate('missing-not-a-uuid');
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: 'mechanic not found', code: 'MECHANIC_NOT_FOUND' });
+  });
+
+  it('rejects non-admin access', async () => {
+    const clientId = insertProfile(testDb, { id: 'reactivate-client', role: 'client' });
+    const clientToken = signAccessToken({ userId: clientId, role: 'client' }).token;
+
+    const response = await reactivate('any-id', clientToken);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: 'forbidden', code: 'FORBIDDEN' });
+  });
+});
