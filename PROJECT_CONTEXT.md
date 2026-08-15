@@ -313,7 +313,7 @@ RPC and both edge functions; notification fan-out; portable Node process.
 | Production data migration (`DATA-04`) | Fresh SQLite DB; no Postgres→SQLite type transform work. |
 | Concrete hosting target | Deliberately deferred; server stays platform-agnostic. |
 | Client app UI/screen rewrites | Out of scope **for the `server/` repo's phases**. The rewire itself is real, planned work — see §16 — it just happens in each app's own repo. |
-| `tests-e2e/` repointing | Known downstream dependency, separate effort. |
+| `tests-e2e/` local-server suite | Completed under D-M on 2026-08-11; fully local-server-pointed, including the admin project. |
 
 ### 4.4 What "deprecating supabase/" concretely means
 
@@ -1530,7 +1530,7 @@ for booking — a **concurrency test proving only one of two racing bookings win
 > - **`tests-e2e/workshop-journey`** — the only test that ever exercised all three apps together.
 >
 > What was *salvaged* is the harness pattern: PowerShell `webServer` commands and pinned ports
-> (19007 `oficina` / 19006 `mechanic` / 19008 `admin`), which the new spec reuses. Note these
+> (19007 `oficina` / 19008 `mechanic` / 19009 `admin`), which the new spec reuses. Note these
 > commands are PowerShell-only and run on no other OS.
 
 | ~~Suite~~ (deleted) | Config | Specs | Port |

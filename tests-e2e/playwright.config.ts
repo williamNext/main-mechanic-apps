@@ -7,6 +7,7 @@ const SERVER_PORT = 3010;
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
 const OFICINA_PORT = 19007;
 const MECHANIC_PORT = 19008;
+const ADMIN_PORT = 19009;
 
 const SERVER_ENV = [
   `$env:DB_PATH='./data/dev-e2e.sqlite'`,
@@ -56,6 +57,12 @@ export default defineConfig({
       reuseExistingServer: true,
       timeout: 240000,
     },
+    {
+      command: `powershell -NoProfile -Command "cd ../admin; $env:CI=1; $env:EXPO_NO_DOCTOR=1; $env:EXPO_PUBLIC_API_URL='${SERVER_URL}'; npx expo start --web --port ${ADMIN_PORT}"`,
+      url: `http://127.0.0.1:${ADMIN_PORT}`,
+      reuseExistingServer: true,
+      timeout: 240000,
+    },
   ],
   projects: [
     {
@@ -72,6 +79,14 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: `http://127.0.0.1:${MECHANIC_PORT}`,
+      },
+    },
+    {
+      name: 'admin-chromium',
+      testDir: './src/flows/admin',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: `http://127.0.0.1:${ADMIN_PORT}`,
       },
     },
   ],

@@ -36,6 +36,7 @@ export function ActionButton({
   disabled,
   loading,
   icon,
+  testID,
 }: {
   label: string;
   onPress: () => void;
@@ -43,12 +44,13 @@ export function ActionButton({
   disabled?: boolean;
   loading?: boolean;
   icon?: ReactNode;
+  testID?: string;
 }) {
   const style = variant === 'danger' ? styles.buttonDanger : variant === 'secondary' ? styles.buttonSecondary : styles.buttonPrimary;
   const textStyle = variant === 'secondary' ? styles.buttonSecondaryText : styles.buttonPrimaryText;
 
   return (
-    <Pressable onPress={onPress} disabled={disabled || loading} style={[styles.button, style, (disabled || loading) && styles.disabled]}>
+    <Pressable testID={testID} onPress={onPress} disabled={disabled || loading} style={[styles.button, style, (disabled || loading) && styles.disabled]}>
       {loading ? <ActivityIndicator color={variant === 'secondary' ? '#344054' : '#ffffff'} /> : icon}
       <Text style={textStyle}>{label}</Text>
     </Pressable>
@@ -60,16 +62,19 @@ export function SearchField({
   onChangeText,
   placeholder = 'Buscar',
   onSubmitEditing,
+  testID,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
   onSubmitEditing?: () => void;
+  testID?: string;
 }) {
   return (
     <View style={styles.searchBox}>
       <Search size={16} color="#667085" />
       <TextInput
+        testID={testID}
         value={value}
         onChangeText={(text) => onChangeText(text.slice(0, 120))}
         placeholder={placeholder}

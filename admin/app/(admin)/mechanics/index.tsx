@@ -175,6 +175,7 @@ export default function MechanicsScreen() {
               <ActionButton
                 label="Adicionar mecânico"
                 variant="primary"
+                testID="add-mechanic-button"
                 icon={<Plus size={15} color="#ffffff" />}
                 onPress={openCreateModal}
               />
@@ -182,6 +183,7 @@ export default function MechanicsScreen() {
                 label="Desativar selecionados"
                 variant="danger"
                 disabled={selectedCount === 0}
+                testID="deactivate-selected-mechanics"
                 loading={loading.deactivateMechanics}
                 icon={<UserMinus size={15} color="#ffffff" />}
                 onPress={() => {
@@ -200,8 +202,8 @@ export default function MechanicsScreen() {
           }
         />
         <View style={styles.filters}>
-          <SearchField value={filters.search} onChangeText={(search) => setFilters({ search, page: 1 })} onSubmitEditing={() => fetchMechanics({ page: 1 })} />
-          <ActionButton label="Aplicar" variant="secondary" onPress={() => fetchMechanics({ page: 1 })} />
+          <SearchField testID="mechanics-search" value={filters.search} onChangeText={(search) => setFilters({ search, page: 1 })} onSubmitEditing={() => fetchMechanics({ page: 1 })} />
+          <ActionButton testID="mechanics-search-submit" label="Aplicar" variant="secondary" onPress={() => fetchMechanics({ page: 1 })} />
         </View>
       </Panel>
 
@@ -269,6 +271,7 @@ export default function MechanicsScreen() {
               </View>
             ) : null}
             <TextInput
+              testID="deactivate-confirmation-input"
               value={confirmWord}
               onChangeText={(text) => setConfirmWord(text.slice(0, DEACTIVATE_CONFIRMATION_WORD.length))}
               placeholder={DEACTIVATE_CONFIRMATION_WORD}
@@ -295,6 +298,7 @@ export default function MechanicsScreen() {
                 label="Desativar"
                 variant="danger"
                 disabled={!confirmationMatches || selectedCount === 0}
+                testID="deactivate-confirm"
                 loading={loading.deactivateMechanics}
                 onPress={confirmDeactivation}
               />
@@ -317,6 +321,7 @@ export default function MechanicsScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Nome Completo</Text>
               <TextInput
+                testID="create-mechanic-name"
                 value={name}
                 onChangeText={setName}
                 placeholder="Ex: João Silva"
@@ -330,6 +335,7 @@ export default function MechanicsScreen() {
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.label}>Celular (com DDD)</Text>
                 <TextInput
+                  testID="create-mechanic-phone"
                   value={phone}
                   onChangeText={(text) => setPhone(formatPhone(text))}
                   placeholder="Ex: (11) 99999-9999"
@@ -343,6 +349,7 @@ export default function MechanicsScreen() {
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.label}>E-mail</Text>
                 <TextInput
+                  testID="create-mechanic-email"
                   value={email}
                   onChangeText={setEmail}
                   placeholder="Ex: joao@exemplo.com"
@@ -360,6 +367,7 @@ export default function MechanicsScreen() {
               <Text style={styles.label}>Senha de Acesso</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
+                  testID="create-mechanic-password"
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Mínimo 8 caracteres"
@@ -379,6 +387,7 @@ export default function MechanicsScreen() {
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.label}>Especialidade</Text>
                 <TextInput
+                  testID="create-mechanic-specialty"
                   value={specialty}
                   onChangeText={setSpecialty}
                   placeholder="Ex: Motor, Suspensão"
@@ -390,6 +399,7 @@ export default function MechanicsScreen() {
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.label}>Credenciais (ex: CREA)</Text>
                 <TextInput
+                  testID="create-mechanic-credentials"
                   value={credentials}
                   onChangeText={setCredentials}
                   placeholder="Ex: CREA-123456"
@@ -410,6 +420,7 @@ export default function MechanicsScreen() {
               <ActionButton
                 label="Confirmar Cadastro"
                 variant="primary"
+                testID="create-mechanic-submit"
                 loading={loading.createMechanic}
                 onPress={handleCreateMechanic}
               />

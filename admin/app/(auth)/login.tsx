@@ -38,6 +38,7 @@ export default function LoginScreen() {
           <View style={styles.inputWrap}>
             <Mail size={18} color="#667085" />
             <TextInput
+              testID="login-email"
               value={email}
               onChangeText={(text) => setEmail(text.slice(0, 160))}
               autoCapitalize="none"
@@ -56,6 +57,7 @@ export default function LoginScreen() {
           <View style={styles.inputWrap}>
             <Lock size={18} color="#667085" />
             <TextInput
+              testID="login-password"
               value={password}
               onChangeText={(text) => setPassword(text.slice(0, 256))}
               autoCapitalize="none"
@@ -71,7 +73,7 @@ export default function LoginScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable disabled={isAuthActionLoading} onPress={submit} style={[styles.button, isAuthActionLoading && styles.buttonDisabled]}>
+        <Pressable testID="login-submit" disabled={isAuthActionLoading} onPress={submit} style={[styles.button, isAuthActionLoading && styles.buttonDisabled]}>
           <Text style={styles.buttonText}>{isAuthActionLoading ? 'Entrando' : 'Entrar'}</Text>
         </Pressable>
       </View>
