@@ -524,7 +524,7 @@ current month, to = today**, both in America/Sao_Paulo. An inverted range raises
 `invalid date range`.
 
 **UC-AD1 · Dashboard** — `app/(admin)/dashboard.tsx` ← `admin_dashboard_summary(from, to)`
-Returns `{ range, generatedAt, mechanics{total,active,pending,inactive},
+Returns `{ range, generatedAt, mechanics{total,active},
 appointments{total,confirmed,unfinished,finished,canceled,today,revenueCents},
 slots{upcomingAvailable,upcomingBlocked}, appointmentsByDay[] (gap-filled per day via
 generate_series), topMechanics[] (top 5 by revenue, then count, then name) }`.
@@ -1039,6 +1039,7 @@ Handwritten migrations (triggers, data backfills) are legitimate — separate st
 | GET | `/auth/me` | Bearer | — | `200 ProfileUser` | 401 `UNAUTHENTICATED` |
 | POST | `/auth/logout` | Bearer | — | `204` | 401 `UNAUTHENTICATED` |
 | POST | `/admin/mechanics` | admin Bearer | `{name, phone, email, password(8–200), specialty, credentials}`; `isActive` ignored and forced `true` | `201 AdminMechanicRow`; profile + mechanic commit atomically | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` · 409 `EMAIL_TAKEN` · 503 `DATABASE_BUSY` |
+| GET | `/admin/dashboard` | admin Bearer | query `from?: YYYY-MM-DD, to?: YYYY-MM-DD` | `200 AdminDashboardSummary`; defaults to current São Paulo month through today | 400 `VALIDATION_FAILED`/`INVALID_DATE_RANGE` · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN` |
 | GET | `/mechanics` | Bearer | — | `200 PublicMechanic[]` ordered by name | 401 `UNAUTHENTICATED` |
 | GET | `/mechanics/:id` | Bearer | — | `200 PublicMechanic` | 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
 | GET | `/mechanics/:id/timeslots` | Bearer | query `date?: YYYY-MM-DD, includeUnavailable?: 'true'` | `200 TimeSlot[]`; default is available, unbooked, active-mechanic future slots and a seven-day window without `date`; owner + `includeUnavailable=true` requires `date` and returns that whole day with `hasActiveAppointment`; parameter is ignored for non-owners | 400 `VALIDATION_FAILED` · 401 `UNAUTHENTICATED` · 404 `MECHANIC_NOT_FOUND` |
