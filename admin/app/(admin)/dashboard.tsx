@@ -5,6 +5,10 @@ import { CalendarDateInput, EmptyState, LoadingState, MetricCard, MiniBarChart, 
 import { useAdminStore } from '@/stores/admin-store';
 import { formatDateDayMonthDisplay } from '@/utils/date';
 
+function formatMoney(cents?: number | null) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((cents ?? 0) / 100);
+}
+
 export default function DashboardScreen() {
   const { dashboard, filters, loading, error, setFilters, fetchDashboard } = useAdminStore();
 
@@ -29,8 +33,11 @@ export default function DashboardScreen() {
         <>
           <View style={styles.metrics}>
             <MetricCard label="Mecânicos" value={dashboard.mechanics.total} />
+            <MetricCard label="Mecânicos ativos" value={dashboard.mechanics.active} tone="good" />
             <MetricCard label="Agendamentos" value={dashboard.appointments.total} />
             <MetricCard label="Confirmados" value={dashboard.appointments.confirmed} tone="good" />
+            <MetricCard label="Não finalizados" value={dashboard.appointments.unfinished} tone="warn" />
+            <MetricCard label="Finalizados" value={dashboard.appointments.finished} />
             <MetricCard label="Cancelados" value={dashboard.appointments.canceled} tone="danger" />
             <MetricCard label="Horários disponíveis" value={dashboard.slots.upcomingAvailable} />
           </View>
@@ -50,9 +57,11 @@ export default function DashboardScreen() {
                   <View key={mechanic.mechanicId} style={styles.listRow}>
                     <View>
                       <Text style={styles.rowTitle}>{mechanic.mechanicName}</Text>
-                      <Text style={styles.rowMeta}>{mechanic.specialty}</Text>
+                      <Text style={styles.rowMeta}>
+                        {mechanic.specialty} · {mechanic.appointments} agendamentos
+                      </Text>
                     </View>
-                    <Text style={styles.rowCount}>{mechanic.appointments}</Text>
+                    <Text style={styles.rowCount}>{formatMoney(mechanic.revenueCents)}</Text>
                   </View>
                 ))}
               </View>

@@ -165,10 +165,9 @@ function YearPickerInput({ label, value, onChangeYear }: { label: string; value:
 
 export default function FinanceScreen() {
   const { finance, filters, loading, error, setFilters, fetchFinancialReport } = useAdminStore();
-  const now = useMemo(() => new Date(), []);
   const [viewMode, setViewMode] = useState<FinanceViewMode>('month');
-  const [selectedMonth, setSelectedMonth] = useState(() => format(startOfMonth(now), 'yyyy-MM'));
-  const [selectedYear, setSelectedYear] = useState(() => format(now, 'yyyy'));
+  const [selectedMonth, setSelectedMonth] = useState(() => filters.from.slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(() => filters.from.slice(0, 4));
 
   const applyMonth = (month: string) => {
     const date = parseISO(`${month}-01`);
@@ -219,12 +218,17 @@ export default function FinanceScreen() {
     value: formatMoney(appointment.totalAmountCents),
   }));
 
-  const useMonthlyTrend = viewMode === 'year' || (viewMode === 'custom' && (finance?.revenueByDay.length ?? 0) > 62);
-  const trendValues = useMonthlyTrend
-    ? (finance?.revenueByMonth ?? []).map((row) => ({ label: formatDateMonthDisplay(`${row.month}-01`), value: row.revenueCents, meta: row.appointments }))
-    : (finance?.revenueByDay ?? []).map((row) => ({ label: formatDateDayMonthDisplay(row.date), value: row.revenueCents, meta: row.appointments }));
+  const dailyRevenueValues = (finance?.revenueByDay ?? []).map((row) => ({
+    label: formatDateDayMonthDisplay(row.date),
+    value: row.revenueCents,
+    meta: row.appointments,
+  }));
+  const monthlyRevenueValues = (finance?.revenueByMonth ?? []).map((row) => ({
+    label: formatDateMonthDisplay(`${row.month}-01`),
+    value: row.revenueCents,
+    meta: row.appointments,
+  }));
   const overviewTitle = viewMode === 'year' ? 'Visao geral do ano' : viewMode === 'month' ? 'Visao geral do mes' : 'Visao geral do intervalo';
-  const trendTitle = useMonthlyTrend ? 'Receita por mes' : 'Receita por dia';
 
   const mechanicChartValues = (finance?.byMechanic ?? []).slice(0, 6).map((row) => ({
     label: row.mechanicName,
@@ -277,8 +281,10 @@ export default function FinanceScreen() {
             <Text style={styles.rangeText}>
               {formatDateDisplay(finance.range.from)} ate {formatDateDisplay(finance.range.to)}
             </Text>
-            <Text style={styles.chartSubtitle}>{trendTitle}</Text>
-            <FinanceBarChart values={trendValues} valueFormatter={formatShortMoney} emptyLabel="Sem receita no periodo." />
+            <Text style={styles.chartSubtitle}>Receita por dia</Text>
+            <FinanceBarChart values={dailyRevenueValues} valueFormatter={formatShortMoney} emptyLabel="Sem receita por dia no periodo." />
+            <Text style={styles.chartSubtitle}>Receita por mes</Text>
+            <FinanceBarChart values={monthlyRevenueValues} valueFormatter={formatShortMoney} emptyLabel="Sem receita por mes no periodo." />
           </Panel>
 
           <View style={styles.chartGrid}>

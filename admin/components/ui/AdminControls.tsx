@@ -272,14 +272,16 @@ export function MiniBarChart({ values }: { values: { label: string; value: numbe
   const width = 480;
   const height = 150;
   const max = Math.max(1, ...values.map((item) => item.value));
-  const barWidth = Math.max(12, (width - 32) / Math.max(values.length, 1) - 5);
+  const valueCount = Math.max(values.length, 1);
+  const gap = Math.min(5, (width - 32) / (valueCount * 3));
+  const barWidth = (width - 32 - gap * (valueCount - 1)) / valueCount;
 
   return (
     <View style={styles.chartWrap}>
       <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
         {values.map((item, index) => {
-          const barHeight = Math.max(2, (item.value / max) * 102);
-          const x = 16 + index * (barWidth + 5);
+          const barHeight = item.value === 0 ? 0 : Math.max(2, (item.value / max) * 102);
+          const x = 16 + index * (barWidth + gap);
           const y = 118 - barHeight;
           return <Rect key={`${item.label}-${index}`} x={x} y={y} width={barWidth} height={barHeight} rx={3} fill="#344054" />;
         })}
@@ -308,10 +310,12 @@ export function FinanceBarChart({
 }) {
   const width = 640;
   const height = 168;
-  const displayValues = values.slice(0, 36);
-  const hasData = displayValues.some((item) => item.value > 0);
+  const displayValues = values;
+  const hasData = displayValues.length > 0;
   const max = Math.max(1, ...displayValues.map((item) => item.value));
-  const barWidth = Math.max(7, (width - 36) / Math.max(displayValues.length, 1) - 5);
+  const valueCount = Math.max(displayValues.length, 1);
+  const gap = Math.min(5, (width - 36) / (valueCount * 3));
+  const barWidth = (width - 36 - gap * (valueCount - 1)) / valueCount;
   const labelStep = Math.max(1, Math.ceil(displayValues.length / 8));
 
   if (!hasData) {
@@ -326,8 +330,8 @@ export function FinanceBarChart({
     <View style={styles.financeChartWrap}>
       <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
         {displayValues.map((item, index) => {
-          const barHeight = Math.max(3, (item.value / max) * 118);
-          const x = 18 + index * (barWidth + 5);
+          const barHeight = item.value === 0 ? 0 : Math.max(3, (item.value / max) * 118);
+          const x = 18 + index * (barWidth + gap);
           const y = 132 - barHeight;
           return <Rect key={`${item.label}-${index}`} x={x} y={y} width={barWidth} height={barHeight} rx={3} fill={color} />;
         })}
