@@ -1,8 +1,7 @@
 import { create } from 'zustand';
+import { getApiErrorMessage, isApiError } from '@main-mechanic/wire-client';
 import { getDefaultFilters, sanitizeFilters } from '@/features/admin/filter-utils';
 import * as adminService from '@/services/admin-service';
-import { isApiError } from '@/services/api';
-import { getApiErrorMessage } from '@/services/error-messages';
 import {
   AdminAppointmentRow,
   AdminDashboardSummary,

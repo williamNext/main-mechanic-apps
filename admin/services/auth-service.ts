@@ -1,4 +1,4 @@
-import { clearStoredToken, getStoredToken, isApiError, request, setStoredToken } from './api';
+import { clearStoredToken, getStoredToken, isApiError, request, setStoredToken } from '@main-mechanic/wire-client';
 import { AdminUser, User } from '@/types/models';
 
 interface AuthResponse {

@@ -1,4 +1,4 @@
-import { request } from '@/services/api';
+import { request } from '@main-mechanic/wire-client';
 import {
   AdminAppointmentRow,
   AdminDashboardSummary,
