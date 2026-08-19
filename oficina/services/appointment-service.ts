@@ -1,5 +1,5 @@
 import { Appointment } from '@/types/models';
-import { isApiError, request } from './api';
+import { isApiError, request } from '@main-mechanic/wire-client';
 
 export interface BookAppointmentInput {
   timeslotId: string;

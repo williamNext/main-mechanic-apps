@@ -1,4 +1,4 @@
-import { isApiError, request } from './api';
+import { isApiError, request } from '@main-mechanic/wire-client';
 import { PublicMechanic } from '@/types/models';
 
 export async function getAllMechanics(): Promise<PublicMechanic[]> {

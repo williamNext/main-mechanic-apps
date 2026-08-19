@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { User, Mechanic, Role } from '@/types/models';
 import * as authService from '@/services/auth-service';
 import * as profileService from '@/services/profile-service';
-import { isApiError } from '@/services/api';
+import { isApiError } from '@main-mechanic/wire-client';
 
 interface AuthState {
   user: User | Mechanic | null;

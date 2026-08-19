@@ -10,3 +10,4 @@ export {
 export { getApiErrorMessage } from './error-messages';
 export type { ApiErrorCode } from './error-messages';
 export { SecureStorage } from './secure-storage';
+export { env } from './env';

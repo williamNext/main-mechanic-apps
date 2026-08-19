@@ -8,8 +8,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { TopAppBar } from '@/components/ui/TopAppBar';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { isApiError } from '@/services/api';
-import { getApiErrorMessage } from '@/services/error-messages';
+import { getApiErrorMessage, isApiError } from '@main-mechanic/wire-client';
 import { formatPhone, getInitials } from '@/utils/format';
 
 export default function ClientProfileScreen() {

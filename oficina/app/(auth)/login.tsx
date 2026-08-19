@@ -16,7 +16,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
 import { env } from '@/config/env';
-import { getApiErrorMessage } from '@/services/error-messages';
+import { getApiErrorMessage } from '@main-mechanic/wire-client';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
