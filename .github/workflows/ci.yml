@@ -24,6 +24,7 @@ jobs:
       mechanic: ${{ steps.filter.outputs.mechanic }}
       oficina: ${{ steps.filter.outputs.oficina }}
       admin: ${{ steps.filter.outputs.admin }}
+      packages: ${{ steps.filter.outputs.packages }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -47,6 +48,8 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - '.gitattributes'
+            packages:
+              - 'packages/**'
 
   server-typecheck:
     needs: changes
@@ -88,7 +91,7 @@ jobs:
 
   mechanic-checks:
     needs: changes
-    if: needs.changes.outputs.mechanic == 'true'
+    if: needs.changes.outputs.mechanic == 'true' || needs.changes.outputs.packages == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -108,7 +111,7 @@ jobs:
 
   admin-checks:
     needs: changes
-    if: needs.changes.outputs.admin == 'true'
+    if: needs.changes.outputs.admin == 'true' || needs.changes.outputs.packages == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -128,7 +131,7 @@ jobs:
 
   oficina-checks:
     needs: changes
-    if: needs.changes.outputs.oficina == 'true'
+    if: needs.changes.outputs.oficina == 'true' || needs.changes.outputs.packages == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -145,3 +148,23 @@ jobs:
         run: npm run -w oficina lint
       - name: Native bundle
         run: npm exec -w oficina -- expo export --platform ios
+
+  packages-checks:
+    needs: changes
+    if: needs.changes.outputs.packages == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npm run -w @main-mechanic/wire-client typecheck
+      - name: Lint
+        run: npm run -w @main-mechanic/wire-client lint
+      - name: Test
+        run: npm run -w @main-mechanic/wire-client test
