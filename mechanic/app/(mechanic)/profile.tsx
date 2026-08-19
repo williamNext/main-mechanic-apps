@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BadgeCheck, UserRound } from 'lucide-react-native';
+import { getApiErrorMessage, isApiError } from '@main-mechanic/wire-client';
 import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
-import { getApiErrorMessage } from '@/services/error-messages';
-import { isApiError } from '@/services/wire-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { Mechanic } from '@/types/models';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';

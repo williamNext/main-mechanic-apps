@@ -1,5 +1,5 @@
 import { TimeSlot } from '@/types/models';
-import { request } from './wire-client';
+import { request } from '@main-mechanic/wire-client';
 
 export interface CreateTimeSlotInput {
   date: string;

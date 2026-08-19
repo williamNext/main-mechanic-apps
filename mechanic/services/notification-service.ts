@@ -1,5 +1,5 @@
 import { AppNotification } from '@/types/models';
-import { request } from './wire-client';
+import { request } from '@main-mechanic/wire-client';
 
 export async function getNotifications(): Promise<AppNotification[]> {
   return request<AppNotification[]>('/notifications');

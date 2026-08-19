@@ -1,5 +1,5 @@
 import { Appointment, CompleteAppointmentInput } from '@/types/models';
-import { isApiError, request } from './wire-client';
+import { isApiError, request } from '@main-mechanic/wire-client';
 
 export type { CompleteAppointmentInput };
 

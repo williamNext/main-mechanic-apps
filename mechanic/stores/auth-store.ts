@@ -1,8 +1,8 @@
 import { create } from 'zustand';
+import { isApiError } from '@main-mechanic/wire-client';
 import { User, Mechanic, Role } from '@/types/models';
 import * as authService from '@/services/auth-service';
 import * as mechanicService from '@/services/mechanic-service';
-import { isApiError } from '@/services/wire-client';
 
 interface AuthState {
   user: User | Mechanic | null;

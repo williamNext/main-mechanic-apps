@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Clock3, Plus, Trash2 } from 'lucide-react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { ApiError, getApiErrorMessage, isApiError } from '@main-mechanic/wire-client';
 import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useAuthStore } from '@/stores/auth-store';
@@ -9,8 +10,6 @@ import { useTimeSlotStore } from '@/stores/timeslot-store';
 import { TimeSlot } from '@/types/models';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
 import { formatDateFull, formatTimeRange, toISODate } from '@/utils/date';
-import { getApiErrorMessage } from '@/services/error-messages';
-import { ApiError, isApiError } from '@/services/wire-client';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
