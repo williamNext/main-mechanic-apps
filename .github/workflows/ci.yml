@@ -34,10 +34,19 @@ jobs:
               - 'server/**'
             mechanic:
               - 'mechanic/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.gitattributes'
             oficina:
               - 'oficina/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.gitattributes'
             admin:
               - 'admin/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.gitattributes'
 
   server-typecheck:
     needs: changes
@@ -81,61 +90,58 @@ jobs:
     needs: changes
     if: needs.changes.outputs.mechanic == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mechanic
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: mechanic/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install deps
         run: npm ci
       - name: Typecheck
-        run: npm run typecheck
+        run: npm run -w mechanic typecheck
       - name: Lint
-        run: npm run lint
+        run: npm run -w mechanic lint
+      - name: Native bundle
+        run: npm exec -w mechanic -- expo export --platform ios
 
   admin-checks:
     needs: changes
     if: needs.changes.outputs.admin == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: admin
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: admin/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install deps
         run: npm ci
       - name: Typecheck
-        run: npm run typecheck
+        run: npm run -w admin typecheck
       - name: Lint
-        run: npm run lint
+        run: npm run -w admin lint
+      - name: Native bundle
+        run: npm exec -w admin -- expo export --platform ios
 
   oficina-checks:
     needs: changes
     if: needs.changes.outputs.oficina == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: oficina
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: oficina/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install deps
         run: npm ci
       - name: Typecheck
-        run: npm run typecheck
+        run: npm run -w oficina typecheck
       - name: Lint
-        run: npm run lint
+        run: npm run -w oficina lint
+      - name: Native bundle
+        run: npm exec -w oficina -- expo export --platform ios

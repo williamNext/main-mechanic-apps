@@ -1,0 +1,14 @@
+{
+  "name": "main-mechanic-apps",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "oficina",
+    "mechanic",
+    "admin",
+    "tests-e2e"
+  ],
+  "engines": {
+    "npm": "12.0.2"
+  }
+}
