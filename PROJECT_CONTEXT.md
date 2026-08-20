@@ -128,15 +128,17 @@ planned.
 
 ## 3. Repository map
 
-**As of 2026-08-11 this is a monorepo.** `C:\Users\Pichau\Desktop\projetos\` is a single git
-repository pushed to **`https://github.com/williamNext/main-mechanic-apps`** (branch `master`).
-The four formerly independent repos were absorbed with `git subtree`, so all 80 original commits
-are preserved. Each subfolder still has its own `package.json`, `node_modules` and deploy config —
-only version control was unified.
+**As of 2026-08-11 this is a monorepo; as of Phase 3b it is also an npm workspace.**
+`C:\Users\Pichau\Desktop\projetos\` is a single git repository pushed to
+**`https://github.com/williamNext/main-mechanic-apps`** (branch `master`). The four formerly
+independent repos were absorbed with `git subtree`, so all 80 original commits are preserved.
+`packages/*`, `oficina`, `mechanic`, `admin` and `tests-e2e` install together with one root
+`npm ci` and one root lockfile. Each app keeps its own `package.json` and deploy configuration.
+`server/` deliberately remains outside the workspace, with its own install and lockfile.
 
-A cross-cutting change is now **one commit**, which is the point: `types/models.ts`,
-`constants/theme.ts`, wire clients, secure-storage adapters, and error maps are copy-pasted between
-apps and have drifted (§17.4).
+A cross-cutting change is now **one commit**, which is the point. The wire client, secure-storage
+adapter and error map are shared through `@main-mechanic/wire-client`; only
+`constants/theme.ts` and `types/models.ts` remain copy-pasted between apps (§17.4).
 
 ⚠️ **Consequences of the absorb, both live:**
 - **The three app CI workflows no longer run.** GitHub reads `.github/workflows/` only at the
@@ -153,9 +155,10 @@ apps and have drifted (§17.4).
 | `oficina/` | Client-facing app (browse mechanics, book, manage bookings) | yes | active |
 | `mechanic/` | Mechanic app (agenda, availability, close service) | yes | active |
 | `admin/` | Admin panel (dashboard, mechanics, appointments, finance, reports) | yes | active |
+| `packages/wire-client/` | Private raw-TypeScript package shared by all three apps | no | active workspace member |
 | `server/` | New Node + SQLite backend | yes | **active, the future** |
 | `supabase/` | Legacy backend: 2 edge functions + docs + planning notes | no `.git` seen | **deprecated** |
-| `tests-e2e/` | Playwright end-to-end suite against the *legacy* stack | no | needs repointing |
+| `tests-e2e/` | Playwright end-to-end suite against the local server and three apps | no | active workspace member; run locally |
 | `specs.client,md.txt` | Raw PT-BR feature wishlist (see §17) | — | backlog notes |
 
 ### 3.1 Inside a client app
@@ -173,16 +176,15 @@ substantial):
   components/
     ui/                Generation-1 primitives (Button, Card, Badge, …)  ← what screens use
     app/               Generation-2 primitives (AppButton, AppCard, …)   ← partial adoption
-  services/            ⬅ THE BACKEND BOUNDARY. Only these files talk to a backend.
-    api.ts             oficina's HTTP client; mechanic uses wire-client.ts; admin still uses Supabase
+  services/            ⬅ THE BACKEND BOUNDARY. Feature services call @main-mechanic/wire-client.
     auth-service.ts    login / signup / session / profile fetch
     mechanic-service.ts, timeslot-service.ts, appointment-service.ts, notification-service.ts
   stores/              Zustand: auth, appointment, timeslot, mechanic, notification
   hooks/               use-auth, use-theme, use-color-scheme, use-theme-color
   constants/           theme.ts (design tokens), config.ts (app constants)
-  config/env.ts        EXPO_PUBLIC_* env access, single place
+  config/env.ts        oficina only: thin env re-export from @main-mechanic/wire-client
   types/models.ts      Domain TypeScript types
-  utils/               date.ts, format.ts  (+ secure-storage.ts in oficina and mechanic)
+  utils/               date.ts, format.ts; secure storage comes from @main-mechanic/wire-client
   scripts/             check-env, export-web, seed*, setup-git-hooks, sql/ (legacy migrations)
   tests/e2e/ + playwright.config.ts   Per-app Playwright suite (see §15.2)
   dist/                Committed static web export output
@@ -196,11 +198,11 @@ substantial):
 
 | | `oficina` / `mechanic` | `admin` |
 |---|---|---|
-| `services/` | 6 files | **3 only**: `api.ts`, `auth-service.ts`, `admin-service.ts`. There is **no** `appointment-service.ts`, `mechanic-service.ts`, `timeslot-service.ts` or `notification-service.ts` — every admin read goes through `admin-service.ts` |
+| `services/` | `oficina`: 6 feature services; `mechanic`: 5 | **2 only**: `auth-service.ts`, `admin-service.ts`. There is **no** `appointment-service.ts`, `mechanic-service.ts`, `timeslot-service.ts` or `notification-service.ts` — every admin read goes through `admin-service.ts` |
 | `stores/` | 5 stores | **2 only**: `auth-store.ts`, `admin-store.ts` |
 | `components/` | full `ui/` + `app/` sets | **no generation-1 set** — only `components/admin/AdminShell.tsx` and `components/ui/AdminControls.tsx` |
 | extra dirs | — | `features/admin/filter-utils.ts` — **client-side UI filter state** only (see the warning below) |
-| native session storage | `oficina` and `mechanic`: `expo-secure-store` via `utils/secure-storage.ts` | `@react-native-async-storage/async-storage` |
+| wire client, errors and session storage | `@main-mechanic/wire-client`; `oficina/config/env.ts` remains as a thin re-export | `@main-mechanic/wire-client`; no local `config/env.ts` |
 | design tokens | consumed from `constants/theme.ts` | largely bypassed (208 literal hexes) |
 
 ⚠️ `admin/package.json` also depends on **`pg` (^8.21.0)** — a Node Postgres driver inside an Expo
@@ -219,10 +221,10 @@ server must follow §6.4/§8, not this file:
 It is still worth reading for the shared param names, the `pageSize` cap of 100, and the
 `search` 120-char trim.
 
-**The single most important structural fact:** only `services/*.ts` import `services/api.ts` — plus
-each app's `app/_layout.tsx`, which subscribes to `supabase.auth.onAuthStateChange` (verified:
-exactly three imports of `api.ts` outside `services/`, all in `_layout.tsx`). That is what makes
-the migration cheap — ~4–10 files per app.
+**The single most important structural fact:** backend transport, token persistence and API error
+mapping now come from `@main-mechanic/wire-client`. App-owned `services/*.ts` remain the feature
+boundary; screens and stores may also import the package's error helpers. No app owns a private
+wire-client, error-map or secure-storage implementation.
 Note the weaker layering claim in §12.2 (`screen → store → service`) *is* violated in places:
 `oficina/app/(auth)/register.tsx` and `admin/app/(admin)/appointments.tsx` import from
 `@/services/` directly.
@@ -273,7 +275,8 @@ functions spread across three repos' `scripts/sql/` folders.
 | **2. Booking & Appointments — `oficina` vertical** | Role guard, `public_mechanics` reads, server-side availability, book, client-cancel, appointment list/detail, notifications + fan-out for those two writes, `profiles.role` triggers (D-R). **Ends with `@supabase/supabase-js` deleted from `oficina`** | ✅ **Complete** (2026-08-12) |
 | **2b. Mechanic vertical** | Timeslot CRUD + **overlap (D-J/D-S)**, completion + service report, mechanic-cancel branch, complete fan-out, `mechanic` app rewired and fully off Supabase; shared-package extraction deferred | ✅ **Complete** (2026-08-14) |
 | **3. Admin Management** | Create/deactivate/reactivate mechanic, dashboard, lists, details, financial report, `admin` app rewired and fully off Supabase | 🔶 Tickets 01–11 complete; ticket 12 (e2e) remaining (**current phase**) |
-| **3b. Shared package extraction** | Extract the copy-pasted `http.ts`, `error-messages.ts` and `secure-storage.ts` (three copies each, across `oficina`/`mechanic`/`admin`) into one shared package, now that all three consumers are final | ⬜ Not started — specced after Phase 3 ships |
+| **3b. Shared package extraction** | Convert the clients to an npm workspace and extract `oficina/services/api.ts`, `mechanic/services/wire-client.ts`, `admin/services/api.ts`, their error maps and secure-storage adapters into `@main-mechanic/wire-client` | ✅ **Complete** (2026-08-20) — tickets 01–06: `c48e038`, `12c000f`, `10553a5`, `ef5f4d2`, `ed990fd`, `804f792` |
+| **Future. Shared theme and model types** | Reconcile the intentionally deferred copies of `constants/theme.ts` and `types/models.ts` after their app-specific drift and ownership boundaries are designed | ⬜ Not started — explicitly deferred from Phase 3b (D-AH) |
 | ~~**4. Notifications**~~ | **Dissolved into Phases 2–3 by D-K.** The client UI already exists; fan-out belongs inside the transactions that cause it | — |
 | **Hosting, deployment & backups** | Concrete hosting target, deployment, backups, rate limiting, structured logging | ⬜ Not started, unplanned as yet — last phase |
 
@@ -1165,6 +1168,17 @@ may override.
 | **D-U** | `syncUnfinalized` scope for admin reads | **Every future `/admin/*` read calls `syncUnfinalized(db)` before it queries, widening D-F/D-O from each appointment list/detail handler to every admin read.** | Inherits both conditions verbatim: D-O's cheap `SELECT EXISTS(...)` guard keeps the common-case read a pure read, and D-F's rule that the sweep runs before any read transaction opens (never nested inside one) stands unchanged. |
 | **D-V** | Mechanic removal semantics | **Deactivate instead of delete; see [ADR 0001](docs/adr/0001-deactivate-instead-of-delete-mechanics.md).** | Extends D-I's admin-only write surface to its removal/restore operations rather than reopening who may write `mechanics.is_active`. Gives up legacy delete parity and true erasure to retain client service history and finished-job revenue. |
 | **D-W** | Shared-package extraction, deferred a third time | **Not discharged in Phase 3, moved to Phase 3b.** §4.2 and §17.4 previously instructed Phase 3 to discharge this debt with all three consumers present | Ratified 2026-08-15. The extraction's input is `admin`'s rewired `services/*.ts`, which only exist once Phase 3's own rewire (tickets 8–11) lands — attempting the extraction inside the same phase that produces its input risks building the shared shape around not-yet-final code. Phase 3b runs immediately after, with every consumer (`oficina`, `mechanic`, `admin`) final and nothing left to wait for. |
+| **D-X** | Shared-package linking mechanism | **Use npm workspaces, not `file:` dependencies, a TypeScript path alias or a sync script.** | Workspaces give npm and Metro one real dependency graph and one install. `file:` retains separate lockfiles and weaker Expo behavior; a path alias can pass typecheck while Metro fails; a sync script preserves the copy drift this phase exists to end. |
+| **D-Y** | Metro configuration for the workspace | **Do not write a `metro.config.js`.** Use Expo's default configuration derived from the root `workspaces` field. | Executing `@expo/metro-config`'s `getDefaultConfig()` confirmed it already returns the workspace members and root module path. A hand-written config would duplicate that derived layout as a second, narrower and driftable source of truth. |
+| **D-Z** | npm pin and lockfile collapse order | **Pin npm `12.0.2` at the root before generating the unified lockfile.** | The root lockfile controls every client workspace; pinning first prevents its version and format from depending on whichever npm version ran last and makes the lockfile collapse reproducible. |
+| **D-AA** | Shared-package output format | **Ship raw TypeScript source; do not compile a `dist`.** | All consumers share Metro and `tsc` in the same workspace, so they can consume source directly. A build output would add a publish-oriented build step and permit stale generated code to diverge from source. |
+| **D-AB** | Workspace boundary | **Keep `server/` outside the workspace; include `tests-e2e`.** | `server/` has an independent deployment, Vitest/Drizzle toolchain and 340-test install that gains nothing from client dependency hoisting; `tests-e2e` operates the three clients and benefits from the same root install. The only server edge is erased at runtime because it is type-only. |
+| **D-AC** | Shared API error-code type | **Define `ApiErrorCode` as the server's `ErrorCode` plus `NETWORK_UNAVAILABLE` and `REQUEST_TIMEOUT`, importing the server type only.** | Deriving the 22 server codes prevents client/server drift while the two transport failures remain client-owned. `import type` erases the non-workspace server edge before Metro resolves runtime modules. |
+| **D-AD** | API base-URL ownership | **The package owns the Expo environment read; do not inject the base URL. Only `oficina/config/env.ts` remains as a thin re-export.** | One package-owned read preserves the byte-identical client contract and avoids three setup paths. `oficina` keeps its re-export solely because an existing login import still uses that stable seam. |
+| **D-AE** | `admin` request timeout | **`admin` inherits the shared 15-second timeout.** | Its former bare `fetch()` had no timeout, so this is a deliberate behavior change rather than accidental parity. Real Chromium verification observed the package's timeout error at 15043 ms against an unresponsive server. |
+| **D-AF** | Client-visible API error messages | **Every app inherits the complete 24-code Portuguese error map.** | `admin` previously mapped only 12 codes it could already receive. Sharing all 24 deliberately widens useful user-visible messages and prevents each app's map from drifting. |
+| **D-AG** | URL polyfill ownership | **Keep the `react-native-url-polyfill` side-effect import and declare it on `@main-mechanic/wire-client`.** | Shared `fetch`/`URL` behavior must not depend on which consuming app happened to declare or import the polyfill; package ownership makes its runtime prerequisite explicit. |
+| **D-AH** | Theme and model-type extraction | **Defer `constants/theme.ts` and `types/models.ts` to a distinct future item.** | Their app-specific drift needs separate domain and design ownership decisions; folding them into a mechanical wire-client extraction would widen risk and hide semantic reconciliation inside package plumbing. Recording a roadmap item prevents a fourth silent deferral. |
 
 **Cross-cutting reminder:** §13.2's status codes (403/404/409) follow from these defaults and
 should be treated as the intended contract, not as competing proposals.
@@ -1688,14 +1702,12 @@ There is also `supabase/docs/specs/easy-first-notifications.md` — read it befo
 - **No logging**: `Fastify({ logger: false })`. Add structured logging deliberately, never logging
   password hashes or full tokens.
 - **Hosting undecided** — keep the server free of platform-specific code.
-- ~~Three separate git repos~~ **Resolved 2026-08-11 by the monorepo (§3)** — a cross-cutting change
-  is now one commit. There is still no shared package, so types, wire clients, secure-storage
-  adapters, error maps, theme constants, and notification services remain copy-pasted and have
-  drifted — now **three** copies each of `http.ts`, `error-messages.ts` and `secure-storage.ts`
-  rather than two, since Phase 3 knowingly added `admin`'s third copy of `secure-storage.ts` (§16)
-  rather than leave unencrypted token storage in place for one more phase. **Deferred a third time,
-  to Phase 3b (D-W)**, not discharged inside Phase 3 itself: the extraction's input is `admin`'s
-  rewired services, which only exist once Phase 3's own rewire is complete.
+- ~~Three separate git repos and three private wire-client stacks~~ **Resolved by the monorepo and
+  Phase 3b (§3, D-X–D-AG).** Tickets 01–06 (`c48e038` through `804f792`) discharged D-W: the wire
+  client, error map and secure-storage adapter now each have one implementation in
+  `@main-mechanic/wire-client`. Only `constants/theme.ts` and `types/models.ts` remain copy-pasted;
+  their semantic reconciliation is a distinct future roadmap item (D-AH), not package-mechanics
+  work hidden inside Phase 3b.
 - Each app repo carries `.agents/AGENT_RULES.md` (terse-response style rules, security rules,
   "confirm before touching >3 files"), `.Jules/` learning notes, and `.planning/codebase/`
   analysis docs. Those `codebase/` docs are still useful reference. `server/.planning/` is
