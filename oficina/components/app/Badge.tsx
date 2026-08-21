@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { BorderRadius, FontSize, FontWeight, Spacing , useAppTheme } from '@main-mechanic/theme';
 
 export function Badge({ label }: { label: string }) {
   const { colors } = useAppTheme();

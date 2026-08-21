@@ -2,8 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TimeSlot } from '@/types/models';
-import { BorderRadius, FontSize, FontWeight, Spacing, Shadow } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { BorderRadius, FontSize, FontWeight, Spacing, Shadow , useAppTheme } from '@main-mechanic/theme';
 
 interface TimeSlotPickerProps {
   slots: TimeSlot[];

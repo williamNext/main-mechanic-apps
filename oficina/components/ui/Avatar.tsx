@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { FontSize, FontWeight } from '@/constants/theme';
+import { FontSize, FontWeight , useAppTheme } from '@main-mechanic/theme';
 import { getInitials } from '@/utils/format';
-import { useAppTheme } from '@/hooks/use-theme';
 
 type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 

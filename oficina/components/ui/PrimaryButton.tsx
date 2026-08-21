@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 
 type PrimaryButtonVariant = 'filled' | 'outlined' | 'whatsapp' | 'secondary';
 

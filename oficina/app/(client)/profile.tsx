@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { TopAppBar } from '@/components/ui/TopAppBar';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { getApiErrorMessage, isApiError } from '@main-mechanic/wire-client';
 import { formatPhone, getInitials } from '@/utils/format';

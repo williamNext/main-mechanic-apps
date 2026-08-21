@@ -6,7 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppointmentCard } from '@/components/ui/AppointmentCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { TopAppBar } from '@/components/ui/TopAppBar';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useAppointmentStore } from '@/stores/appointment-store';
 

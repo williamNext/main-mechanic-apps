@@ -1,8 +1,7 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { Spacing , useAppTheme } from '@main-mechanic/theme';
 
 interface ScreenContainerProps {
   children: React.ReactNode;

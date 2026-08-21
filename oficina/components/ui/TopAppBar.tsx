@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { colors, radius, spacing, typography } from '@/constants/theme';
+import { colors, radius, spacing, typography } from '@main-mechanic/theme';
 
 interface TopAppBarProps {
   title?: string;

@@ -18,7 +18,7 @@ import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { TimeSlotButton } from '@/components/ui/TimeSlotButton';
 import { TopAppBar } from '@/components/ui/TopAppBar';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useAppointmentStore } from '@/stores/appointment-store';
 import { useMechanicStore } from '@/stores/mechanic-store';

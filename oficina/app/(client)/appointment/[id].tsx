@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { StatusBanner } from '@/components/ui/StatusBanner';
 import { TopAppBar } from '@/components/ui/TopAppBar';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { getApiErrorMessage, isApiError } from '@main-mechanic/wire-client';
 import { useAppointmentStore } from '@/stores/appointment-store';
 import { formatDate, formatTimeRange } from '@/utils/date';

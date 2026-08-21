@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { BorderRadius, FontSize, FontWeight, Spacing , useAppTheme } from '@main-mechanic/theme';
 
 interface AppInputProps extends TextInputProps {
   label: string;

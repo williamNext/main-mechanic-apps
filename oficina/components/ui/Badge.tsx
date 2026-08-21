@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { BorderRadius, FontSize, FontWeight, getStatusColor, Spacing, StatusLabels } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { BorderRadius, FontSize, FontWeight, getStatusColor, Spacing, StatusLabels , useAppTheme } from '@main-mechanic/theme';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
 

@@ -12,7 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InputField } from '@/components/ui/InputField';
 import { TopAppBar } from '@/components/ui/TopAppBar';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useMechanicStore } from '@/stores/mechanic-store';
 import { PublicMechanic } from '@/types/models';
 import { getInitials } from '@/utils/format';
