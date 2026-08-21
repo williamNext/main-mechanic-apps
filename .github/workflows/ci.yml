@@ -91,7 +91,7 @@ jobs:
 
   mechanic-checks:
     needs: changes
-    if: needs.changes.outputs.mechanic == 'true' || needs.changes.outputs.packages == 'true'
+    if: needs.changes.outputs.mechanic == 'true' || needs.changes.outputs.packages == 'true' || needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
 
   admin-checks:
     needs: changes
-    if: needs.changes.outputs.admin == 'true' || needs.changes.outputs.packages == 'true'
+    if: needs.changes.outputs.admin == 'true' || needs.changes.outputs.packages == 'true' || needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +131,7 @@ jobs:
 
   oficina-checks:
     needs: changes
-    if: needs.changes.outputs.oficina == 'true' || needs.changes.outputs.packages == 'true'
+    if: needs.changes.outputs.oficina == 'true' || needs.changes.outputs.packages == 'true' || needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -163,8 +163,8 @@ jobs:
       - name: Install deps
         run: npm ci
       - name: Typecheck
-        run: npm run -w @main-mechanic/wire-client typecheck
+        run: npm run --if-present -w ./packages typecheck
       - name: Lint
-        run: npm run -w @main-mechanic/wire-client lint
+        run: npm run --if-present -w ./packages lint
       - name: Test
-        run: npm run -w @main-mechanic/wire-client test
+        run: npm run --if-present -w ./packages test
