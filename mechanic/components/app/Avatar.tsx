@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { BorderRadius, FontSize, FontWeight } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { BorderRadius, FontSize, FontWeight , useAppTheme } from '@main-mechanic/theme';
 
 export function Avatar({ name, size = 48 }: { name: string; size?: number }) {
   const { colors } = useAppTheme();

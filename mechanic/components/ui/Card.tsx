@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { BorderRadius, Shadow, Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { BorderRadius, Shadow, Spacing , useAppTheme } from '@main-mechanic/theme';
 
 interface CardProps {
   children: React.ReactNode;

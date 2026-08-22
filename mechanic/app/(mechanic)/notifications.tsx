@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotificationStore } from '@/stores/notification-store';
 import { AppNotification } from '@/types/models';

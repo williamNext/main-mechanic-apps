@@ -1,7 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { BorderRadius, FontSize, FontWeight, Spacing , useAppTheme } from '@main-mechanic/theme';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'danger';
 

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNotificationStore } from '@/stores/notification-store';
 

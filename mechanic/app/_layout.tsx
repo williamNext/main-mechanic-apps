@@ -13,7 +13,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { useAuthStore } from '@/stores/auth-store';
 import * as authService from '@/services/auth-service';
-import { useAppTheme } from '@/hooks/use-theme';
+import { useAppTheme } from '@main-mechanic/theme';
 
 void SplashScreen.preventAutoHideAsync();
 

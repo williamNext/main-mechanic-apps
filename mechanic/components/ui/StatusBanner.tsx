@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { spacing, statusTheme, StatusLabels, typography } from '@/constants/theme';
+import { spacing, statusTheme, StatusLabels, typography } from '@main-mechanic/theme';
 
 interface StatusBannerProps {
   status: keyof typeof statusTheme | string;

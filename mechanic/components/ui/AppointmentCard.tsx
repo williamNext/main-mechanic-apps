@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Appointment } from '@/types/models';
-import { colors, radius, shadow, spacing, statusTheme, StatusLabels, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, statusTheme, StatusLabels, typography } from '@main-mechanic/theme';
 import { formatDate, formatTimeRange } from '@/utils/date';
 import { getInitials } from '@/utils/format';
 

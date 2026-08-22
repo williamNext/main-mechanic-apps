@@ -7,8 +7,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { BorderRadius, FontSize, FontWeight, Spacing , useAppTheme } from '@main-mechanic/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';

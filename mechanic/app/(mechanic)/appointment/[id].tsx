@@ -5,7 +5,7 @@ import { ArrowLeft, CalendarDays, Car, Clock3, Phone, Plus, Trash2, UserRound } 
 import { getApiErrorMessage, isApiError } from '@main-mechanic/wire-client';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useAppointmentStore } from '@/stores/appointment-store';
-import { colors, radius, shadow, spacing, statusTheme, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, statusTheme, typography } from '@main-mechanic/theme';
 import { formatDateFull, formatTimeRange } from '@/utils/date';
 
 type ServiceItemDraft = {

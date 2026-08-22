@@ -8,7 +8,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTimeSlotStore } from '@/stores/timeslot-store';
 import { TimeSlot } from '@/types/models';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { formatDateFull, formatTimeRange, toISODate } from '@/utils/date';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;

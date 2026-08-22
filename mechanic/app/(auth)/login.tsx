@@ -6,7 +6,7 @@ import { getApiErrorMessage } from '@main-mechanic/wire-client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InputField } from '@/components/ui/InputField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useAuthStore } from '@/stores/auth-store';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

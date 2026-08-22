@@ -5,8 +5,7 @@ import { Mechanic } from '@/types/models';
 import { AppCard } from '@/components/app/AppCard';
 import { Avatar } from '@/components/app/Avatar';
 import { Badge } from '@/components/app/Badge';
-import { FontSize, FontWeight, Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-theme';
+import { FontSize, FontWeight, Spacing , useAppTheme } from '@main-mechanic/theme';
 
 interface MechanicCardProps {
   mechanic: Mechanic;

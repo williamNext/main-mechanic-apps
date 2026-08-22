@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors } from '@main-mechanic/theme';
 
 export function useAppTheme() {
   const scheme = 'light';

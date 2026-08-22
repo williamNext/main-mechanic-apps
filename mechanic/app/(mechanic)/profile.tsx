@@ -6,7 +6,7 @@ import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useAuthStore } from '@/stores/auth-store';
 import { Mechanic } from '@/types/models';
-import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 
 function ScreenErrorBanner({ message, testID }: { message: string | null; testID: string }) {
   if (!message) return null;

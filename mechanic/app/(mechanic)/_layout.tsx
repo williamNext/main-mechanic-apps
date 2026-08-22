@@ -1,6 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import { BottomNavBar } from '@/components/ui/BottomNavBar';
-import { colors } from '@/constants/theme';
+import { colors } from '@main-mechanic/theme';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function MechanicLayout() {

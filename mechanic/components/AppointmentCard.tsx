@@ -4,9 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Appointment } from '@/types/models';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
-import { FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { FontSize, FontWeight, Spacing , useAppTheme } from '@main-mechanic/theme';
 import { formatDate, formatTimeRange } from '@/utils/date';
-import { useAppTheme } from '@/hooks/use-theme';
 
 interface AppointmentCardProps {
   appointment: Appointment;
