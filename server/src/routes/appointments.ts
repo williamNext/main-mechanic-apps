@@ -33,7 +33,7 @@ const NullableTrimmedString = (max: number) =>
     .optional()
     .transform((value) => value ?? null);
 
-const BookAppointmentSchema = z
+export const BookAppointmentSchema = z
   .object({
     timeSlotId: z.string().trim().min(1),
     vehicleInfo: NullableTrimmedString(120),
@@ -41,7 +41,7 @@ const BookAppointmentSchema = z
   })
   .strict();
 
-const CompleteAppointmentSchema = z
+export const CompleteAppointmentSchema = z
   .object({
     summary: z.string().trim().min(3).max(240),
     diagnosis: NullableTrimmedString(1000),

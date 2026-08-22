@@ -7,7 +7,7 @@ import { mechanics, profiles } from '../db/schema.js';
 import { HttpError } from '../errors.js';
 import { profileUserColumns, serializeProfileUser } from './user.js';
 
-const UpdateProfileSchema = z
+export const UpdateProfileSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     specialty: z.string().trim().min(1).optional(),

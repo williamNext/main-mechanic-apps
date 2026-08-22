@@ -22,7 +22,7 @@ import {
 import { HttpError } from '../errors.js';
 import { getSaoPauloDateTimeParts } from '../lib/sao-paulo-time.js';
 
-const CreateMechanicSchema = z.object({
+export const CreateMechanicSchema = z.object({
   name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(1),
   email: z.string().trim().email(),
@@ -32,7 +32,7 @@ const CreateMechanicSchema = z.object({
   isActive: z.unknown().optional(),
 }).strict();
 
-const DeactivateMechanicsSchema = z
+export const DeactivateMechanicsSchema = z
   .object({
     mechanicIds: z.array(z.string().trim().min(1)),
   })

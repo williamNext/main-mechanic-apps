@@ -8,7 +8,7 @@ const PositiveIntegerQueryValue = z.preprocess(
   z.number().int().positive(),
 );
 
-const AdminFiltersSchema = z.object({
+export const AdminFiltersSchema = z.object({
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   status: z.enum(['all', ...APPOINTMENT_STATUSES]).default('all'),

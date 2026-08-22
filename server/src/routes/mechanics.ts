@@ -39,7 +39,7 @@ type TimeslotResponse = {
 
 const TimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/);
 
-const CreateTimeslotSchema = z
+export const CreateTimeslotSchema = z
   .object({
     date: z.string().refine(isDateString),
     startTime: TimeSchema,
@@ -50,7 +50,7 @@ const CreateTimeslotSchema = z
 
 const CreateTimeslotsSchema = z.union([CreateTimeslotSchema, z.array(CreateTimeslotSchema).min(1)]);
 
-const UpdateTimeslotSchema = z.object({ isAvailable: z.boolean() }).strict();
+export const UpdateTimeslotSchema = z.object({ isAvailable: z.boolean() }).strict();
 
 const timeslotNotFound = () => new HttpError(404, 'timeslot not found', 'TIMESLOT_NOT_FOUND');
 

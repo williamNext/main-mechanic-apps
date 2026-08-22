@@ -13,13 +13,13 @@ import { profileUserColumns, serializeProfileUser } from './user.js';
 
 // Unknown keys (including a client-supplied `role`) are stripped by zod's
 // default "strip" behavior — they never reach the insert (D-07, T-01-03).
-const SignupSchema = z.object({
+export const SignupSchema = z.object({
   name: z.string().min(1).max(120),
   email: z.string().email(),
   password: z.string().min(8).max(200),
 });
 
-const LoginSchema = z.object({
+export const LoginSchema = z.object({
   // .trim() runs before .email() so surrounding whitespace never fails
   // validation — the handler still normalizes (trim + lowercase) again
   // before lookup, matching how signup stored the email.
