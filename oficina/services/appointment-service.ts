@@ -2,7 +2,7 @@ import { Appointment } from '@/types/models';
 import { isApiError, request } from '@main-mechanic/wire-client';
 
 export interface BookAppointmentInput {
-  timeslotId: string;
+  timeSlotId: string;
   vehicleInfo?: string;
   notes?: string;
 }

@@ -217,7 +217,7 @@ describe('GET /mechanics/:id/timeslots', () => {
     insertAppointment(testDb, {
       clientId,
       mechanicId: owner.id,
-      timeslotId: confirmed,
+      timeSlotId: confirmed,
       date: '2026-08-12',
       startTime: '09:00',
       endTime: '10:00',
@@ -226,7 +226,7 @@ describe('GET /mechanics/:id/timeslots', () => {
     insertAppointment(testDb, {
       clientId,
       mechanicId: owner.id,
-      timeslotId: unfinished,
+      timeSlotId: unfinished,
       date: '2026-08-12',
       startTime: '10:00',
       endTime: '11:00',
@@ -235,7 +235,7 @@ describe('GET /mechanics/:id/timeslots', () => {
     insertAppointment(testDb, {
       clientId,
       mechanicId: owner.id,
-      timeslotId: finished,
+      timeSlotId: finished,
       date: '2026-08-12',
       startTime: '11:00',
       endTime: '12:00',
@@ -244,7 +244,7 @@ describe('GET /mechanics/:id/timeslots', () => {
     insertAppointment(testDb, {
       clientId,
       mechanicId: owner.id,
-      timeslotId: canceled,
+      timeSlotId: canceled,
       date: '2026-08-12',
       startTime: '12:00',
       endTime: '13:00',
@@ -430,9 +430,9 @@ describe('GET /mechanics/:id/timeslots', () => {
       startTime: '11:00',
       endTime: '12:00',
     });
-    insertAppointment(testDb, { clientId, mechanicId, timeslotId: confirmed, date: '2026-08-13', startTime: '09:00', endTime: '10:00', status: 'confirmado' });
-    insertAppointment(testDb, { clientId, mechanicId, timeslotId: unfinished, date: '2026-08-13', startTime: '10:00', endTime: '11:00', status: 'nao_finalizado' });
-    insertAppointment(testDb, { clientId, mechanicId, timeslotId: canceled, date: '2026-08-13', startTime: '11:00', endTime: '12:00', status: 'cancelado' });
+    insertAppointment(testDb, { clientId, mechanicId, timeSlotId: confirmed, date: '2026-08-13', startTime: '09:00', endTime: '10:00', status: 'confirmado' });
+    insertAppointment(testDb, { clientId, mechanicId, timeSlotId: unfinished, date: '2026-08-13', startTime: '10:00', endTime: '11:00', status: 'nao_finalizado' });
+    insertAppointment(testDb, { clientId, mechanicId, timeSlotId: canceled, date: '2026-08-13', startTime: '11:00', endTime: '12:00', status: 'cancelado' });
 
     const res = await app.inject({
       method: 'GET',
@@ -597,7 +597,7 @@ describe('GET /mechanics/:id/timeslots', () => {
     const mechanicId = insertMechanic(testDb);
     const taken = insertTimeslot(testDb, { mechanicId, date: '2026-08-13', startTime: '09:00', endTime: '10:00' });
     const open = insertTimeslot(testDb, { mechanicId, date: '2026-08-13', startTime: '10:00', endTime: '11:00' });
-    insertAppointment(testDb, { clientId, mechanicId, timeslotId: taken, date: '2026-08-13', startTime: '09:00', endTime: '10:00', status: 'confirmado' });
+    insertAppointment(testDb, { clientId, mechanicId, timeSlotId: taken, date: '2026-08-13', startTime: '09:00', endTime: '10:00', status: 'confirmado' });
 
     const res = await app.inject({
       method: 'GET',
@@ -942,7 +942,7 @@ describe('PATCH /timeslots/:id', () => {
     async (status) => {
       const id = insertTimeslot(testDb, { mechanicId: mechanic.id, isAvailable: 0 });
       const clientId = insertProfile(testDb, { role: 'client' });
-      insertAppointment(testDb, { clientId, mechanicId: mechanic.id, timeslotId: id, status });
+      insertAppointment(testDb, { clientId, mechanicId: mechanic.id, timeSlotId: id, status });
 
       const res = await app.inject({
         method: 'PATCH',
@@ -995,7 +995,7 @@ describe('DELETE /timeslots/:id', () => {
     async (status) => {
       const id = insertTimeslot(testDb, { mechanicId: mechanic.id, isAvailable: 0 });
       const clientId = insertProfile(testDb, { role: 'client' });
-      insertAppointment(testDb, { clientId, mechanicId: mechanic.id, timeslotId: id, status });
+      insertAppointment(testDb, { clientId, mechanicId: mechanic.id, timeSlotId: id, status });
 
       const res = await app.inject({
         method: 'DELETE',
@@ -1028,7 +1028,7 @@ describe('DELETE /timeslots/:id', () => {
     const appointmentId = insertAppointment(testDb, {
       clientId,
       mechanicId: mechanic.id,
-      timeslotId: id,
+      timeSlotId: id,
       status: 'acabado',
     });
 
@@ -1040,8 +1040,8 @@ describe('DELETE /timeslots/:id', () => {
 
     expect(res.statusCode).toBe(204);
     expect(
-      testDb.connection.prepare('SELECT timeslot_id AS timeslotId FROM appointments WHERE id = ?').get(appointmentId),
-    ).toEqual({ timeslotId: null });
+      testDb.connection.prepare('SELECT timeslot_id AS timeSlotId FROM appointments WHERE id = ?').get(appointmentId),
+    ).toEqual({ timeSlotId: null });
   });
 
   it('returns TIMESLOT_NOT_FOUND to non-owning mechanics and clients', async () => {

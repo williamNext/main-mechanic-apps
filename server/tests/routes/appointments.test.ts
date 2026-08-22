@@ -155,7 +155,7 @@ describe('GET /appointments', () => {
       id: laterTime,
       clientId,
       mechanicId,
-      timeslotId: null,
+      timeSlotId: null,
       date: '2026-08-14',
       startTime: '14:00:00',
       endTime: '15:00:00',
@@ -447,7 +447,7 @@ describe('POST /appointments', () => {
   });
 
   it('books a future slot, denormalizes it, trims input, and removes it from availability', async () => {
-    const timeslotId = insertTimeslot(testDb, {
+    const timeSlotId = insertTimeslot(testDb, {
       mechanicId,
       date: '2026-08-13',
       startTime: '09:30:00',
@@ -459,7 +459,7 @@ describe('POST /appointments', () => {
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId, vehicleInfo: '  Honda Civic  ', notes: '  Trocar pastilhas  ' },
+      payload: { timeSlotId, vehicleInfo: '  Honda Civic  ', notes: '  Trocar pastilhas  ' },
     });
 
     expect(response.statusCode).toBe(201);
@@ -468,7 +468,7 @@ describe('POST /appointments', () => {
       id: expect.any(String),
       clientId,
       mechanicId,
-      timeslotId,
+      timeSlotId,
       date: '2026-08-13',
       startTime: '09:30:00',
       endTime: '10:30:00',
@@ -526,13 +526,13 @@ describe('POST /appointments', () => {
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId: firstSlot },
+      payload: { timeSlotId: firstSlot },
     });
     const empty = await app.inject({
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId: secondSlot, vehicleInfo: '   ', notes: '' },
+      payload: { timeSlotId: secondSlot, vehicleInfo: '   ', notes: '' },
     });
 
     expect(omitted.json().vehicleInfo).toBeNull();
@@ -545,14 +545,14 @@ describe('POST /appointments', () => {
     { vehicleInfo: 'x'.repeat(121) },
     { notes: 'x'.repeat(1001) },
   ])('rejects over-length input before opening a transaction', async (fields) => {
-    const timeslotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13' });
+    const timeSlotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13' });
     const transaction = vi.spyOn(testDb.db, 'transaction');
 
     const response = await app.inject({
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId, ...fields },
+      payload: { timeSlotId, ...fields },
     });
 
     expect(response.statusCode).toBe(400);
@@ -562,14 +562,14 @@ describe('POST /appointments', () => {
 
   it.each(['mechanic', 'admin'] as const)('rejects stored %s role before opening a transaction', async (role) => {
     const caller = makeUserToken(testDb, role);
-    const timeslotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13' });
+    const timeSlotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13' });
     const transaction = vi.spyOn(testDb.db, 'transaction');
 
     const response = await app.inject({
       method: 'POST',
       url: '/appointments',
       headers: auth(caller.token),
-      payload: { timeslotId },
+      payload: { timeSlotId },
     });
 
     expect(response.statusCode).toBe(403);
@@ -582,7 +582,7 @@ describe('POST /appointments', () => {
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId: randomUUID() },
+      payload: { timeSlotId: randomUUID() },
     });
 
     expect(response.statusCode).toBe(404);
@@ -591,13 +591,13 @@ describe('POST /appointments', () => {
 
   it('returns MECHANIC_UNAVAILABLE for a slot owned by an inactive mechanic', async () => {
     const inactive = insertMechanic(testDb, { isActive: 0 });
-    const timeslotId = insertTimeslot(testDb, { mechanicId: inactive, date: '2026-08-13' });
+    const timeSlotId = insertTimeslot(testDb, { mechanicId: inactive, date: '2026-08-13' });
 
     const response = await app.inject({
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId },
+      payload: { timeSlotId },
     });
 
     expect(response.statusCode).toBe(409);
@@ -605,13 +605,13 @@ describe('POST /appointments', () => {
   });
 
   it('returns TIMESLOT_UNAVAILABLE for an unavailable slot and rolls back notification fan-out', async () => {
-    const timeslotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13', isAvailable: 0 });
+    const timeSlotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13', isAvailable: 0 });
 
     const response = await app.inject({
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId },
+      payload: { timeSlotId },
     });
 
     expect(response.statusCode).toBe(409);
@@ -620,7 +620,7 @@ describe('POST /appointments', () => {
   });
 
   it('returns TIMESLOT_EXPIRED when start is not future in Sao Paulo time', async () => {
-    const timeslotId = insertTimeslot(testDb, {
+    const timeSlotId = insertTimeslot(testDb, {
       mechanicId,
       date: '2026-08-12',
       startTime: '12:00:00',
@@ -631,7 +631,7 @@ describe('POST /appointments', () => {
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId },
+      payload: { timeSlotId },
     });
 
     expect(response.statusCode).toBe(409);
@@ -640,21 +640,21 @@ describe('POST /appointments', () => {
 
   it('maps the active-appointment unique-index violation after availability bookkeeping is forced stale', async () => {
     const otherClient = makeUserToken(testDb);
-    const timeslotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13' });
+    const timeSlotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13' });
     insertAppointment(testDb, {
       clientId: otherClient.id,
       mechanicId,
-      timeslotId,
+      timeSlotId,
       date: '2026-08-13',
       status: 'confirmado',
     });
-    testDb.connection.prepare('UPDATE timeslots SET is_available = 1 WHERE id = ?').run(timeslotId);
+    testDb.connection.prepare('UPDATE timeslots SET is_available = 1 WHERE id = ?').run(timeSlotId);
 
     const response = await app.inject({
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId },
+      payload: { timeSlotId },
     });
 
     expect(response.statusCode).toBe(409);
@@ -663,7 +663,7 @@ describe('POST /appointments', () => {
   });
 
   it('writes exact confirmed notification and keeps mechanic name captured after rename', async () => {
-    const timeslotId = insertTimeslot(testDb, {
+    const timeSlotId = insertTimeslot(testDb, {
       mechanicId,
       date: '2026-09-03',
       startTime: '08:05:59',
@@ -675,7 +675,7 @@ describe('POST /appointments', () => {
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId },
+      payload: { timeSlotId },
     });
     await app.inject({
       method: 'PATCH',
@@ -730,7 +730,7 @@ describe('POST /appointments/:id/cancel', () => {
   });
 
   it('cancels a confirmed appointment, frees its slot, fans out, and permits rebooking', async () => {
-    const timeslotId = insertTimeslot(testDb, {
+    const timeSlotId = insertTimeslot(testDb, {
       mechanicId,
       date: '2026-08-13',
       startTime: '14:20:30',
@@ -740,7 +740,7 @@ describe('POST /appointments/:id/cancel', () => {
     const appointmentId = insertAppointment(testDb, {
       clientId,
       mechanicId,
-      timeslotId,
+      timeSlotId,
       date: '2026-08-13',
       startTime: '14:20:30',
       endTime: '15:20:30',
@@ -757,7 +757,7 @@ describe('POST /appointments/:id/cancel', () => {
     expect(transaction.mock.calls[0]?.[1]).toEqual({ behavior: 'immediate' });
     expect(canceled.json()).toEqual(expect.objectContaining({
       id: appointmentId,
-      timeslotId,
+      timeSlotId,
       status: 'cancelado',
       mechanicName: 'Maria Souza',
       mechanicPhone: '+5511888888888',
@@ -788,14 +788,14 @@ describe('POST /appointments/:id/cancel', () => {
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId },
+      payload: { timeSlotId },
     });
     expect(rebooked.statusCode).toBe(201);
   });
 
   it('lets the assigned mechanic cancel a confirmed appointment and frees its slot', async () => {
     testDb.connection.prepare('UPDATE profiles SET phone = ? WHERE id = ?').run('+5511999999999', clientId);
-    const timeslotId = insertTimeslot(testDb, {
+    const timeSlotId = insertTimeslot(testDb, {
       mechanicId,
       date: '2026-08-13',
       startTime: '14:20:30',
@@ -805,7 +805,7 @@ describe('POST /appointments/:id/cancel', () => {
     const appointmentId = insertAppointment(testDb, {
       clientId,
       mechanicId,
-      timeslotId,
+      timeSlotId,
       date: '2026-08-13',
       startTime: '14:20:30',
       endTime: '15:20:30',
@@ -820,14 +820,14 @@ describe('POST /appointments/:id/cancel', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(expect.objectContaining({
       id: appointmentId,
-      timeslotId,
+      timeSlotId,
       status: 'cancelado',
       mechanicName: 'Maria Souza',
       mechanicPhone: null,
       clientName: 'Test Person',
       clientPhone: '+5511999999999',
     }));
-    expect(testDb.connection.prepare('SELECT is_available FROM timeslots WHERE id = ?').get(timeslotId)).toEqual({
+    expect(testDb.connection.prepare('SELECT is_available FROM timeslots WHERE id = ?').get(timeSlotId)).toEqual({
       is_available: 1,
     });
     expect(notificationRows(testDb)).toEqual([
@@ -845,7 +845,7 @@ describe('POST /appointments/:id/cancel', () => {
     const appointmentId = insertAppointment(testDb, {
       clientId,
       mechanicId,
-      timeslotId: null,
+      timeSlotId: null,
       status: 'nao_finalizado',
     });
 
@@ -858,7 +858,7 @@ describe('POST /appointments/:id/cancel', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(expect.objectContaining({
       id: appointmentId,
-      timeslotId: null,
+      timeSlotId: null,
       status: 'cancelado',
     }));
   });
@@ -960,8 +960,8 @@ describe('POST /appointments/:id/cancel', () => {
     expect(unknown.json()).toEqual({ error: 'appointment not found', code: 'APPOINTMENT_NOT_FOUND' });
   });
 
-  it('cancels successfully when timeslotId is null', async () => {
-    const appointmentId = insertAppointment(testDb, { clientId, mechanicId, timeslotId: null });
+  it('cancels successfully when timeSlotId is null', async () => {
+    const appointmentId = insertAppointment(testDb, { clientId, mechanicId, timeSlotId: null });
 
     const response = await app.inject({
       method: 'POST',
@@ -970,7 +970,7 @@ describe('POST /appointments/:id/cancel', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().timeslotId).toBeNull();
+    expect(response.json().timeSlotId).toBeNull();
     expect(response.json().status).toBe('cancelado');
   });
 
@@ -1029,11 +1029,11 @@ describe('POST /appointments/:id/cancel', () => {
   });
 
   it('uses the same flat serializer keys as booking', async () => {
-    const timeslotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13', isAvailable: 0 });
+    const timeSlotId = insertTimeslot(testDb, { mechanicId, date: '2026-08-13', isAvailable: 0 });
     const appointmentId = insertAppointment(testDb, {
       clientId,
       mechanicId,
-      timeslotId,
+      timeSlotId,
       date: '2026-08-13',
     });
     const canceled = await app.inject({
@@ -1045,11 +1045,11 @@ describe('POST /appointments/:id/cancel', () => {
       method: 'POST',
       url: '/appointments',
       headers: auth(clientToken),
-      payload: { timeslotId },
+      payload: { timeSlotId },
     });
 
     expect(Object.keys(canceled.json()).sort()).toEqual(Object.keys(booked.json()).sort());
-    expect(canceled.json()).toHaveProperty('timeslotId');
+    expect(canceled.json()).toHaveProperty('timeSlotId');
     expect(canceled.json()).toHaveProperty('serviceSummary', null);
     expect(canceled.json()).toHaveProperty('serviceDiagnosis', null);
     expect(canceled.json()).not.toHaveProperty('summary');
@@ -1083,7 +1083,7 @@ describe('POST /appointments/:id/complete', () => {
 
   it('completes a confirmed appointment with its full report, ordered items, total, notification, and occupied slot', async () => {
     testDb.connection.prepare('UPDATE profiles SET phone = ? WHERE id = ?').run('+5511999999999', clientId);
-    const timeslotId = insertTimeslot(testDb, {
+    const timeSlotId = insertTimeslot(testDb, {
       mechanicId,
       date: '2026-09-03',
       startTime: '08:05:59',
@@ -1093,7 +1093,7 @@ describe('POST /appointments/:id/complete', () => {
     const appointmentId = insertAppointment(testDb, {
       clientId,
       mechanicId,
-      timeslotId,
+      timeSlotId,
       date: '2026-09-03',
       startTime: '08:05:59',
       endTime: '09:05:59',
@@ -1143,7 +1143,7 @@ describe('POST /appointments/:id/complete', () => {
         .prepare('SELECT total_amount_cents FROM appointment_service_reports WHERE appointment_id = ?')
         .get(appointmentId),
     ).toEqual({ total_amount_cents: 37500 });
-    expect(testDb.connection.prepare('SELECT is_available FROM timeslots WHERE id = ?').get(timeslotId)).toEqual({
+    expect(testDb.connection.prepare('SELECT is_available FROM timeslots WHERE id = ?').get(timeSlotId)).toEqual({
       is_available: 0,
     });
     expect(notificationRows(testDb)).toEqual([

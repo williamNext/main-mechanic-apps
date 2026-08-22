@@ -67,7 +67,7 @@ function insertAppointment(
     id: string;
     clientId: string;
     mechanicId: string;
-    timeslotId: string | null;
+    timeSlotId: string | null;
     date: string;
     startTime: string;
     endTime: string;
@@ -87,7 +87,7 @@ function insertAppointment(
       id,
       overrides.clientId,
       overrides.mechanicId,
-      overrides.timeslotId === undefined ? null : overrides.timeslotId,
+      overrides.timeSlotId === undefined ? null : overrides.timeSlotId,
       overrides.date ?? '2026-09-01',
       overrides.startTime ?? '09:00:00',
       overrides.endTime ?? '10:00:00',
@@ -305,24 +305,24 @@ describe('DATA-01: full nine-table schema', () => {
     it('rejects a second confirmado appointment on the same timeslot', () => {
       const clientId = insertProfile(testDb, { role: 'client' });
       const mechanicId = insertMechanicWithProfile(testDb);
-      const timeslotId = insertTimeslot(testDb, { mechanicId });
-      insertAppointment(testDb, { clientId, mechanicId, timeslotId, status: 'confirmado' });
+      const timeSlotId = insertTimeslot(testDb, { mechanicId });
+      insertAppointment(testDb, { clientId, mechanicId, timeSlotId, status: 'confirmado' });
 
       const secondClientId = insertProfile(testDb, { role: 'client' });
       expect(() =>
-        insertAppointment(testDb, { clientId: secondClientId, mechanicId, timeslotId, status: 'confirmado' }),
+        insertAppointment(testDb, { clientId: secondClientId, mechanicId, timeSlotId, status: 'confirmado' }),
       ).toThrow();
     });
 
     it('rejects a nao_finalizado appointment reusing a timeslot already held by a confirmado row', () => {
       const clientId = insertProfile(testDb, { role: 'client' });
       const mechanicId = insertMechanicWithProfile(testDb);
-      const timeslotId = insertTimeslot(testDb, { mechanicId });
-      insertAppointment(testDb, { clientId, mechanicId, timeslotId, status: 'confirmado' });
+      const timeSlotId = insertTimeslot(testDb, { mechanicId });
+      insertAppointment(testDb, { clientId, mechanicId, timeSlotId, status: 'confirmado' });
 
       const secondClientId = insertProfile(testDb, { role: 'client' });
       expect(() =>
-        insertAppointment(testDb, { clientId: secondClientId, mechanicId, timeslotId, status: 'nao_finalizado' }),
+        insertAppointment(testDb, { clientId: secondClientId, mechanicId, timeSlotId, status: 'nao_finalizado' }),
       ).toThrow();
     });
 
@@ -366,11 +366,11 @@ describe('DATA-01: full nine-table schema', () => {
     it('allows rebooking a timeslot whose existing appointment is cancelado', () => {
       const clientId = insertProfile(testDb, { role: 'client' });
       const mechanicId = insertMechanicWithProfile(testDb);
-      const timeslotId = insertTimeslot(testDb, { mechanicId });
-      insertAppointment(testDb, { clientId, mechanicId, timeslotId, status: 'cancelado' });
+      const timeSlotId = insertTimeslot(testDb, { mechanicId });
+      insertAppointment(testDb, { clientId, mechanicId, timeSlotId, status: 'cancelado' });
 
       expect(() =>
-        insertAppointment(testDb, { clientId, mechanicId, timeslotId, status: 'confirmado' }),
+        insertAppointment(testDb, { clientId, mechanicId, timeSlotId, status: 'confirmado' }),
       ).not.toThrow();
     });
 
@@ -379,8 +379,8 @@ describe('DATA-01: full nine-table schema', () => {
       const mechanicId = insertMechanicWithProfile(testDb);
 
       expect(() => {
-        insertAppointment(testDb, { clientId, mechanicId, timeslotId: null });
-        insertAppointment(testDb, { clientId, mechanicId, timeslotId: null });
+        insertAppointment(testDb, { clientId, mechanicId, timeSlotId: null });
+        insertAppointment(testDb, { clientId, mechanicId, timeSlotId: null });
       }).not.toThrow();
     });
 

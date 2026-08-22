@@ -169,7 +169,7 @@ export function mechanicsRoutes(app: FastifyInstance, db: Db) {
           .from(appointments)
           .where(
             and(
-              eq(appointments.timeslotId, slot.id),
+              eq(appointments.timeSlotId, slot.id),
               sql`${appointments.status} IN ('confirmado', 'nao_finalizado', 'acabado')`,
             ),
           )
@@ -204,7 +204,7 @@ export function mechanicsRoutes(app: FastifyInstance, db: Db) {
         .from(appointments)
         .where(
           and(
-            eq(appointments.timeslotId, slot.id),
+            eq(appointments.timeSlotId, slot.id),
             sql`${appointments.status} IN ('confirmado', 'nao_finalizado')`,
           ),
         )
@@ -322,7 +322,7 @@ export function mechanicsRoutes(app: FastifyInstance, db: Db) {
         .leftJoin(
           appointments,
           and(
-            eq(appointments.timeslotId, timeslots.id),
+            eq(appointments.timeSlotId, timeslots.id),
             sql`${appointments.status} IN ('confirmado', 'nao_finalizado')`,
           ),
         )

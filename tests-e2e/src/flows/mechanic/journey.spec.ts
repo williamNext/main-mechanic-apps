@@ -133,7 +133,7 @@ test('mechanic publishes availability, sees every slot state, and completes an a
     const bookingResponse = await request.post(`${SERVER_URL}/appointments`, {
       headers: authorization(clientToken),
       data: {
-        timeslotId: bookedSlot.id,
+        timeSlotId: bookedSlot.id,
         vehicleInfo: 'E2E Mechanic Journey Vehicle',
         notes: 'E2E mechanic journey booking',
       },

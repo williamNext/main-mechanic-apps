@@ -147,7 +147,7 @@ export const appointments = sqliteTable(
     mechanicId: text('mechanic_id')
       .notNull()
       .references(() => mechanics.id, { onDelete: 'cascade' }),
-    timeslotId: text('timeslot_id').references(() => timeslots.id, { onDelete: 'set null' }),
+    timeSlotId: text('timeslot_id').references(() => timeslots.id, { onDelete: 'set null' }),
     date: text('date').notNull(),
     startTime: text('start_time').notNull(),
     endTime: text('end_time').notNull(),
@@ -171,8 +171,8 @@ export const appointments = sqliteTable(
     index('appointments_mechanic_date_desc_idx').on(t.mechanicId, desc(t.date)),
     index('appointments_date_status_mechanic_idx').on(desc(t.date), t.status, t.mechanicId),
     uniqueIndex('appointments_one_active_per_timeslot')
-      .on(t.timeslotId)
-      .where(sql`${t.status} IN ('confirmado', 'nao_finalizado') AND ${t.timeslotId} IS NOT NULL`),
+      .on(t.timeSlotId)
+      .where(sql`${t.status} IN ('confirmado', 'nao_finalizado') AND ${t.timeSlotId} IS NOT NULL`),
   ],
 );
 

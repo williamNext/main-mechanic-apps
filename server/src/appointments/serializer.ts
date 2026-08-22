@@ -9,7 +9,7 @@ const appointmentViewColumns = {
   id: appointments.id,
   clientId: appointments.clientId,
   mechanicId: appointments.mechanicId,
-  timeslotId: appointments.timeslotId,
+  timeSlotId: appointments.timeSlotId,
   date: appointments.date,
   startTime: appointments.startTime,
   endTime: appointments.endTime,
@@ -57,7 +57,7 @@ export type AppointmentViewRow = {
   id: string;
   clientId: string;
   mechanicId: string;
-  timeslotId: string | null;
+  timeSlotId: string | null;
   date: string;
   startTime: string;
   endTime: string;

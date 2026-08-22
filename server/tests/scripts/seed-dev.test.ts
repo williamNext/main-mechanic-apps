@@ -160,7 +160,7 @@ describe('seedDev', () => {
       .get();
     const expectedMonth = previousMonth(dateOffset(0));
     expect(appointment).toMatchObject({
-      timeslotId: 'seed-timeslot-completed-previous-month',
+      timeSlotId: 'seed-timeslot-completed-previous-month',
       status: 'acabado',
     });
     expect(appointment?.date.slice(0, 7)).toBe(expectedMonth);
@@ -209,7 +209,7 @@ describe('seedDev', () => {
     expect(appointment).toMatchObject({
       clientId: 'seed-client-2',
       mechanicId: 'seed-mechanic-3',
-      timeslotId: 'seed-timeslot-completed',
+      timeSlotId: 'seed-timeslot-completed',
       status: 'acabado',
       vehicleInfo: 'Volkswagen T-Cross 2021',
     });

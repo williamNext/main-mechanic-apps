@@ -81,7 +81,7 @@ export default function BookMechanicScreen() {
     setBooking(true);
     try {
       const appointment = await book({
-        timeslotId: selectedSlot.id,
+        timeSlotId: selectedSlot.id,
         vehicleInfo: vehicleModel.trim(),
         notes: problemDescription.trim(),
       });

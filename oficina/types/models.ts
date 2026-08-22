@@ -45,7 +45,7 @@ export interface Appointment {
   mechanicId: string;
   mechanicName?: string;
   mechanicPhone?: string;
-  timeslotId: string | null;
+  timeSlotId: string | null;
   date: string;
   startTime: string;
   endTime: string;

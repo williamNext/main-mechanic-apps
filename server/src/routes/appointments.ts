@@ -35,7 +35,7 @@ const NullableTrimmedString = (max: number) =>
 
 const BookAppointmentSchema = z
   .object({
-    timeslotId: z.string().trim().min(1),
+    timeSlotId: z.string().trim().min(1),
     vehicleInfo: NullableTrimmedString(120),
     notes: NullableTrimmedString(1000),
   })
@@ -215,7 +215,7 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
             .from(timeslots)
             .innerJoin(mechanics, eq(mechanics.id, timeslots.mechanicId))
             .innerJoin(profiles, eq(profiles.id, timeslots.mechanicId))
-            .where(eq(timeslots.id, parsed.data.timeslotId))
+            .where(eq(timeslots.id, parsed.data.timeSlotId))
             .get();
 
           if (!slot) {
@@ -245,7 +245,7 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
               id: randomUUID(),
               clientId: request.user!.sub,
               mechanicId: slot.mechanicId,
-              timeslotId: slot.id,
+              timeSlotId: slot.id,
               date: slot.date,
               startTime: slot.startTime,
               endTime: slot.endTime,
@@ -358,8 +358,8 @@ export function appointmentRoutes(app: FastifyInstance, db: Db) {
         }
 
         tx.update(appointments).set({ status: 'cancelado' }).where(eq(appointments.id, row.id)).run();
-        if (row.timeslotId !== null) {
-          tx.update(timeslots).set({ isAvailable: true }).where(eq(timeslots.id, row.timeslotId)).run();
+        if (row.timeSlotId !== null) {
+          tx.update(timeslots).set({ isAvailable: true }).where(eq(timeslots.id, row.timeSlotId)).run();
         }
         tx.insert(notifications)
           .values({

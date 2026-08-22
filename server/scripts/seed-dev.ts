@@ -156,7 +156,7 @@ function upsertAppointment(
     id: string;
     clientId: string;
     mechanicId: string;
-    timeslotId: string;
+    timeSlotId: string;
     date: string;
     startTime: string;
     endTime: string;
@@ -236,9 +236,9 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
 
       dates.forEach((date, dayIndex) => {
         SLOTS_PER_DAY.forEach((slot, slotIndex) => {
-          const timeslotId = `seed-timeslot-${i}-${dayIndex}-${slotIndex}`;
+          const timeSlotId = `seed-timeslot-${i}-${dayIndex}-${slotIndex}`;
           upsertTimeslot(tx, {
-            id: timeslotId,
+            id: timeSlotId,
             mechanicId: mechanic.id,
             date,
             startTime: slot.start,
@@ -271,7 +271,7 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       id: 'seed-appointment-confirmado',
       clientId: CLIENT_SEED.id,
       mechanicId: MECHANIC_SEEDS[0].id,
-      timeslotId: 'seed-timeslot-0-0-0',
+      timeSlotId: 'seed-timeslot-0-0-0',
       date: dates[0],
       startTime: '09:00',
       endTime: '10:00',
@@ -283,7 +283,7 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       id: 'seed-appointment-nao-finalizado',
       clientId: CLIENT_SEED.id,
       mechanicId: MECHANIC_SEEDS[1].id,
-      timeslotId: activePastTimeslot.id,
+      timeSlotId: activePastTimeslot.id,
       date: pastDate,
       startTime: '09:00',
       endTime: '10:00',
@@ -295,7 +295,7 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       id: 'seed-appointment-cancelado',
       clientId: CLIENT_SEED.id,
       mechanicId: MECHANIC_SEEDS[0].id,
-      timeslotId: 'seed-timeslot-0-0-1',
+      timeSlotId: 'seed-timeslot-0-0-1',
       date: dates[0],
       startTime: '10:00',
       endTime: '11:00',
@@ -307,7 +307,7 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       id: 'seed-appointment-acabado',
       clientId: SECOND_CLIENT_SEED.id,
       mechanicId: MECHANIC_SEEDS[2].id,
-      timeslotId: completedTimeslot.id,
+      timeSlotId: completedTimeslot.id,
       date: completedTimeslot.date,
       startTime: completedTimeslot.startTime,
       endTime: completedTimeslot.endTime,
@@ -320,7 +320,7 @@ export async function seedDev(db: Db): Promise<SeedDevResult> {
       id: 'seed-appointment-acabado-previous-month',
       clientId: CLIENT_SEED.id,
       mechanicId: MECHANIC_SEEDS[0].id,
-      timeslotId: previousMonthCompletedTimeslot.id,
+      timeSlotId: previousMonthCompletedTimeslot.id,
       date: previousMonthCompletedTimeslot.date,
       startTime: previousMonthCompletedTimeslot.startTime,
       endTime: previousMonthCompletedTimeslot.endTime,

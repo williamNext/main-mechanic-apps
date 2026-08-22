@@ -40,7 +40,7 @@ export interface Appointment {
   mechanicId: string;
   mechanicName?: string;
   mechanicPhone?: string;
-  timeslotId: string;
+  timeSlotId: string;
   date: string;
   startTime: string;
   endTime: string;

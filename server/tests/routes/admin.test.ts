@@ -233,7 +233,7 @@ function insertAppointmentFixture(
     revenueCents?: number;
     startTime?: string;
     endTime?: string;
-    timeslotId?: string;
+    timeSlotId?: string;
     vehicleInfo?: string;
     notes?: string;
   },
@@ -248,7 +248,7 @@ function insertAppointmentFixture(
       input.id,
       input.clientId,
       input.mechanicId,
-      input.timeslotId ?? null,
+      input.timeSlotId ?? null,
       input.date,
       input.startTime ?? '09:00',
       input.endTime ?? '10:00',
@@ -1298,7 +1298,7 @@ describe('POST /admin/mechanics/deactivate', () => {
         id: fixture.id,
         clientId,
         mechanicId,
-        timeslotId: fixture.slotId,
+        timeSlotId: fixture.slotId,
         date: fixture.date,
         startTime: fixture.startTime,
         endTime: `${String(Number(fixture.startTime.slice(0, 2)) + 1).padStart(2, '0')}:${fixture.startTime.slice(3)}`,
@@ -1391,7 +1391,7 @@ describe('POST /admin/mechanics/deactivate', () => {
       method: 'POST',
       url: '/appointments',
       headers: { authorization: `Bearer ${clientToken}` },
-      payload: { timeslotId: 'still-free-slot' },
+      payload: { timeSlotId: 'still-free-slot' },
     });
     expect(booking.statusCode).toBe(409);
     expect(booking.json()).toEqual({ error: 'mechanic unavailable', code: 'MECHANIC_UNAVAILABLE' });
@@ -1402,7 +1402,7 @@ describe('POST /admin/mechanics/deactivate', () => {
     const clientId = insertProfile(testDb, { id: 'rollback-client', role: 'client' });
     insertSlot('rollback-slot', mechanicId, '2099-10-01', '09:00');
     insertAppointmentFixture(testDb, {
-      id: 'rollback-appointment', clientId, mechanicId, timeslotId: 'rollback-slot', date: '2099-10-01',
+      id: 'rollback-appointment', clientId, mechanicId, timeSlotId: 'rollback-slot', date: '2099-10-01',
       status: 'confirmado',
     });
     testDb.connection.exec(`
@@ -1506,7 +1506,7 @@ describe('POST /admin/mechanics/:id/reactivate', () => {
     const mechanicId = insertMechanicFixture(testDb, { id: 'one-way-mechanic', name: 'One Way', isActive: false });
     const clientId = insertProfile(testDb, { id: 'one-way-client', role: 'client' });
     insertAppointmentFixture(testDb, {
-      id: 'stays-canceled', clientId, mechanicId, date: '2099-09-01', status: 'cancelado', timeslotId: undefined,
+      id: 'stays-canceled', clientId, mechanicId, date: '2099-09-01', status: 'cancelado', timeSlotId: undefined,
     });
 
     const response = await reactivate(mechanicId);

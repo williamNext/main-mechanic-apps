@@ -117,7 +117,7 @@ const adminAppointmentColumns = {
   mechanicName: sql<string | null>`(select name from ${profiles} where ${profiles.id} = ${appointments.mechanicId})`,
   mechanicPhone: sql<string | null>`(select phone from ${profiles} where ${profiles.id} = ${appointments.mechanicId})`,
   specialty: sql<string | null>`(select specialty from ${mechanics} where ${mechanics.id} = ${appointments.mechanicId})`,
-  timeSlotId: appointments.timeslotId,
+  timeSlotId: appointments.timeSlotId,
   date: appointments.date,
   startTime: appointments.startTime,
   endTime: appointments.endTime,
@@ -545,7 +545,7 @@ export function adminRoutes(app: FastifyInstance, db: Db) {
         clientName: sql<string | null>`(select name from ${profiles} where ${profiles.id} = ${appointments.clientId})`,
         clientPhone: sql<string | null>`(select phone from ${profiles} where ${profiles.id} = ${appointments.clientId})`,
         mechanicId: appointments.mechanicId,
-        timeSlotId: appointments.timeslotId,
+        timeSlotId: appointments.timeSlotId,
         date: appointments.date,
         startTime: appointments.startTime,
         endTime: appointments.endTime,
@@ -683,7 +683,7 @@ export function adminRoutes(app: FastifyInstance, db: Db) {
                 id: appointments.id,
                 clientId: appointments.clientId,
                 mechanicId: appointments.mechanicId,
-                timeslotId: appointments.timeslotId,
+                timeSlotId: appointments.timeSlotId,
                 date: appointments.date,
                 startTime: appointments.startTime,
               })
@@ -699,16 +699,16 @@ export function adminRoutes(app: FastifyInstance, db: Db) {
 
       if (cancellableAppointments.length > 0) {
         const appointmentIds = cancellableAppointments.map((appointment) => appointment.id);
-        const timeslotIds = cancellableAppointments.flatMap((appointment) =>
-          appointment.timeslotId === null ? [] : [appointment.timeslotId],
+        const timeSlotIds = cancellableAppointments.flatMap((appointment) =>
+          appointment.timeSlotId === null ? [] : [appointment.timeSlotId],
         );
 
         tx.update(appointments)
           .set({ status: 'cancelado' })
           .where(inArray(appointments.id, appointmentIds))
           .run();
-        if (timeslotIds.length > 0) {
-          tx.update(timeslots).set({ isAvailable: true }).where(inArray(timeslots.id, timeslotIds)).run();
+        if (timeSlotIds.length > 0) {
+          tx.update(timeslots).set({ isAvailable: true }).where(inArray(timeslots.id, timeSlotIds)).run();
         }
 
         const mechanicNames = new Map(activeMechanics.map((mechanic) => [mechanic.id, mechanic.name]));

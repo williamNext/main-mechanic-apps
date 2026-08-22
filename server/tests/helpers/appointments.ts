@@ -73,7 +73,7 @@ export function insertAppointment(
     id: string;
     clientId: string;
     mechanicId: string;
-    timeslotId: string | null;
+    timeSlotId: string | null;
     date: string;
     startTime: string;
     endTime: string;
@@ -93,7 +93,7 @@ export function insertAppointment(
       id,
       overrides.clientId,
       overrides.mechanicId,
-      overrides.timeslotId === undefined ? null : overrides.timeslotId,
+      overrides.timeSlotId === undefined ? null : overrides.timeSlotId,
       overrides.date ?? '2026-09-01',
       overrides.startTime ?? '09:00',
       overrides.endTime ?? '10:00',
