@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { ChevronRight, Clock3 } from 'lucide-react-native';
-import { Mechanic } from '@/types/models';
+import { Mechanic } from '@main-mechanic/types';
 import { AppCard } from '@/components/app/AppCard';
 import { Avatar } from '@/components/app/Avatar';
 import { Badge } from '@/components/app/Badge';

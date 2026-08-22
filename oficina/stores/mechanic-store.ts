@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { PublicMechanic } from '@/types/models';
+import { PublicMechanic } from '@main-mechanic/types';
 import * as mechanicService from '@/services/mechanic-service';
 
 const MECHANICS_CACHE_TTL_MS = 5 * 60 * 1000;

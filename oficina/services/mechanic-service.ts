@@ -1,5 +1,5 @@
 import { isApiError, request } from '@main-mechanic/wire-client';
-import { PublicMechanic } from '@/types/models';
+import { PublicMechanic } from '@main-mechanic/types';
 
 export async function getAllMechanics(): Promise<PublicMechanic[]> {
   return request<PublicMechanic[]>('/mechanics');

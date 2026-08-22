@@ -10,7 +10,7 @@ import { TopAppBar } from '@/components/ui/TopAppBar';
 import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotificationStore } from '@/stores/notification-store';
-import { AppNotification } from '@/types/models';
+import { AppNotification } from '@main-mechanic/types';
 
 function formatCreatedAt(value: string) {
   return formatDistanceToNow(parseISO(value), { addSuffix: true, locale: ptBR });

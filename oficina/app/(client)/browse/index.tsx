@@ -14,7 +14,7 @@ import { InputField } from '@/components/ui/InputField';
 import { TopAppBar } from '@/components/ui/TopAppBar';
 import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useMechanicStore } from '@/stores/mechanic-store';
-import { PublicMechanic } from '@/types/models';
+import { PublicMechanic } from '@main-mechanic/types';
 import { getInitials } from '@/utils/format';
 
 export default function BrowseMechanicsScreen() {

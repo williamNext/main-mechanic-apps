@@ -1,5 +1,5 @@
 import { useAuthStore } from '@/stores/auth-store';
-import { Role } from '@/types/models';
+import { Role } from '@main-mechanic/types';
 
 export function useAuth() {
   const {

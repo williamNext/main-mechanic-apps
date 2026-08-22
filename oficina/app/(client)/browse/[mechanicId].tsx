@@ -24,7 +24,7 @@ import { useAppointmentStore } from '@/stores/appointment-store';
 import { useMechanicStore } from '@/stores/mechanic-store';
 import { useTimeSlotStore } from '@/stores/timeslot-store';
 import { getApiErrorMessage, isApiError } from '@main-mechanic/wire-client';
-import { PublicMechanic, TimeSlot } from '@/types/models';
+import { PublicMechanic, TimeSlot } from '@main-mechanic/types';
 import { getNextDays } from '@/utils/date';
 import { getInitials } from '@/utils/format';
 

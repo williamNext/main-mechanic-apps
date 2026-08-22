@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Appointment } from '@/types/models';
+import { Appointment, BookAppointmentInput } from '@main-mechanic/types';
 import * as appointmentService from '@/services/appointment-service';
 import { useNotificationStore } from '@/stores/notification-store';
 import { useTimeSlotStore } from '@/stores/timeslot-store';
@@ -14,7 +14,7 @@ interface AppointmentState {
 
   fetchByClient: () => Promise<void>;
   fetchById: (id: string) => Promise<void>;
-  book: (data: appointmentService.BookAppointmentInput) => Promise<Appointment>;
+  book: (data: BookAppointmentInput) => Promise<Appointment>;
   cancelByClient: (id: string) => Promise<void>;
 }
 

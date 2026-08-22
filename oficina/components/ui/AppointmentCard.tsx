@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Appointment } from '@/types/models';
+import { Appointment } from '@main-mechanic/types';
 import { colors, radius, shadow, spacing, statusTheme, StatusLabels, typography } from '@main-mechanic/theme';
 import { formatDate, formatTimeRange } from '@/utils/date';
 import { getInitials } from '@/utils/format';

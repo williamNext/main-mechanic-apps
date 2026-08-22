@@ -1,12 +1,7 @@
 import { clearStoredToken, getStoredToken, isApiError, request, setStoredToken } from '@main-mechanic/wire-client';
-import { User } from '@/types/models';
+import { AuthResponse, ProfileUserResponse } from '@main-mechanic/types';
 
-interface AuthResponse {
-  token: string;
-  user: User;
-}
-
-export async function login(email: string, password: string): Promise<User> {
+export async function login(email: string, password: string): Promise<ProfileUserResponse> {
   const { token, user } = await request<AuthResponse>('/auth/login', {
     method: 'POST',
     body: { email, password },
@@ -16,7 +11,7 @@ export async function login(email: string, password: string): Promise<User> {
   return user;
 }
 
-export async function signUp(name: string, email: string, password: string): Promise<User> {
+export async function signUp(name: string, email: string, password: string): Promise<ProfileUserResponse> {
   const { token, user } = await request<AuthResponse>('/auth/signup', {
     method: 'POST',
     body: { name, email, password },
@@ -40,12 +35,12 @@ export async function logout(): Promise<void> {
   }
 }
 
-export async function getCurrentSessionUser(): Promise<User | null> {
+export async function getCurrentSessionUser(): Promise<ProfileUserResponse | null> {
   const token = await getStoredToken();
   if (!token) return null;
 
   try {
-    return await request<User>('/auth/me', { token });
+    return await request<ProfileUserResponse>('/auth/me', { token });
   } catch (error) {
     if (isApiError(error) && error.status === 401) {
       return null;

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { AppNotification } from '@/types/models';
+import { AppNotification } from '@main-mechanic/types';
 import * as notificationService from '@/services/notification-service';
 
 interface NotificationState {

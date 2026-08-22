@@ -1,11 +1,5 @@
-import { Appointment } from '@/types/models';
+import { Appointment, BookAppointmentInput } from '@main-mechanic/types';
 import { isApiError, request } from '@main-mechanic/wire-client';
-
-export interface BookAppointmentInput {
-  timeSlotId: string;
-  vehicleInfo?: string;
-  notes?: string;
-}
 
 export async function getAppointmentsByClient(): Promise<Appointment[]> {
   return request<Appointment[]>('/appointments');

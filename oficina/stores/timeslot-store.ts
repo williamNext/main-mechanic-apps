@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TimeSlot } from '@/types/models';
+import { TimeSlot } from '@main-mechanic/types';
 import * as timeslotService from '@/services/timeslot-service';
 
 const TIMESLOTS_CACHE_TTL_MS = 60 * 1000;
