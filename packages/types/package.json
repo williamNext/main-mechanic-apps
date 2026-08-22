@@ -1,5 +1,5 @@
 {
-  "name": "@main-mechanic/theme",
+  "name": "@main-mechanic/types",
   "version": "0.1.0",
   "private": true,
   "main": "src/index.ts",
@@ -8,12 +8,11 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit --skipLibCheck",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
   },
   "devDependencies": {
-    "@main-mechanic/types": "0.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2",
