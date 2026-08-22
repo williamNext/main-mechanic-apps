@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as authService from '@/services/auth-service';
-import { AdminUser, Role } from '@/types/models';
+import { AdminUser, Role } from '@main-mechanic/types';
 
 interface AuthState {
   user: AdminUser | null;

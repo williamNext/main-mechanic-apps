@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AdminFilters, AppointmentStatus } from '@/types/models';
+import { AdminFilters, AppointmentStatus } from '@main-mechanic/types';
 
 const appointmentStatus = z.enum(['all', 'confirmado', 'nao_finalizado', 'cancelado', 'acabado']);
 

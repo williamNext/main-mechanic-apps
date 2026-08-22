@@ -18,7 +18,7 @@ import {
 import { appointmentStatusOptions } from '@/features/admin/filter-utils';
 import * as adminService from '@/services/admin-service';
 import { useAdminStore } from '@/stores/admin-store';
-import { AdminMechanicRow } from '@/types/models';
+import { AdminMechanicRow } from '@main-mechanic/types';
 import { appointmentsToCsv, downloadCsv } from '@/utils/csv';
 import { formatDateDisplay } from '@/utils/date';
 

@@ -1,12 +1,7 @@
 import { clearStoredToken, getStoredToken, isApiError, request, setStoredToken } from '@main-mechanic/wire-client';
-import { AdminUser, User } from '@/types/models';
+import { AdminUser, AuthResponse, ProfileUserResponse } from '@main-mechanic/types';
 
-interface AuthResponse {
-  token: string;
-  user: User;
-}
-
-async function requireAdmin(user: User): Promise<AdminUser> {
+async function requireAdmin(user: ProfileUserResponse): Promise<AdminUser> {
   if (user.role !== 'admin') {
     await clearStoredToken();
     throw new Error('Acesso administrativo obrigatório');
@@ -47,7 +42,7 @@ export async function getCurrentSessionUser(): Promise<AdminUser | null> {
   if (!token) return null;
 
   try {
-    const user = await request<User>('/auth/me', { token });
+    const user = await request<ProfileUserResponse>('/auth/me', { token });
     return await requireAdmin(user);
   } catch (error) {
     if (isApiError(error) && error.status === 401) return null;

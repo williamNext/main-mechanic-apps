@@ -9,9 +9,10 @@ import {
   AdminFilters,
   AdminMechanicDetail,
   AdminMechanicRow,
+  CreateMechanicInput,
   DeactivateMechanicsResult,
   PaginatedResult,
-} from '@/types/models';
+} from '@main-mechanic/types';
 
 type LoadKey =
   | 'dashboard'
@@ -42,14 +43,7 @@ interface AdminState {
   fetchMechanicDetail: (mechanicId: string) => Promise<void>;
   deactivateMechanics: (mechanicIds: string[]) => Promise<DeactivateMechanicsResult | null>;
   reactivateMechanic: (mechanicId: string) => Promise<boolean>;
-  createMechanic: (params: {
-    name: string;
-    phone: string;
-    email: string;
-    password: string;
-    specialty: string;
-    credentials: string;
-  }) => Promise<boolean>;
+  createMechanic: (params: CreateMechanicInput) => Promise<boolean>;
   clearError: () => void;
 }
 

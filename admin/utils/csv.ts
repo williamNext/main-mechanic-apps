@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { AdminAppointmentRow, AdminFinancialReport, AdminMechanicRow } from '@/types/models';
+import { AdminAppointmentRow, AdminFinancialReport, AdminMechanicRow } from '@main-mechanic/types';
 import { formatDateDisplay } from '@/utils/date';
 
 function cell(value: unknown): string {

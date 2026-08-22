@@ -2,13 +2,16 @@ import { request } from '@main-mechanic/wire-client';
 import {
   AdminAppointmentRow,
   AdminDashboardSummary,
+  AdminFilterQuery,
   AdminFinancialReport,
   AdminFilters,
   AdminMechanicDetail,
   AdminMechanicRow,
+  CreateMechanicInput,
+  DeactivateMechanicsInput,
   DeactivateMechanicsResult,
   PaginatedResult,
-} from '@/types/models';
+} from '@main-mechanic/types';
 
 function normalizePhoneToE164(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -19,46 +22,51 @@ function normalizePhoneToE164(phone: string): string {
 }
 
 export async function fetchDashboardSummary(filters: Pick<AdminFilters, 'from' | 'to'>) {
-  const query = new URLSearchParams({ from: filters.from, to: filters.to });
+  const filterQuery = { from: filters.from, to: filters.to } satisfies AdminFilterQuery;
+  const query = new URLSearchParams(filterQuery);
   return request<AdminDashboardSummary>(`/admin/dashboard?${query.toString()}`);
 }
 
 export async function fetchMechanics(filters: Pick<AdminFilters, 'search' | 'page' | 'pageSize'>) {
-  const query = new URLSearchParams({
+  const filterQuery = {
     search: filters.search,
     page: String(filters.page),
     pageSize: String(filters.pageSize),
-  });
+  } satisfies AdminFilterQuery;
+  const query = new URLSearchParams(filterQuery);
   return request<PaginatedResult<AdminMechanicRow>>(`/admin/mechanics?${query.toString()}`);
 }
 
 export async function fetchAppointments(filters: AdminFilters) {
-  const query = new URLSearchParams({
+  const filterQuery = {
     from: filters.from,
     to: filters.to,
     status: filters.status,
     search: filters.search,
     page: String(filters.page),
     pageSize: String(filters.pageSize),
-  });
+  } satisfies AdminFilterQuery;
+  const query = new URLSearchParams(filterQuery);
   if (filters.mechanicId) query.set('mechanicId', filters.mechanicId);
 
   return request<PaginatedResult<AdminAppointmentRow>>(`/admin/appointments?${query.toString()}`);
 }
 
 export async function fetchFinancialReport(filters: Pick<AdminFilters, 'from' | 'to' | 'mechanicId' | 'search'>) {
-  const query = new URLSearchParams({
+  const filterQuery = {
     from: filters.from,
     to: filters.to,
     search: filters.search,
-  });
+  } satisfies AdminFilterQuery;
+  const query = new URLSearchParams(filterQuery);
   if (filters.mechanicId) query.set('mechanicId', filters.mechanicId);
 
   return request<AdminFinancialReport>(`/admin/finance?${query.toString()}`);
 }
 
 export async function fetchMechanicDetail(mechanicId: string, filters: Pick<AdminFilters, 'from' | 'to'>) {
-  const query = new URLSearchParams({ from: filters.from, to: filters.to });
+  const filterQuery = { from: filters.from, to: filters.to } satisfies AdminFilterQuery;
+  const query = new URLSearchParams(filterQuery);
   return request<AdminMechanicDetail>(`/admin/mechanics/${encodeURIComponent(mechanicId)}?${query.toString()}`);
 }
 
@@ -71,18 +79,11 @@ export async function deactivateMechanics(mechanicIds: string[]) {
 
   return request<DeactivateMechanicsResult>('/admin/mechanics/deactivate', {
     method: 'POST',
-    body: { mechanicIds: ids },
+    body: { mechanicIds: ids } satisfies DeactivateMechanicsInput,
   });
 }
 
-export async function createMechanic(params: {
-  name: string;
-  phone: string;
-  email: string;
-  password: string;
-  specialty: string;
-  credentials: string;
-}) {
+export async function createMechanic(params: CreateMechanicInput) {
   return request<AdminMechanicRow>('/admin/mechanics', {
     method: 'POST',
     body: {

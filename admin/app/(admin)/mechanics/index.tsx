@@ -15,7 +15,7 @@ import {
   StatusPill,
 } from '@/components/ui/AdminControls';
 import { useAdminStore } from '@/stores/admin-store';
-import { DeactivateMechanicsResult } from '@/types/models';
+import { DeactivateMechanicsResult } from '@main-mechanic/types';
 import { downloadCsv, mechanicsToCsv } from '@/utils/csv';
 import { formatDateDisplay } from '@/utils/date';
 import { formatPhone } from '@/utils/format';
