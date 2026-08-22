@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TimeSlot } from '@/types/models';
+import { TimeSlot } from '@main-mechanic/types';
 import { BorderRadius, FontSize, FontWeight, Spacing, Shadow , useAppTheme } from '@main-mechanic/theme';
 
 interface TimeSlotPickerProps {

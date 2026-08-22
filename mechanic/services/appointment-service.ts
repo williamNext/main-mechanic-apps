@@ -1,7 +1,5 @@
-import { Appointment, CompleteAppointmentInput } from '@/types/models';
+import { Appointment, CompleteAppointmentInput } from '@main-mechanic/types';
 import { isApiError, request } from '@main-mechanic/wire-client';
-
-export type { CompleteAppointmentInput };
 
 export async function getAppointmentsByMechanic(): Promise<Appointment[]> {
   return request<Appointment[]>('/appointments');

@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { isApiError } from '@main-mechanic/wire-client';
-import { User, Mechanic, Role } from '@/types/models';
+import { Mechanic, ProfileUserResponse, Role } from '@main-mechanic/types';
 import * as authService from '@/services/auth-service';
 import * as mechanicService from '@/services/mechanic-service';
 
 interface AuthState {
-  user: User | Mechanic | null;
+  user: ProfileUserResponse | null;
   isLoading: boolean;
   isBootstrappingSession: boolean;
   isAuthActionLoading: boolean;
@@ -17,7 +17,7 @@ interface AuthState {
   loginByEmail: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (data: Pick<Mechanic, 'name' | 'specialty'>) => Promise<void>;
-  setUser: (user: User | Mechanic | null) => void;
+  setUser: (user: ProfileUserResponse | null) => void;
   setBootstrappingSession: (isBootstrappingSession: boolean) => void;
 }
 

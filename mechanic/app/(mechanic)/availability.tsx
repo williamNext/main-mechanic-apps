@@ -7,7 +7,7 @@ import { AppInput } from '@/components/app/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTimeSlotStore } from '@/stores/timeslot-store';
-import { TimeSlot } from '@/types/models';
+import { TimeSlot } from '@main-mechanic/types';
 import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { formatDateFull, formatTimeRange, toISODate } from '@/utils/date';
 

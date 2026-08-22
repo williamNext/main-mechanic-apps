@@ -5,7 +5,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, radius, shadow, spacing, typography } from '@main-mechanic/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotificationStore } from '@/stores/notification-store';
-import { AppNotification } from '@/types/models';
+import { AppNotification } from '@main-mechanic/types';
 
 function formatCreatedAt(value: string) {
   return new Intl.DateTimeFormat('pt-BR', {

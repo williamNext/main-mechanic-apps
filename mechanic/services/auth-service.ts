@@ -1,12 +1,7 @@
 import { request, getStoredToken, setStoredToken, clearStoredToken, isApiError } from '@main-mechanic/wire-client';
-import { User, Mechanic } from '@/types/models';
+import { AuthResponse, ProfileUserResponse } from '@main-mechanic/types';
 
-interface AuthResponse {
-  token: string;
-  user: User | Mechanic;
-}
-
-export async function login(email: string, password: string): Promise<User | Mechanic> {
+export async function login(email: string, password: string): Promise<ProfileUserResponse> {
   const { token, user } = await request<AuthResponse>('/auth/login', {
     method: 'POST',
     body: { email, password },
@@ -30,12 +25,12 @@ export async function logout(): Promise<void> {
   }
 }
 
-export async function getCurrentSessionUser(): Promise<User | Mechanic | null> {
+export async function getCurrentSessionUser(): Promise<ProfileUserResponse | null> {
   const token = await getStoredToken();
   if (!token) return null;
 
   try {
-    return await request<User | Mechanic>('/auth/me', { token });
+    return await request<ProfileUserResponse>('/auth/me', { token });
   } catch (error) {
     if (isApiError(error) && error.status === 401) {
       return null;

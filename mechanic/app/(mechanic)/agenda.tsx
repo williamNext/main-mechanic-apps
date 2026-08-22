@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CalendarDays, Clock3, Phone, UserRound } from 'lucide-react-native';
-import { Appointment } from '@/types/models';
+import { Appointment } from '@main-mechanic/types';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAppointmentStore } from '@/stores/appointment-store';
 import { colors, radius, shadow, spacing, statusTheme, typography } from '@main-mechanic/theme';

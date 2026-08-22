@@ -1,11 +1,5 @@
-import { TimeSlot } from '@/types/models';
+import { CreateTimeSlotInput, TimeSlot, UpdateTimeSlotInput } from '@main-mechanic/types';
 import { request } from '@main-mechanic/wire-client';
-
-export interface CreateTimeSlotInput {
-  date: string;
-  startTime: string;
-  endTime: string;
-}
 
 export async function getSlotsByMechanic(
   mechanicId: string,
@@ -26,7 +20,7 @@ export async function createSlot(slot: CreateTimeSlotInput | CreateTimeSlotInput
 export async function updateSlotAvailability(id: string, isAvailable: boolean): Promise<TimeSlot> {
   return request<TimeSlot>(`/timeslots/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: { isAvailable },
+    body: { isAvailable } satisfies UpdateTimeSlotInput,
   });
 }
 

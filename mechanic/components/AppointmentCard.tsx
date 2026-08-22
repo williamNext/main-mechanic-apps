@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Appointment } from '@/types/models';
+import { Appointment } from '@main-mechanic/types';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
 import { FontSize, FontWeight, Spacing , useAppTheme } from '@main-mechanic/theme';

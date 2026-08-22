@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Appointment } from '@/types/models';
+import { Appointment, CompleteAppointmentInput } from '@main-mechanic/types';
 import * as appointmentService from '@/services/appointment-service';
 import { useNotificationStore } from '@/stores/notification-store';
 import { useTimeSlotStore } from '@/stores/timeslot-store';
@@ -15,7 +15,7 @@ interface AppointmentState {
   fetchByMechanic: () => Promise<void>;
   fetchById: (id: string) => Promise<void>;
   cancelByMechanic: (id: string) => Promise<void>;
-  completeByMechanic: (data: appointmentService.CompleteAppointmentInput) => Promise<void>;
+  completeByMechanic: (data: CompleteAppointmentInput) => Promise<void>;
 }
 
 export const useAppointmentStore = create<AppointmentState>((set) => ({
