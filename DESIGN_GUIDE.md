@@ -12,7 +12,7 @@
 > against the code and survived two review passes. The **counts** in §1 and §5 are point-in-time
 > measurements — re-derive them with the grep in §1 rather than trusting them. §6's component
 > inventory covers `oficina`/`mechanic` only; `admin` has no equivalent set (§5).
-> If this guide and `constants/theme.ts` disagree, the code wins.
+> If this guide and `packages/theme`'s `src/theme.ts` disagree, the code wins.
 
 ---
 
@@ -42,9 +42,9 @@ Three apps, three copies of the design system:
 
 | App | Role | Design source | Token discipline |
 |---|---|---|---|
-| `oficina/` | client-facing, mobile-first | `constants/theme.ts` | ✅ good — 1 hard-coded hex in all of `app/` + `components/` |
-| `mechanic/` | mechanic, mobile-first | `constants/theme.ts` (effectively identical to oficina) | ✅ good — 1 hard-coded hex |
-| `admin/` | admin panel, desktop-first web | `constants/theme.ts` exists **but is largely bypassed** | ❌ poor — **208 hard-coded hexes** in `app/` + `components/` |
+| `oficina/` | client-facing, mobile-first | `@main-mechanic/theme` (`packages/theme`) | ✅ good — 1 hard-coded hex in all of `app/` + `components/` |
+| `mechanic/` | mechanic, mobile-first | `@main-mechanic/theme` (same package, same tokens) | ✅ good — 1 hard-coded hex |
+| `admin/` | admin panel, desktop-first web | `@main-mechanic/theme` exists **but is largely bypassed** | ❌ poor — **219 hard-coded hexes** in `app/` + `components/` |
 
 Counts above were measured on 2026-08-10. Re-derive them at any time with:
 
@@ -59,9 +59,12 @@ literal in these files (a `{3,8}` variant returns the identical 1 / 1 / 208), bu
 3-digit (`#fff`) or 8-digit alpha forms if any were introduced. The runtime `color + '1A'`
 alpha-suffix pattern (§6.1) is never matched by any of these greps.
 
-There is **no shared design package**. `constants/theme.ts` is copy-pasted between repos. A token
-change is **three edits in three git repos**, and they can silently drift (they already have —
-see §3.6).
+**`@main-mechanic/theme` (`packages/theme`) is the shared design package**, since Phase 4
+(`D-AN`). A token change is **one edit**, checked by the package's own typecheck/lint/test and
+consumed by all three apps through one workspace dependency. No app declares `constants/theme.ts`
+any more — the copy-and-drift failure mode this section used to describe (one real instance was
+found and closed before extraction: two `letterSpacing` values, see §3.4) can no longer happen,
+because there is only one file left to drift from.
 
 Everything is React Native `StyleSheet` (via `react-native-web` on web). There is no Tailwind, no
 CSS-in-JS library, no styled-components, no NativeWind.
@@ -71,23 +74,32 @@ CSS-in-JS library, no styled-components, no NativeWind.
 ## 2. Where design lives
 
 ```
+packages/theme/
+  src/theme.ts          ★ THE design token file — colors, spacing, radius, typography,
+                          shadows, status theme, layout metrics. Change design HERE.
+  src/use-theme.ts       useAppTheme() → { colors, theme }   ← currently HARD-LOCKED to 'light'
+  src/index.ts            barrel — all 17 exported names, this package's only public surface
+
 <app>/
-  constants/theme.ts     ★ THE design token file — colors, spacing, radius, typography,
-                           shadows, status theme, layout metrics. Change design HERE.
-  hooks/
-    use-theme.ts         useAppTheme() → { colors, theme }   ← currently HARD-LOCKED to 'light'
-    use-theme-color.ts   useThemeColor({light,dark}, name)   ← respects the OS scheme
-    use-color-scheme.ts  re-export of RN useColorScheme (+ .web variant)
+  app/**/*.tsx           Screens: local StyleSheet blocks that consume the tokens, imported
+                          from `@main-mechanic/theme`
   components/
     ui/                  Generation-1 primitives (the ones screens actually use)
     app/                 Generation-2 primitives (AppButton, AppCard, AppInput, Avatar,
                          Badge, ScreenContainer) — partially adopted
-    themed-text.tsx      Expo-template leftovers, barely used
-    themed-view.tsx
-  app/**/*.tsx           Screens: local StyleSheet blocks that consume the tokens
   assets/images/         icon, splash, adaptive icons, favicon
   app.json               splash screen config, adaptive icon colors, userInterfaceStyle
 ```
+
+Since Phase 4 (`D-AN`, `D-AO`), no app has its own `constants/theme.ts`, `hooks/use-theme.ts`, or
+`hooks/use-theme-color.ts` — every screen imports `colors`, `spacing`, `radius`, `typography`,
+`shadow`, `statusTheme`, `StatusLabels`, `useAppTheme`, and the rest directly from
+`@main-mechanic/theme`. `hooks/use-color-scheme.ts` and the Expo-template leftovers
+(`themed-text.tsx`, `themed-view.tsx`, `components/ui/collapsible.tsx`,
+`components/ui/icon-symbol*.tsx`) are deleted outright in every app, not moved — `useAppTheme` was
+the only live accessor on that seam. See `PROJECT_CONTEXT.md` §10.3 `D-AO` for the full 22-file
+list and [ADR 0002](docs/adr/0002-npm-workspaces-shared-wire-client.md) for why the package
+mechanism is npm workspaces, not a build step or a sync script.
 
 **`admin/` has a different tree.** It has **no generation-1 `components/ui/` set** — only:
 
@@ -111,8 +123,8 @@ component to change.
 
 ## 3. Design tokens reference
 
-All from `oficina/constants/theme.ts`. `mechanic/` is identical except two `letterSpacing`
-values (§3.6). `admin/` has the same file but most of its screens ignore it.
+All from `@main-mechanic/theme`'s `src/theme.ts` — one file, all three apps. `admin/` imports the
+same package but most of its screens ignore it (§5).
 
 ### 3.1 `colors` — the raw palette (Material-3-flavored naming)
 
@@ -192,6 +204,11 @@ xl 20 · xxl 24 · xxxl 32 · hero 48`; weights `400/500/600/700`). **Prefer the
 presets** — `FontWeight` alone does not select the matching Inter family, which is why some text
 renders in a different weight than intended.
 
+The `-0.96` / `-0.32` `letterSpacing` values above are now canonical **in the code, not just in
+this table** — `mechanic` and `admin` set both to `0` until Phase 4's theme extraction adopted
+`oficina`'s values platform-wide (`D-AL`). One file now enforces what this section always
+documented as correct.
+
 ### 3.5 Shadows
 
 `shadow.light` — offset `(0,4)`, opacity `.05`, radius 6, elevation 2
@@ -201,14 +218,7 @@ renders in a different weight than intended.
 `Shadow` alias: `sm → light`, `md → medium`, `lg → medium` (**`lg` is not actually larger than
 `md`**).
 
-### 3.6 Verified drift between apps
-
-`oficina/constants/theme.ts` sets `headlineXl.letterSpacing = -0.96` and
-`headlineLg.letterSpacing = -0.32`; `mechanic/` and `admin/` set both to `0`. Everything else in
-the file matches. Line endings also differ (CRLF vs mixed), so a naive full-file copy shows a
-whole-file diff — compare with `diff <(tr -d '\r' < a) <(tr -d '\r' < b)`.
-
-### 3.7 `LayoutMetrics`
+### 3.6 `LayoutMetrics`
 
 `tabBarHeight: 80 · tabBarBottomPadding: 0 · ctaHeight: 56 · ctaGapFromTabs: 12`
 Use these when positioning a floating CTA above the bottom tab bar, so it never collides.
@@ -470,8 +480,8 @@ term for each domain concept.
 
 1. **Change tokens, not literals.** If you find yourself typing a hex in a screen, add a token
    instead (`admin/` excepted only until it is migrated).
-2. **Three repos.** `oficina`, `mechanic`, `admin` each need the edit. State explicitly which repos
-   your change touched and keep the token files in sync (see §3.6 for the existing drift).
+2. **One package, one edit.** `packages/theme` is the single token source for all three apps
+   (§2) — there is no per-app copy left to keep in sync.
 3. **Know which generation you are in** before editing a component (§4). `spacing.md = 24` but
    `Spacing.md = 16`; getting this wrong silently changes every gap in the file.
 4. **`StyleSheet.create` at module scope is evaluated once.** Anything that must react to state or
@@ -516,14 +526,14 @@ term for each domain concept.
 
 | # | Issue | Impact | Fix size |
 |---|---|---|---|
-| 1 | 208 hard-coded hexes in `admin/` | Admin cannot be re-skinned from tokens | large |
+| 1 | 219 hard-coded hexes in `admin/` | Admin cannot be re-skinned from tokens | large |
 | 2 | Two component generations (`ui/` vs `app/`) with different tokens and base elements | Inconsistent buttons/cards; every change needs a "which one?" decision | large |
-| 3 | Three copy-pasted `theme.ts` files, already drifting (letterSpacing) | Apps diverge silently | medium (extract a shared package, or accept and document) |
-| 4 | `Colors.dark` is a copy of `Colors.light`; `useAppTheme` hard-locked to `'light'` while `app.json` says `"automatic"` | Dark mode is advertised but not delivered | large |
-| 5 | `spacing.sm (12) > spacing.base (8)` — non-monotonic scale | Easy to pick the wrong value | small (rename, but touches many files) |
-| 6 | `Shadow.lg === Shadow.md` | "large" shadow does nothing | trivial |
-| 7 | `secondary` (`#a83639`, a red) is aliased to `success` in `Colors` | A success state could render red | small |
-| 8 | Amber `nao_finalizado` pair hard-coded inside `statusTheme` | Escapes the token system | trivial |
+| 3 | ~~Three copy-pasted `theme.ts` files, already drifting (letterSpacing)~~ **Closed by Phase 4.** `@main-mechanic/theme` is the one file now; the letterSpacing drift this row described is the same instance §3.4 records as resolved (`D-AL`). | — | — |
+| 4 | `Colors.dark` is a copy of `Colors.light`; `useAppTheme` hard-locked to `'light'` while `app.json` says `"automatic"` | Dark mode is advertised but not delivered | large — **deliberately deferred by Phase 4 (`D-AW`, `D-AM`).** The file moved into `packages/theme` untouched; this row's premise did not change |
+| 5 | `spacing.sm (12) > spacing.base (8)` — non-monotonic scale | Easy to pick the wrong value | small in isolation, but the rename touches **201 occurrences in 29 files** — **deliberately deferred by Phase 4**, which named this exact number as the reason the extraction diff would become unreviewable if bundled with a fix |
+| 6 | `Shadow.lg === Shadow.md` | "large" shadow does nothing | trivial — **deliberately deferred by Phase 4 (`D-AM`).** Cosmetic, out of scope for the same reason as #4 and #8 |
+| 7 | ~~`secondary` (`#a83639`, a red) is aliased to `success` in `Colors`~~ **Closed by Phase 4 (`D-AX`).** A new green entered the raw palette; `Colors.success` now points at it. No other pixel moved. | — | — |
+| 8 | Amber `nao_finalizado` pair hard-coded inside `statusTheme` | Escapes the token system | trivial — **deliberately deferred by Phase 4 (`D-AM`).** Cosmetic, out of scope for the same reason as #4 and #6 |
 | 9 | `acabado` status color is a light grey used as *text* color | Poor contrast / near-invisible | small |
 | 10 | `TopAppBar` default title is `'Mechanic Pro'` | Wrong brand leaks into any screen that omits `title` | trivial |
 | 11 | Tab labels duplicated between `BottomNavBar` and `_layout.tsx`, already inconsistent ("Avisos" vs "Notificacoes") | Confusing labels | trivial |
@@ -531,9 +541,11 @@ term for each domain concept.
 | 13 | Duplicate components (`components/AppointmentCard.tsx` vs `components/ui/AppointmentCard.tsx`) | Edit the wrong one, see no change | small |
 | 14 | `PrimaryButton` / `AppButton` missing a11y props | Screen readers announce nothing useful | small |
 | 15 | Android adaptive-icon background `#E6F4FE` matches no palette color | Off-brand launcher icon | trivial |
-| 16 | Expo-template leftovers (`themed-text`, `themed-view`, `icon-symbol`, `collapsible`) | Dead weight, misleading | small |
+| 16 | ~~Expo-template leftovers (`themed-text`, `themed-view`, `icon-symbol`, `collapsible`)~~ **Closed by Phase 4**, as a side effect of `D-AO` (only `useAppTheme` travelled into the theme package; everything else on that seam, including these four, was deleted rather than moved). | — | — |
+| 17 | **Newly identified by Phase 4, nothing deleted here.** Tracing importers across both consumer apps while building `D-AO`'s 22-file deletion list found a much larger unreachable region than the theme seam exposed: **10 component files in `oficina`, 15 in `mechanic`**, unreachable from any screen. Shared by both apps: `AppointmentCard.tsx`, `MechanicCard.tsx`, `TimeSlotPicker.tsx`, `components/app/AppButton.tsx`, `components/app/ScreenContainer.tsx`, `components/ui/Avatar.tsx`, `components/ui/Button.tsx`, `components/ui/EmptyState.tsx`, `components/ui/Input.tsx` (9). `mechanic` additionally: `components/ui/AppointmentCard.tsx`, `components/ui/StatusBanner.tsx`, `components/ui/DateChip.tsx`, `components/ui/TimeSlotButton.tsx`, `components/ui/TopAppBar.tsx` (5). `components/ui/Badge` is transitively dead on top of those in both apps (imported only by the dead `AppointmentCard.tsx`). Only `ui/collapsible` (already counted in #16 / `D-AO`) was on the theme seam this phase touched — the rest is untouched. | Dead code inflates the two-generation confusion (#2) and the bundle | large — a component-inventory project of its own; sizing it is this row's contribution |
 
 ---
 
 *Maintenance: when a token, component or breakpoint changes, update this file in the same change.
-If this document and `constants/theme.ts` disagree, the code wins — and this document has a bug.*
+If this document and `packages/theme`'s `src/theme.ts` disagree, the code wins — and this document
+has a bug.*
